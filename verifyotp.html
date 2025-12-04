@@ -38,29 +38,25 @@
         return;
       }
 
-
-
       try {
-        // ✅ Relative path since HTML + API are on the same server (port 3000)
-        
-         // Verify OTP
-        fetch('/.netlify/functions/verify-otp', {
+        // ✅ Assign fetch result to res
+        const res = await fetch('/.netlify/functions/verify-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, otp, newPassword })
         });
-        //const res = await fetch('/api/verify-otp', {
-        //  method: 'POST',
-        //  headers: { 'Content-Type': 'application/json' },
-        //  body: JSON.stringify({ email, otp, newPassword })
-        //});
 
-        // Try to parse JSON response
-        const data = await res.json();
+        // Safely read response
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { error: text }; // fallback if response is plain text
+        }
 
         if (res.ok) {
-          output.textContent = data.message;
-          // Redirect after 2 seconds
+          output.textContent = data.message || "Password reset successful!";
           setTimeout(() => {
             window.location.href = "/index.html";
           }, 2000);
