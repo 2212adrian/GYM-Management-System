@@ -71,7 +71,14 @@
 
       try {
         // ✅ Call backend API route
-        const res = await fetch('/api/request-otp', {
+      //  const res = await fetch('/api/request-otp', {
+      //    method: 'POST',
+      //    headers: { 'Content-Type': 'application/json' },
+      //    body: JSON.stringify({ email })
+      //  });
+
+          // Request OTP
+        fetch('/.netlify/functions/request-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
@@ -135,6 +142,7 @@
         }, 1000);
       }
     });
+
   </script>
 </body>
 </html>

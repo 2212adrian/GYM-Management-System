@@ -38,13 +38,22 @@
         return;
       }
 
+
+
       try {
         // ✅ Relative path since HTML + API are on the same server (port 3000)
-        const res = await fetch('/api/verify-otp', {
+        
+         // Verify OTP
+        fetch('/.netlify/functions/verify-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, otp, newPassword })
         });
+        //const res = await fetch('/api/verify-otp', {
+        //  method: 'POST',
+        //  headers: { 'Content-Type': 'application/json' },
+        //  body: JSON.stringify({ email, otp, newPassword })
+        //});
 
         // Try to parse JSON response
         const data = await res.json();
