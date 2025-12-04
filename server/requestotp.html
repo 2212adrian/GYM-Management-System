@@ -1,48 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Request OTP</title>
-</head>
-<body>
-  <h2>Forgot Password</h2>
-  <input type="email" id="email" placeholder="Enter your email">
-  <button id="sendBtn">Send OTP</button>
-  <div id="output"></div>
+import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
-  <script>
-    document.getElementById('sendBtn').addEventListener('click', async () => {
-      const email = document.getElementById('email').value;
-      const output = document.getElementById('output');
+const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
+const serviceRoleKey = 'sb_secret_OdFToFL4d7I_O-XlbbGEew_FNH5sZQd';
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-      if (!email) {
-        output.textContent = "Enter your email!";
-        return;
-      }
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'adrianangeles2212@gmail.com',
+    pass: 'xksp onuk ncii uyue'
+  }
+});
 
-      try {
-        // ✅ Relative path, same origin (port 3000)
-        const res = await fetch('/api/request-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-        const data = await res.json();
+export async function handler(event, context) {
+  try {
+    const { email } = JSON.parse(event.body);
+    if (!email) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Email is required" }) };
+    }
 
-        if (res.ok) {
-          output.textContent = data.message;
-          setTimeout(() => {
-            window.location.href = `verifyotp.html?email=${encodeURIComponent(email)}`;
-          }, 2000);
-        } else {
-          output.textContent = data.error;
-        }
-      } catch (err) {
-        output.textContent = "Unexpected error: " + err.message;
-      }
+    const { data: { users }, error } = await supabase.auth.admin.listUsers();
+    if (error) {
+      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
+
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      return { statusCode: 404, body: JSON.stringify({ error: "User not found" }) };
+    }
+
+    const otp = generateOtp();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await supabase.from('password_reset_otp').insert([
+      { user_id: user.id, otp_code: otp, expires_at: expiresAt }
+    ]);
+
+    await transporter.sendMail({
+      from: '"Your App" <no-reply@example.com>',
+      to: email,
+      subject: 'Your OTP Code',
+      text: `Your OTP code is: ${otp} (expires in 5 minutes)`
     });
-  </script>
-</body>
-</html>
+
+    return { statusCode: 200, body: JSON.stringify({ message: "OTP sent to email!" }) };
+  } catch (err) {
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
+}
