@@ -1,4 +1,3 @@
-// netlify/functions/request-otp.js
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
@@ -12,7 +11,7 @@ const transporter = nodemailer.createTransport({
   secure: false,
   auth: {
     user: 'adrianangeles2212@gmail.com',
-    pass: 'xksp onuk ncii uyue' // Gmail App Password
+    pass: 'xksp onuk ncii uyue'
   }
 });
 
@@ -28,10 +27,14 @@ export async function handler(event, context) {
     }
 
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
-    if (error) return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    if (error) {
+      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
 
     const user = users.find(u => u.email === email);
-    if (!user) return { statusCode: 404, body: JSON.stringify({ error: "User not found" }) };
+    if (!user) {
+      return { statusCode: 404, body: JSON.stringify({ error: "User not found" }) };
+    }
 
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -44,7 +47,7 @@ export async function handler(event, context) {
       from: '"Your App" <no-reply@example.com>',
       to: email,
       subject: 'Your OTP Code',
-      text: `Hello!\n\nYour OTP code is: ${otp}\nIt expires in 5 minutes.\n\nIf you did not request this, ignore this email.`
+      text: `Your OTP code is: ${otp} (expires in 5 minutes)`
     });
 
     return { statusCode: 200, body: JSON.stringify({ message: "OTP sent to email!" }) };

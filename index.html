@@ -70,30 +70,29 @@
       }
 
       try {
-        // ✅ Call backend API route
-      //  const res = await fetch('/api/request-otp', {
-      //    method: 'POST',
-      //    headers: { 'Content-Type': 'application/json' },
-      //    body: JSON.stringify({ email })
-      //  });
-
-          // Request OTP
-        fetch('/.netlify/functions/request-otp', {
+        // ✅ Call Netlify Function endpoint and assign to res
+        const res = await fetch('/.netlify/functions/request-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
         });
 
-        const data = await res.json();
-
+        const text = await res.text();
+        let data;
+              
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { error: text }; // fallback if response is plain text
+        }
+        
         if (res.ok) {
-          resetOutput.textContent = data.message;
-          // Redirect to verify page after 2s with email as query param
+          resetOutput.textContent = data.message || "OTP sent!";
           setTimeout(() => {
             window.location.href = `verifyotp.html?email=${encodeURIComponent(email)}`;
           }, 2000);
         } else {
-          resetOutput.textContent = data.error;
+          resetOutput.textContent = data.error || "Something went wrong.";
         }
       } catch (err) {
         resetOutput.textContent = "Unexpected error: " + err.message;
@@ -142,7 +141,6 @@
         }, 1000);
       }
     });
-
   </script>
 </body>
 </html>
