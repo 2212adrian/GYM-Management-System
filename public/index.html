@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wolf OS - Palomar Gym Login</title>
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+
+  <!-- SUCCESS MODAL -->
+  <div id="successModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="success-icon"><i class='bx bx-check-circle'></i></div>
+        <h3>PASSWORD RESET</h3>
+        <p>Password updated successfully. Access granted to login console.</p>
+        <button id="closeModalBtn">RETURN TO LOGIN</button>
+    </div>
+  </div>
+
+  <div class="flip-card">
+    <div class="flip-card-inner" id="flipCardInner">
+
+      <!-- FRONT: LOGIN -->
+      <div class="flip-card-front">
+        <div class="brand">WOLF <span>PALOMAR</span></div>
+        <p class="system-subtitle">Gym Management System</p>
+        <div class="version">SECURE ACCESS V0.1.0</div>
+        
+        <form id="loginForm">
+          <label>Email Address</label>
+          <input type="email" id="email" placeholder="e.g: admin@wolfpalomar.com" required>
+          
+          <label>Password</label>
+          <input type="password" id="password" placeholder="••••••••" required>
+
+          <!-- NEW: AGREEMENT CHECKBOX -->
+          <div class="checkbox-group">
+            <input type="checkbox" id="loginAgreement" required>
+            <label for="loginAgreement" class="checkbox-label">
+                I agree to the security protocols and data privacy policy.
+            </label>
+          </div>
+
+          <button type="submit" id="loginBtn">AUTHORIZE ACCESS</button>
+        </form>
+
+        <a href="#" class="link-muted" id="forgotLink">Forgot System Password?</a>
+        <div id="loginOutput"></div>
+
+        <!-- NEW: FOOTER -->
+        <div class="auth-footer">
+            &copy; 2026 WOLF PALOMAR. All Rights Reserved.<br>
+            <span>Authorized Personnel Only.</span>
+        </div>
+      </div>
+
+
+      <!-- BACK: RECOVERY MODE -->
+      <div class="flip-card-back">
+        <div class="brand">RECOVERY <span>MODE</span></div>
+        <p class="system-subtitle">System Restoration Utility</p>
+
+        <div id="recoveryContainer" class="recovery-container">
+            <div id="recoveryStep1" class="recovery-step active-step">
+                <p class="desc">Wolf Palomar uses encrypted OTP verification. Enter your authorized email to begin.</p>
+                <form id="otpForm">
+                    <input type="email" id="forgotEmail" placeholder="Authorized Email" required>
+                    <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
+                </form>
+            </div>
+          
+            <div id="recoveryStep2" class="recovery-step">
+                <p class="desc">A 6-digit security key has been transmitted to your email. Enter it below to reconfigure access.</p>
+                <form id="verifyResetForm">
+                    <div class="otp-input-group">
+                        <input type="text" class="otp-field" maxlength="1">
+                        <input type="text" class="otp-field" maxlength="1">
+                        <input type="text" class="otp-field" maxlength="1">
+                        <input type="text" class="otp-field" maxlength="1">
+                        <input type="text" class="otp-field" maxlength="1">
+                        <input type="text" class="otp-field" maxlength="1">
+                    </div>
+                    <input type="password" id="newPassword" placeholder="New Access Password" required>
+                    <button type="submit" id="resetBtn">RESET SYSTEM PASSWORD</button>
+                    
+                    <div class="resend-wrap" style="text-align: center; margin-top: 15px;">
+                        <button type="button" id="resendOtpBtn" style="background:none; border:none; color: var(--wolf-red); font-size: 11px; cursor:pointer; font-weight: bold;">
+                            RESEND SECURITY CODE
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <a href="#" class="link-muted" id="backToLogin">Return to Login Console</a>
+        <div id="resetOutput"></div>
+
+        <div class="auth-footer">
+             &copy; 2026 WOLF PALOMAR. All Rights Reserved.<br>
+            <span>Only registered email addresses are valid.</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="assets/js/auth.js"></script>
+</body>
+</html>

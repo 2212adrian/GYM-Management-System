@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    
+    <!-- Styles -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <!-- Security Guard (Keep this first!) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/utils/auth-guard.js"></script> 
+    
+</head>
+<body class="bg-light">
+    
+    <div id="sidebar-backdrop"></div> <!-- Overlay for Blur Effect -->
+    <div id="topbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="container py-3" style="margin-bottom: 100px;">
+        
+        <div class="wolf-card"> <!-- REVENUE CARD -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.8rem; letter-spacing: 1px;">TOTAL NET REVENUE</div>
+                    <div style="font-size: 2.5rem; font-weight: 900; font-style: italic;">₱5,980</div>
+                    <div style="color: var(--accent-red); font-size: 0.8rem; font-weight: bold;">
+                        <i class='bx bx-trending-down'></i> 67.7% VS YESTERDAY
+                    </div>
+                </div>
+                <div style="background: #222; padding: 10px; border-radius: 12px; color: var(--accent-red); font-size: 24px;">
+                    <i class='bx bx-bar-chart-alt-2'></i>
+                </div>
+            </div>
+            
+            <hr style="border-color: #333; margin: 25px 0;">
+
+            <div class="row text-center">
+                <div class="col-6 border-end border-secondary">
+                    <div style="color: var(--text-muted); font-size: 0.7rem;">PRODUCTS</div>
+                    <div style="font-weight: bold;">₱5,900</div>
+                </div>
+                <div class="col-6">
+                    <div style="color: var(--text-muted); font-size: 0.7rem;">LOG FEES</div>
+                    <div style="font-weight: bold;">₱80</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cta-card-red mb-4"> <!-- BIG RED CTA -->
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 15px; font-size: 24px;">
+                    <i class='bx bx-grid-alt'></i>
+                </div>
+                <div>
+                    <div style="font-weight: 900; font-style: italic; font-size: 1.1rem;">SHOW ALL TABS</div>
+                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">INVENTORY, MEMBERS & TOOLS</div>
+                </div>
+            </div>
+            <i class='bx bx-right-arrow-alt' style="font-size: 32px;"></i>
+        </div>
+        
+        <div class="row g-3"> <!-- GRID STATS -->
+            <div class="col-6">
+                <div class="wolf-card text-center">
+                    <i class='bx bx-user-voice' style="color: var(--accent-red); font-size: 24px;"></i>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px;">ACTIVE MEMBER</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">4</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="wolf-card text-center">
+                    <i class='bx bx-pulse' style="color: #3b82f6; font-size: 24px;"></i>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px;">FLOOR TRAFFIC</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">2/30</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="nav-container"></div>
+    <script src="assets/js/utils/ui-loader.js"></script>
+</body>
+</html>
