@@ -1,11 +1,17 @@
 <style>
 .topbar {
-    height: 60px; background: #fff;
+    height: 60px;
     display: flex; align-items: center; justify-content: center;
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 1000; border-bottom: 1px solid #e0e0e0;
+    background: var(--card-bg) !important; /* Uses variable */
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.3s ease;
 }
-.brand-name { font-weight: 800; color: #2b3674; font-size: 1.2rem; letter-spacing: 1px; }
+.brand-name { font-weight: 800; color: var(--wolf-blue); font-size: 1.2rem; letter-spacing: 1px; }
+body.light-theme .brand-name {
+    color: #1a237e; 
+}
 .brand-name span { color: #a63429; }
 </style>
 

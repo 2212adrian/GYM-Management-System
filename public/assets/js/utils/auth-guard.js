@@ -1,47 +1,62 @@
-(function() {
-    // --- 1. THE ONLY-DASHBOARD RULE ---
-    const url = window.location.href.toLowerCase();
-    
-    // If the URL DOES NOT contain 'dashboard', kill the script immediately.
-    if (!url.includes('dashboard')) {
-        console.log("Wolf OS Guard: Not a protected page. Exiting.");
-        return; 
-    }
-
-    // --- 2. INITIALIZE SUPABASE ---
+(async function() {
+    // 1. Setup Supabase
     const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
     const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    async function checkAccess() {
-        console.log("Wolf OS Guard: Verifying credentials for Dashboard...");
+    // 2. Define our "One Path" system
+    const PATH_LOGIN = "/index.html";
+    const PATH_DASHBOARD = "dashboard.html";
+    const PATH_UNAUTHORIZED = "/pages/unauthorized.html";
+
+    // Detect where we are
+    const path = window.location.pathname;
+    const isLoginPage = path === "/" || path.endsWith("index.html");
+    const isProtectedPage = path.includes("dashboard.html");
+    const isUnauthorizedPage = path.includes("unauthorized.html");
+
+    async function evaluateSecurity() {
+        // Get session (Supabase "Cookie")
+        const { data: { session } } = await supabase.auth.getSession();
         
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Ensure we have a user, an email, and the admin role
+        const user = session?.user;
+        const hasAccess = user && user.email && user.user_metadata?.role === 'admin';
 
-        // A. No session? 
-        if (error || !session) {
-            console.error("Wolf OS Guard: No session found. Redirecting to Login.");
-            window.location.replace("pages/unauthorized.html");
+        // --- THE SIMPLE LOGIC ---
+
+        // 1. If I'm on Login and I have a session/email -> GO TO DASHBOARD
+        if (isLoginPage && hasAccess) {
+            console.log("Wolf OS: Admin detected. Forwarding to Dashboard...");
+            window.location.replace(PATH_DASHBOARD);
             return;
         }
 
-        // B. No Admin Role?
-        const role = session.user.user_metadata?.role;
-        if (role !== 'admin') {
-            console.error("Wolf OS Guard: Role is not Admin. Redirecting to Unauthorized.");
-            window.location.replace("pages/unauthorized.html");
+        // 2. If I'm on Dashboard and I DON'T have a session -> GO TO UNAUTHORIZED
+        if (isProtectedPage && !user) {
+            window.location.replace(PATH_UNAUTHORIZED);
             return;
         }
 
-        console.log("Wolf OS Guard: Welcome Admin.");
+        // 3. If I'm on Dashboard and I have a session but NO email/admin role -> GO TO UNAUTHORIZED
+        if (isProtectedPage && !hasAccess) {
+            window.location.replace(PATH_UNAUTHORIZED);
+            return;
+        }
+
+        console.log("Wolf OS Guard: System standing by.");
     }
 
-    checkAccess();
+    // Run immediately
+    await evaluateSecurity();
 
-    // Listen for logouts
-    supabase.auth.onAuthStateChange((event) => {
+    // Watch for state changes (Logout button or session expiry)
+    supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
-            window.location.replace("../index.html");
+            window.location.replace(PATH_LOGIN);
+        }
+        if (event === 'SIGNED_IN' && isLoginPage) {
+            evaluateSecurity(); // Re-run logic if they just logged in
         }
     });
 })();

@@ -9,12 +9,13 @@
     position: fixed;
     top: 0;
     height: 100vh;
-    background: var(--side-bg);
     z-index: 10000;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
     overflow: hidden; /* Vital to hide text when narrow */
+    background: var(--card-bg); /* Changed from #111 */
+    border-right: 1px solid var(--border-color);
 }
 
 /* 📱 MOBILE: Snap to RIGHT side */
@@ -104,7 +105,7 @@
 #sidebarClose {
     background: none;
     border: none;
-    color: #fff;
+    color: var(--text-muted);
     font-size: 28px; 
     cursor: pointer;
     transition: 0.2s;
@@ -112,22 +113,22 @@
     align-items: center;
 }
 #sidebarClose:hover {
-    color: #ccc;
+    color: black;
 }
 
 /* User Details */
-.user-name { font-weight: 800; font-size: 1.1rem; color: #fff; white-space: nowrap; }
-.user-email { font-size: 0.8rem; color: #888; white-space: nowrap; }
+.user-name { font-weight: 800; font-size: 1.1rem; color: var(--text-main); white-space: nowrap; }
+.user-email { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
 
 /* Target Box */
-.target-box { background: #1a1a1a; border-radius: 20px; padding: 20px; margin: 20px; transition: opacity 0.3s; }
-.progress-container { height: 6px; background: #333; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+.target-box { background: var(--bg-dark); border-radius: 20px; padding: 20px; margin: 20px; transition: opacity 0.3s; border: 1px solid var(--border-color); }
+.progress-container { height: 6px; background: var(--input-bg); border-radius: 10px; margin: 10px 0; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--accent-red); width: 85%; }
 
 /* Nav Links */
 .nav-list { flex-grow: 1; margin-top: 10px; }
-.nav-item-side { display: flex; align-items: center; gap: 15px; padding: 15px 25px; color: #ccc; text-decoration: none; font-weight: 600; font-size: 0.9rem; border-radius: 10px; white-space: nowrap; }
-.nav-item-side:hover { background: rgba(255,255,255,0.05); color: var(--accent-red); }
+.nav-item-side { display: flex; align-items: center; gap: 15px; padding: 15px 25px; color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; border-radius: 10px; white-space: nowrap; }
+.nav-item-side:hover { background: rgba(255,255,255,0.05); color: var(--border-color); }
 
 /* Disconnect Button */
 .btn-disconnect { color: var(--accent-red); font-weight: 900; padding: 20px 25px; position: relative; bottom: 60px; display: flex; align-items: center; gap: 15px; cursor: pointer; text-transform: uppercase; border-top: 1px solid #222; white-space: nowrap; }
@@ -139,6 +140,10 @@
             <i class='bx bx-chevron-left' id="closeIcon"></i>
         </button>
         <span class="label-gray">OS v0.1.0</span>
+        <a href="#" class="nav-item-side" id="themeToggleBtn">
+        <i class='bx bx-moon'></i> 
+        <span class="nav-text">THEME TOGGLE</span>
+    </a>
     </div>
 
     <!-- Wrapped text in .profile-area for hiding -->
@@ -158,6 +163,18 @@
     </div>
 
     <div class="nav-list">
+        <a href="#" class="nav-item-side" data-page="dashboard">
+            <i class='bx bx-home-alt'></i>
+            <span class="nav-text">HOME</span>
+        </a>
+        <a href="#" class="nav-item-side" data-page="sales">
+            <i class='bx bx-money-withdraw'></i>
+            <span class="nav-text">SALES</span>
+        </a>
+        <a href="#" class="nav-item-side" data-page="logbook">
+            <i class='bx bx-book-content'></i>
+            <span class="nav-text">LOGBOOK</span>
+        </a>
         <a href="#" class="nav-item-side">
             <i class='bx bx-cube'></i> 
             <span class="nav-text">MANAGEMENT</span>
