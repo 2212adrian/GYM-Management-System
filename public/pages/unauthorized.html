@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf OS - Access Restricted</title>
+    
+    <!-- Icons & Fonts -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #0f0f0f;
+            --wolf-red: #a63429;
+            --text-main: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .restriction-overlay {
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .lock-icon {
+            font-size: 80px;
+            color: var(--wolf-red);
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite;
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 2rem;
+            letter-spacing: 2px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        p {
+            color: #888;
+            font-size: 14px;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        .countdown-container {
+            margin-top: 40px;
+            font-weight: bold;
+            font-size: 12px;
+            color: var(--wolf-red);
+            letter-spacing: 2px;
+        }
+
+        #timer {
+            font-size: 18px;
+            display: block;
+            margin-top: 5px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="restriction-overlay">
+        <div class="lock-icon"><i class='bx bxs-shield-x'></i></div>
+        <h1>Access Restricted</h1>
+        <p>Unauthorized personnel detected. Credentials required.</p>
+
+        <div class="countdown-container">
+            SYSTEM REDIRECTING IN
+            <span id="timer">3 SECONDS</span>
+        </div>
+    </div>
+
+    <script>
+        let seconds = 5;
+        const timerDisplay = document.getElementById('timer');
+
+        // Update the visual countdown every second
+        const countdown = setInterval(() => {
+            seconds--;
+            timerDisplay.textContent = `${seconds} SECOND${seconds !== 1 ? 'S' : ''}`;
+            
+            if (seconds <= 0) {
+                clearInterval(countdown);
+            }
+        }, 1000);
+
+        // Perform the actual redirect
+        setTimeout(() => {
+            // Using replace to prevent them from hitting "Back" to see the restricted page
+            window.location.replace("/index.html");
+        }, 5000);
+    </script>
+</body>
+</html>

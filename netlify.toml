@@ -1,3 +1,13 @@
 [build]
-  publish = "."   # serve index.html from root
-  functions = "netlify/functions"  # where your functions live
+  # This tells Netlify to serve your HTML/CSS from the public folder
+  publish = "public"
+
+  # This tells Netlify where your backend functions are
+  functions = "netlify/functions"
+
+[dev]
+  # This ensures 'netlify dev' looks into the public folder locally
+  publish = "public"
+  
+  # The port your local server will run on
+  port = 8888

@@ -1,0 +1,105 @@
+<style>
+/* --- BASE NAV STYLES --- */
+.gcash-nav-container {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    width: 100%; height: 75px; 
+    background: #1a1a1a; /* Darker background to match image */
+    z-index: 1050;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.gcash-nav-content {
+    display: flex; justify-content: space-around; 
+    align-items: center; height: 100%;
+}
+
+ /* HIGHLIGHT STATE: When the sidebar is open */
+    .nav-item.sidebar-active {
+        color: #a63429 !important; /* Your Muted Red */
+        font-weight: bold;
+    }
+
+/* --- ICON MAPPING (Mobile Default) --- */
+.item-home    { order: 1; }
+.item-sales   { order: 2; }
+.item-qr      { order: 3; }
+.item-logbook { order: 4; }
+.item-more    { order: 5; }
+
+/* --- PC REDESIGN (SNAP) --- */
+@media (min-width: 768px) {
+    .gcash-nav-container {
+        bottom: 25px; left: 50%; right: auto; transform: translateX(-50%);
+        width: 520px; border-radius: 100px; height: 85px;
+        border: 1px solid #333; background: rgba(26, 26, 26, 0.95);
+        backdrop-filter: blur(10px);
+    }
+    /* ORDER: More > Home > Scan > Sales > Logbook */
+    .item-more    { order: 1 !important; }
+    .item-home    { order: 2 !important; }
+    .item-qr      { order: 3 !important; }
+    .item-sales   { order: 4 !important; }
+    .item-logbook { order: 5 !important; }
+}
+
+/* Individual Item Styling */
+.nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    color: #888; flex: 1; cursor: pointer; transition: 0.2s;
+    transition: color 0.3s ease;
+}
+.nav-item i { font-size: 26px; margin-bottom: 2px; }
+.nav-item span { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+
+/* Active/Home Color */
+.nav-item.active { color: var(--accent-red) !important;
+    font-weight: bold; } /* Wolf Red */
+    
+/* The Floating QR Button */
+.qr-wrapper { position: relative; width: 75px; display: flex; justify-content: center; }
+.qr-btn {
+    position: absolute; top: -45px;
+    width: 65px; height: 65px;
+    background: #a63429; /* Matched Red */
+    border-radius: 50%;
+    border: 6px solid #111; /* Dark ring separator */
+    color: white; font-size: 32px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 5px 20px rgba(166, 52, 41, 0.4);
+}
+</style>
+
+<nav class="gcash-nav-container shadow">
+    <div class="gcash-nav-content">
+        <!-- Home (Active) -->
+        <div class="nav-item active item-home" onclick="location.href='#'">
+            <i class='bx bx-home-alt'></i>
+            <span>HOME</span>
+        </div>
+
+        <!-- Sales -->
+        <div class="nav-item item-sales">
+            <i class='bx bx-shopping-bag'></i>
+            <span>SALES</span>
+        </div>
+
+        <!-- Scan (Center) -->
+        <div class="qr-wrapper item-qr">
+            <button class="qr-btn" id="qrScannerBtn">
+                <i class='bx bx-scan'></i>
+            </button>
+        </div>
+
+        <!-- Logbook -->
+        <div class="nav-item item-logbook">
+            <i class='bx bx-clipboard'></i>
+            <span>LOGBOOK</span>
+        </div>
+
+        <!-- More (Burger Icon) -->
+        <div class="nav-item item-more" id="moreNavBtn">
+            <i class='bx bx-menu'></i>
+            <span>MORE</span>
+        </div>
+    </div>
+</nav>

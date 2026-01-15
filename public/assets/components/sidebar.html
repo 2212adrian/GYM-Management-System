@@ -1,0 +1,179 @@
+<style>
+:root {
+    --side-bg: #111111;
+    --accent-red: #a63429;
+    --text-primary: #ffffff;
+}
+
+.sidebar-panel {
+    position: fixed;
+    top: 0;
+    height: 100vh;
+    background: var(--side-bg);
+    z-index: 10000;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Vital to hide text when narrow */
+}
+
+/* 📱 MOBILE: Snap to RIGHT side */
+@media (max-width: 767px) {
+    .sidebar-panel {
+        right: 0;
+        width: 85%;
+        max-width: 320px;
+        transform: translateX(100%);
+    }
+    .sidebar-panel.active { transform: translateX(0); }
+    .nav-text { opacity: 1 !important; visibility: visible !important; } 
+    .sidebar-header {
+        flex-direction: row; /* [Button] [Text] */
+    }
+}
+
+/* 💻 PC: Snap to LEFT side */
+@media (min-width: 768px) {
+    /* Fixed: added the '.' before sidebar-panel */
+    .sidebar-panel {
+        left: 0;
+        /* THE "MINI" STATE (Icons only) */
+        width: 80px; 
+        transform: translateX(0); /* Always visible */
+        border-right: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* THE "EXPANDED" STATE */
+    .sidebar-panel.active {
+        width: 280px;
+    }
+
+    /* Hide text/boxes when NOT active (mini mode) */
+    .sidebar-panel:not(.active) .nav-text,
+    .sidebar-panel:not(.active) .profile-area,
+    .sidebar-panel:not(.active) .target-box,
+    .sidebar-panel:not(.active) .label-gray {
+        opacity: 0;
+        visibility: hidden;
+        white-space: nowrap;
+    }
+    
+    .nav-text { transition: opacity 0.2s; }
+    
+    .sidebar-header {
+        flex-direction: row-reverse; /* [Text] [Button] */
+    }
+
+    .nav-item-side i, .btn-disconnect i, #sidebarClose i {
+        transition: font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s;
+        min-width: 30px;
+        width: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* 2. RAIL MODE: Icons are LARGE (No text visible) */
+    .sidebar-panel:not(.active) .nav-item-side i,
+    .sidebar-panel:not(.active) .btn-disconnect i {
+        font-size: 38px !important; 
+    }
+
+    /* 3. FULL MODE: Icons shrink SMALLER (To match the text) */
+    .sidebar-panel.active .nav-item-side i,
+    .sidebar-panel.active .btn-disconnect i {
+        font-size: 22px !important;
+    }
+}
+
+/* 🔓 ACTIVE STATE: Shows the sidebar */
+.sidebar-panel.active {
+    transform: translateX(0) !important;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+#sidebarClose {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 28px; 
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+}
+#sidebarClose:hover {
+    color: #ccc;
+}
+
+/* User Details */
+.user-name { font-weight: 800; font-size: 1.1rem; color: #fff; white-space: nowrap; }
+.user-email { font-size: 0.8rem; color: #888; white-space: nowrap; }
+
+/* Target Box */
+.target-box { background: #1a1a1a; border-radius: 20px; padding: 20px; margin: 20px; transition: opacity 0.3s; }
+.progress-container { height: 6px; background: #333; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent-red); width: 85%; }
+
+/* Nav Links */
+.nav-list { flex-grow: 1; margin-top: 10px; }
+.nav-item-side { display: flex; align-items: center; gap: 15px; padding: 15px 25px; color: #ccc; text-decoration: none; font-weight: 600; font-size: 0.9rem; border-radius: 10px; white-space: nowrap; }
+.nav-item-side:hover { background: rgba(255,255,255,0.05); color: var(--accent-red); }
+
+/* Disconnect Button */
+.btn-disconnect { color: var(--accent-red); font-weight: 800; padding: 20px 25px; display: flex; align-items: center; gap: 15px; cursor: pointer; text-transform: uppercase; border-top: 1px solid #222; white-space: nowrap; }
+</style>
+
+<div class="sidebar-panel" id="wolfSidebar">
+    <div class="sidebar-header">
+        <button id="sidebarClose">
+            <i class='bx bx-chevron-left' id="closeIcon"></i>
+        </button>
+        <span class="label-gray">OS v0.1.0</span>
+    </div>
+
+    <!-- Wrapped text in .profile-area for hiding -->
+    <div class="profile-area" style="padding: 0 20px; transition: opacity 0.3s;">
+        <div class="user-name">PALOMAR ADMIN</div>
+        <div class="user-email">admin@palomargym.com</div>
+    </div>
+
+    <div class="target-box shadow">
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #888;">
+            <span>TODAY TARGET</span> <b style="color:#fff">100%</b>
+        </div>
+        <div class="progress-container"><div class="progress-fill"></div></div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #666;">
+            <span>REACHED</span> <b style="color:#fff">₱5,980 / ₱5,000</b>
+        </div>
+    </div>
+
+    <div class="nav-list">
+        <a href="#" class="nav-item-side">
+            <i class='bx bx-cube'></i> 
+            <span class="nav-text">MANAGEMENT</span>
+        </a>
+        <a href="#" class="nav-item-side">
+            <i class='bx bx-pulse'></i> 
+            <span class="nav-text">SYSTEM AUDIT</span>
+        </a>
+        <a href="#" class="nav-item-side">
+            <i class='bx bx-cog'></i> 
+            <span class="nav-text">ACCOUNT SETTINGS</span>
+        </a>
+    </div>
+
+    <div class="btn-disconnect" id="disconnectBtn">
+        <i class='bx bx-log-out-circle'></i> 
+        <span class="nav-text">DISCONNECT</span>
+    </div>
+</div>

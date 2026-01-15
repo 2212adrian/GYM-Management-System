@@ -1,0 +1,77 @@
+ body { background-color: #f4f7f6; padding-top: 60px; }
+
+    #sidebar-backdrop {
+    position: fixed;
+    top: 0; 
+    left: 0;
+    width: 100vw; 
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5); /* Essential for blur to show up */
+    backdrop-filter: blur(10px) !important; 
+    -webkit-backdrop-filter: blur(10px) !important; 
+    z-index: 9999; /* Set this LOWER than your sidebar */
+    
+    /* Use these for smooth transitions */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+
+    /* Add this class to handle the toggle */
+    #sidebar-backdrop.active {
+        display: block !important;
+        opacity: 1 !important;
+        /* Force hardware acceleration for the blur */
+        transform: translateZ(0);
+        visibility: visible;
+    }
+
+    /* Prevent sidebar overlap on PC */
+    @media (min-width: 768px) {
+    #sidebar-backdrop {
+        display: none !important;
+    }
+    main {
+        /* Use calc to ensure we don't overflow */
+        width: auto;
+        margin-left: 80px; 
+        transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 40px 20px; /* Reduced side padding slightly for more room */
+    }
+
+    /* Ensure the Topbar also shifts with the sidebar on PC */
+    #topbar-container {
+        margin-left: 80px;
+        transition: margin-left 0.4s ease;
+    }
+    body.sidebar-open #topbar-container {
+        margin-left: 280px;
+    }
+    }
+
+    /* Adjust for mobile navbar height */
+    @media (max-width: 767px) {
+        #sidebar-backdrop.active {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+         main { padding: 20px; padding-bottom: 100px; }
+         #sidebar-backdrop.active {
+            opacity: 1;
+            visibility: visible;
+        }
+    }
+
+    /* --- FIX FOR THE RED CTA CARD --- */
+    .cta-card-red {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: nowrap; /* Prevents the arrow from dropping to the next line */
+        min-height: 80px;
+    }
+
+    /* Ensure inner text doesn't shrink to zero */
+    .cta-card-red div {
+        min-width: 0; 
+    }
