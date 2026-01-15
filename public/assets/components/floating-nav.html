@@ -3,9 +3,10 @@
 .gcash-nav-container {
     position: fixed; bottom: 0; left: 0; right: 0;
     width: 100%; height: 75px; 
-    background: #1a1a1a; /* Darker background to match image */
+    background: var(--card-bg) !important; /* Swaps #1a1a1a for variable */
+    border-top: 1px solid var(--border-color);
+    transition: background 0.3s ease;
     z-index: 1050;
-    border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .gcash-nav-content {
@@ -34,6 +35,9 @@
         border: 1px solid #333; background: rgba(26, 26, 26, 0.95);
         backdrop-filter: blur(10px);
     }
+    .nav-item:hover:not(.active) {
+        color: #bbb;
+    }
     /* ORDER: More > Home > Scan > Sales > Logbook */
     .item-more    { order: 1 !important; }
     .item-home    { order: 2 !important; }
@@ -49,12 +53,24 @@
     transition: color 0.3s ease;
 }
 .nav-item i { font-size: 26px; margin-bottom: 2px; }
-.nav-item span { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.nav-item span { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--text-muted); }
+
+.nav-item.active span, .nav-item.active i {
+    color: var(--accent-red) !important;
+}
 
 /* Active/Home Color */
-.nav-item.active { color: var(--accent-red) !important;
-    font-weight: bold; } /* Wolf Red */
-    
+/* Active state for Bottom Nav links */
+.nav-item.active {
+    color: var(--accent-red) !important;
+    transform: translateY(-3px);
+}
+
+/* Specific state for the MORE button when sidebar is open */
+.nav-item#moreNavBtn.sidebar-active {
+    color: var(--accent-red) !important;
+}
+
 /* The Floating QR Button */
 .qr-wrapper { position: relative; width: 75px; display: flex; justify-content: center; }
 .qr-btn {
@@ -62,7 +78,7 @@
     width: 65px; height: 65px;
     background: #a63429; /* Matched Red */
     border-radius: 50%;
-    border: 6px solid #111; /* Dark ring separator */
+    border: 6px solid var(--bg-dark) !important;
     color: white; font-size: 32px;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 5px 20px rgba(166, 52, 41, 0.4);
@@ -71,16 +87,16 @@
 
 <nav class="gcash-nav-container shadow">
     <div class="gcash-nav-content">
-        <!-- Home (Active) -->
-        <div class="nav-item active item-home" onclick="location.href='#'">
-            <i class='bx bx-home-alt'></i>
-            <span>HOME</span>
+        <!-- More (Burger Icon) - Triggers Sidebar -->
+        <div class="nav-item item-more" id="moreNavBtn">
+            <i class='bx bx-menu' id="navMoreIcon"></i>
+            <span>MORE</span>
         </div>
 
-        <!-- Sales -->
-        <div class="nav-item item-sales">
-            <i class='bx bx-shopping-bag'></i>
-            <span>SALES</span>
+        <!-- Home (AJAX) -->
+        <div class="nav-item item-home active" data-page="dashboard">
+            <i class='bx bx-home-alt'></i>
+            <span>HOME</span>
         </div>
 
         <!-- Scan (Center) -->
@@ -90,16 +106,16 @@
             </button>
         </div>
 
-        <!-- Logbook -->
-        <div class="nav-item item-logbook">
-            <i class='bx bx-clipboard'></i>
-            <span>LOGBOOK</span>
+        <!-- Sales (AJAX) -->
+        <div class="nav-item item-sales" data-page="sales">
+            <i class='bx bx-shopping-bag'></i>
+            <span>SALES</span>
         </div>
 
-        <!-- More (Burger Icon) -->
-        <div class="nav-item item-more" id="moreNavBtn">
-            <i class='bx bx-menu'></i>
-            <span>MORE</span>
+        <!-- Logbook (AJAX) -->
+        <div class="nav-item item-logbook" data-page="logbook">
+            <i class='bx bx-clipboard'></i>
+            <span>LOGBOOK</span>
         </div>
     </div>
 </nav>

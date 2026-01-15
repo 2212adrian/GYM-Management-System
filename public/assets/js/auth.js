@@ -1,12 +1,3 @@
-// --- 0. REDIRECT IF ALREADY AUTHENTICATED ---
-async function checkAuth() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session && session.user.user_metadata.role === 'admin') {
-        window.location.replace("pages/dashboard.html");
-    }
-}
-checkAuth();
-
 // --- 1. INITIALIZE SUPABASE ---
 const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
 const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT';
