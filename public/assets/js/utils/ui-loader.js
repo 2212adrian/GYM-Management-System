@@ -21,17 +21,24 @@ async function initUI() {
     const backdrop = document.getElementById('sidebar-backdrop');
     const moreBtn = document.getElementById('moreNavBtn'); 
     const closeBtn = document.getElementById('sidebarClose'); 
-    const disconnectBtn = document.getElementById('disconnectBtn');
 
-    // 3. LOGOUT / DISCONNECT LOGIC
-    if (disconnectBtn) {
-        disconnectBtn.onclick = async () => {
+    // 3. LOGOUT / DISCONNECT LOGIC (Multi-device support)
+    const logoutButtons = document.querySelectorAll('.logout-btn');
+    
+    logoutButtons.forEach(btn => {
+        btn.onclick = async (e) => {
+            e.preventDefault();
+            
+            // Visual feedback
+            const originalText = btn.textContent;
+            btn.textContent = "DISCONNECTING...";
+            btn.style.opacity = "0.5";
+
             const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
             const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT';
             const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
             try {
-                console.log("Disconnecting from Wolf OS...");
                 await supabase.auth.signOut();
                 localStorage.clear();
                 sessionStorage.clear();
@@ -41,7 +48,7 @@ async function initUI() {
                 window.location.replace("/index.html");
             }
         };
-    }
+    });
 
     // 4. CLEAN SIDEBAR TOGGLE LOGIC
     const toggleSidebar = () => {
