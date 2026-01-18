@@ -215,7 +215,7 @@ button:hover:not(:disabled) { background: #8e2a22; transform: translateY(-2px); 
 }
 .link-muted { color: var(--text-muted); text-decoration: none; font-size: 13px; margin-top: 25px; text-align: center; transition: 0.3s; }
 .link-muted:hover { color: #fff; }
-#loginOutput, #resetOutput { font-size: 12px; margin-top: 20px; text-align: center; font-weight: bold; top: 100px; position: relative; }
+#loginOutput, #resetOutput { font-size: 12px; text-align: center; font-weight: bold; bottom: 115px; position: relative; }
 
 /* ===========================================
    MOBILE RESPONSIVE DESIGN (Appropriate Fix)
