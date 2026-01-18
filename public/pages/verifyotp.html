@@ -15,8 +15,8 @@
     <div id="successModal" class="modal-overlay">
         <div class="modal-content">
             <div class="success-icon"><i class='bx bx-check-circle'></i></div>
-            <h3>SYSTEM RESTORED</h3>
-            <p>Password updated successfully. Access granted to login console.</p>
+            <h3>NEW PASSWORD SUCCESS</h3>
+            <p>Password updated successfully. Re-enter new password on login page.</p>
             <button id="closeModalBtn">RETURN TO LOGIN</button>
         </div>
     </div>
@@ -59,17 +59,17 @@
 
                         <form id="verifyResetForm">
                             <div class="otp-input-group">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
-                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" class="otp-field" maxlength="1" inputmode="numeric" pattern="[0-9]">
                             </div>
                             <input type="password" id="newPassword" placeholder="Enter your new password" required>
-                            <button type="submit" id="resetBtn">RESTORE SYSTEM ACCESS</button>
+                            <button type="submit" id="resetBtn">CHANGE PASSWORD</button>
                         </form>
-                    
+                        <div id="resetOutput"></div>
                         <!-- NOTICE BOX FOR OTP -->
                         <div class="protocol-notice-box secure-blue">
                             <div class="notice-header">
@@ -79,15 +79,12 @@
                             <div class="notice-body">
                                 Enter the 6-digit code sent to your email. This is Step 2 of password recovery - verify the code first, then enter your new password below to complete the reset.
                             </div>
+                            <div class="resend-wrap">
+                            </div>
                         </div>
-
+                        <a href="#" id="resendOtpBtn" style="color: var(--wolf-red); font-size: 11px; text-decoration: none; font-weight: bold; position: static;">RESEND SECURITY CODE</a>
                         <!-- MOVED HERE: Below blue notice box -->
                         <a href="#" class="link-muted" id="backToLoginTriggerSecondary">Already have an account?</a>
-
-                        <div class="resend-wrap">
-                            <a href="#" id="resendOtpBtn" style="color: var(--wolf-red); font-size: 11px; text-decoration: none; font-weight: bold; position: static;">RESEND SECURITY CODE</a>
-                            <div id="resetOutput"></div>
-                        </div>
                     </div>
                 </div>
                 
@@ -99,5 +96,21 @@
     </div>
 
     <script src="assets/js/auth.js"></script>
+    <script>
+document.querySelectorAll('.otp-field').forEach(input => {
+    input.addEventListener('input', () => {
+        // Remove anything that's not 0–9
+        input.value = input.value.replace(/[^0-9]/g, '');
+    });
+
+    input.addEventListener('paste', e => {
+        e.preventDefault();
+        const paste = (e.clipboardData || window.clipboardData)
+            .getData('text')
+            .replace(/[^0-9]/g, '');
+        input.value = paste.charAt(0) || '';
+    });
+});
+</script>
 </body>
 </html>

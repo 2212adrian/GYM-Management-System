@@ -17,6 +17,45 @@ body.light-theme {
   --border-color: rgba(0, 0, 0, 0.1);
   --input-bg: #eeeeee;
 }
+/* Styling for the Mute Toggle state */
+#muteToggleBtn {
+    position: absolute;
+    right: 190px;
+    top: 29.5px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--input-bg); 
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-weight: 800; 
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
+}
+
+/* If muted, make the button slightly more transparent (industrial look) */
+body:has(#muteToggleBtn i.bx-volume-mute) #muteToggleBtn {
+    opacity: 0.6;
+}
+
+#muteToggleBtn:hover {
+    opacity: 1 !important;
+    background: var(--border-color);
+}
+
+/* Ensure the red active highlight doesn't stay on utility toggles */
+#themeToggleBtn.active, #muteToggleBtn.active {
+    background: transparent !important;
+    color: var(--text-muted) !important;
+}
 
 /* --- GLOBAL STYLES --- */
 body { 

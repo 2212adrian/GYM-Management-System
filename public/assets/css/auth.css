@@ -107,6 +107,8 @@ button {
   cursor: pointer;
   font-size: 14px;
   transition: 0.3s;
+  margin-top: 10px;
+
 }
 
 button:disabled {
@@ -118,6 +120,57 @@ button:disabled {
 }
 
 button:hover:not(:disabled) { background: #8e2a22; transform: translateY(-2px); }
+
+.resend-wrap {
+    position: relative;
+    top: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.btn-resend {
+    background: transparent;
+    border: 1px solid rgba(166, 52, 41, 0.4); /* Muted Wolf Red border */
+    color: #888;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+}
+
+.btn-resend i {
+    font-size: 16px;
+    color: var(--wolf-red);
+}
+
+.btn-resend:hover {
+    border-color: var(--wolf-red);
+    color: #fff;
+    background: rgba(166, 52, 41, 0.05);
+    box-shadow: 0 0 15px rgba(166, 52, 41, 0.2);
+}
+
+/* --- DISABLED / COOLDOWN STATE --- */
+.btn-resend:disabled {
+    border-color: #222 !important;
+    color: #444 !important;
+    background: transparent !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-resend:disabled i {
+    color: #333;
+}
 
 /* --- MODAL --- */
 .modal-overlay {
@@ -215,8 +268,8 @@ button:hover:not(:disabled) { background: #8e2a22; transform: translateY(-2px); 
 }
 .link-muted { color: var(--text-muted); text-decoration: none; font-size: 13px; margin-top: 25px; text-align: center; transition: 0.3s; }
 .link-muted:hover { color: #fff; }
-#loginOutput, #resetOutput { font-size: 12px; text-align: center; font-weight: bold; bottom: 115px; position: relative; }
-
+#resetOutput { font-size: 12px; text-align: center; font-weight: bold; top: 10px; position: relative; color: var(--wolf-red); }
+#loginOutput { font-size: 12px; text-align: center; font-weight: bold; position: relative; color: var(--wolf-red); bottom: 118px;}
 /* ===========================================
    MOBILE RESPONSIVE DESIGN (Appropriate Fix)
    =========================================== */
