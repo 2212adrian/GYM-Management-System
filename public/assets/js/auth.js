@@ -8,6 +8,38 @@ const MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MINUTES = 5; // Set to 1 for your testing
 const OTP_COOLDOWN_SECONDS = 60; 
 
+// --- DYNAMIC STAR GENERATOR ---
+function createStars() {
+    const container = document.getElementById('starContainer');
+    if (!container) return;
+
+    for (let i = 0; i < 30; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        
+        // Random Position
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        
+        // Random Size
+        const size = Math.random() * 3 + 1;
+        
+        // Random Delay & Duration
+        const delay = Math.random() * 5;
+        const duration = Math.random() * 3 + 2;
+
+        star.style.left = `${x}%`;
+        star.style.top = `${y}%`;
+        star.style.width = `${size}px`;
+        star.style.height = `${size}px`;
+        star.style.animationDelay = `${delay}s`;
+        star.style.animationDuration = `${duration}s`;
+
+        container.appendChild(star);
+    }
+}
+createStars();
+
 document.addEventListener('DOMContentLoaded', async () => {
     // --- UI ELEMENTS ---
     const inner = document.getElementById('flipCardInner');
@@ -239,7 +271,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else if (data.user.user_metadata.role === 'admin') {
                 await supabaseClient.from('login_attempts').delete().eq('ip_address', userIP);
-                window.location.replace("/pages/main.html");
+                
+                // Trigger outro animation before redirect
+                const container = document.querySelector('.auth-split-container');
+                const card = document.querySelector('.flip-card');
+                if (container) container.classList.add('outro');
+                if (card) card.classList.add('outro');
+                
+                // Wait for animation to complete then redirect
+                setTimeout(() => {
+                    window.location.replace("/pages/main.html");
+                }, 2000);
             } else {
                 loginOutput.textContent = "[ERR_102] Unauthorized administrative role.";
                 await supabaseClient.auth.signOut();

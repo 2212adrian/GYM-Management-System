@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/utils/system-config.js"></script> <!-- CONFIG FIRST -->
+  <script src="assets/js/utils/system-config.js"></script>
   <script src="assets/js/utils/auth-guard.js"></script>
   <link rel="stylesheet" href="assets/css/auth.css">
 </head>
@@ -23,80 +23,86 @@
     </div>
   </div>
 
-  <div class="flip-card">
-    <div class="flip-card-inner" id="flipCardInner">
+  <!-- NEW: SPLIT CONTAINER WRAPPER -->
+  <div class="auth-split-container">
+    
+    <!-- LEFT SIDE: LOGIN & STAR EFFECT -->
+    <div class="auth-left" id="starContainer">
+        <!-- The card is pushed slightly right using CSS flex/margins -->
+        <div class="flip-card">
+            <div class="flip-card-inner" id="flipCardInner">
+                <!-- FRONT: LOGIN -->
+                <div class="flip-card-front">
+                    <div class="brand">WOLF <span>PALOMAR</span></div>
+                    <p class="system-subtitle">Gym Management System</p>
+                    <div class="version sys-version"></div>
+                    
+                    <form id="loginForm">
+                        <label>Administrative Email</label>
+                        <input type="email" id="email" placeholder="admin@wolfpalomar.com" required>
+                        <label>Access Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
 
-      <!-- FRONT: LOGIN -->
-      <div class="flip-card-front">
-        <div class="brand">WOLF <span>PALOMAR</span></div>
-        <p class="system-subtitle">Gym Management System</p>
-        <div class="version sys-version"></div> <!-- AUTO LOADED -->
-        
-        <form id="loginForm">
-          <label>Email Address</label>
-          <input type="email" id="email" placeholder="e.g: admin@wolfpalomar.com" required>
-          <label>Password</label>
-          <input type="password" id="password" placeholder="••••••••" required>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="loginAgreement" checked>
+                            <label for="loginAgreement" class="checkbox-label">I acknowledge the security protocol.</label>
+                        </div>
 
-          <div class="checkbox-group">
-            <input type="checkbox" id="loginAgreement" required>
-            <label for="loginAgreement" class="checkbox-label">
-                I agree to the security protocols and data privacy policy.
-            </label>
-          </div>
+                        <button type="submit" id="loginBtn">AUTHORIZE ACCESS</button>
+                    </form>
 
-          <button type="submit" id="loginBtn">AUTHORIZE ACCESS</button>
-        </form>
+                    <a href="#" class="link-muted" id="forgotLink">System Recovery</a>
+                    <div id="loginOutput"></div>
 
-        <a href="#" class="link-muted" id="forgotLink">Forgot System Password?</a>
-        <div id="loginOutput"></div>
-
-        <div class="auth-footer">
-            <div class="sys-copyright"></div> <!-- AUTO LOADED -->
-            <span>Authorized Personnel Only.</span>
-        </div>
-      </div>
-
-      <!-- BACK: RECOVERY MODE -->
-      <div class="flip-card-back">
-        <div class="brand">RECOVERY <span>MODE</span></div>
-        <p class="system-subtitle">System Restoration Utility</p>
-
-        <div id="recoveryContainer" class="recovery-container">
-            <div id="recoveryStep1" class="recovery-step active-step">
-                <p class="desc">Wolf Palomar uses encrypted OTP verification. Enter authorized email.</p>
-                <form id="otpForm">
-                    <input type="email" id="forgotEmail" placeholder="Authorized Email" required>
-                    <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
-                </form>
-            </div>
-          
-            <div id="recoveryStep2" class="recovery-step">
-                <p class="desc">Enter 6-digit security key transmitted to your email.</p>
-                <form id="verifyResetForm">
-                    <div class="otp-input-group">
-                        <input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1">
+                    <div class="auth-footer">
+                        <div class="sys-copyright"></div>
                     </div>
-                    <input type="password" id="newPassword" placeholder="New Access Password" required>
-                    <button type="submit" id="resetBtn">RESET SYSTEM PASSWORD</button>
-                    <div class="resend-wrap" style="text-align: center; margin-top: 15px;">
-                        <button type="button" id="resendOtpBtn" style="background:none; border:none; color: var(--wolf-red); font-size: 11px; cursor:pointer; font-weight: bold;">RESEND SECURITY CODE</button>
+                </div>
+
+                <!-- BACK: RECOVERY -->
+                <div class="flip-card-back">
+                    <div class="brand">RECOVERY <span>MODE</span></div>
+                    <div id="recoveryContainer" class="recovery-container">
+                        <div id="recoveryStep1" class="recovery-step active-step">
+                            <p class="desc">Enter authorized email to receive security key.</p>
+                            <form id="otpForm">
+                                <input type="email" id="forgotEmail" placeholder="Email Address" required>
+                                <button type="submit" id="sendOtpBtn">SEND OTP</button>
+                            </form>
+                        </div>
+                        <div id="recoveryStep2" class="recovery-step">
+                            <p class="desc">Enter 6-digit key to reset password.</p>
+                            <form id="verifyResetForm">
+                                <div class="otp-input-group">
+                                    <input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1"><input type="text" class="otp-field" maxlength="1">
+                                </div>
+                                <input type="password" id="newPassword" placeholder="New Password" required>
+                                <button type="submit" id="resetBtn">RESTORE SYSTEM</button>
+                            </form>
+                        </div>
                     </div>
-                </form>
+                    <a href="#" class="link-muted" id="backToLogin">Return to Login</a>
+                </div>
             </div>
         </div>
-
-        <a href="#" class="link-muted" id="backToLogin">Return to Login Console</a>
-        <div id="resetOutput"></div>
-
-        <div class="auth-footer">
-             <div class="sys-copyright"></div> <!-- AUTO LOADED -->
-            <span>Only registered email addresses are valid.</span>
-        </div>
-      </div>
-
     </div>
-  </div>
+
+    <!-- RIGHT SIDE: LOOPING IMAGE CAROUSEL -->
+    <div class="auth-right">
+        <div class="carousel-bg-wrapper">
+            <!-- These loop automatically via CSS -->
+            <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070')"></div>
+            <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=2070')"></div>
+            <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=2070')"></div>
+        </div>
+        <div class="carousel-overlay"></div>
+        <div class="carousel-content">
+            <h2>Beyond <br> <span>Strength</span></h2>
+            <p>The ultimate terminal for Palomar Gym administrative control. Encrypted, fast, and precise.</p>
+            <div class="sys-name watermark"></div>
+        </div>
+    </div>
+</div>
 
   <script src="assets/js/auth.js"></script>
 </body>

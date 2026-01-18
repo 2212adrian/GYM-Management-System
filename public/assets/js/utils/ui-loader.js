@@ -1,5 +1,5 @@
 /**
- * WOLF OS - UI LOADER & NAVIGATION ENGINE
+ * WOLF OS - UI LOADER (main.html) & NAVIGATION ENGINE
  * Handles AJAX page swapping, component injection, and UI state synchronization.
  */
 
@@ -30,6 +30,37 @@ const themeManager = {
 
 // Initialize theme immediately to prevent "white flash"
 themeManager.init();
+
+// --- STAR GENERATOR FOR LOADING ---
+function createLoadingStars() {
+    const container = document.getElementById('stars-container');
+    if (!container) return;
+
+    for (let i = 0; i < 50; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        
+        // Random Position
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        
+        // Random Size
+        const size = Math.random() * 4 + 1;
+        
+        // Random Delay & Duration
+        const delay = Math.random() * 3;
+        const duration = Math.random() * 2 + 2;
+
+        star.style.left = `${x}%`;
+        star.style.top = `${y}%`;
+        star.style.width = `${size}px`;
+        star.style.height = `${size}px`;
+        star.style.animationDelay = `${delay}s`;
+        star.style.animationDuration = `${duration}s`;
+
+        container.appendChild(star);
+    }
+}
 
 // --- 1. CORE UTILS ---
 async function loadComponent(id, path) {
@@ -116,7 +147,17 @@ async function navigateTo(pageName) {
             // --- THE 404 PROTOCOL: Fetch your actual 404.html design ---
             console.warn(`Wolf OS: Protocol ${pageName} fault. Loading 404 UI.`);
             const errRes = await fetch('/404.html');
-            html = await errRes.text();
+            const fullHtml = await errRes.text();
+            
+            // Extract just the body content and include styles inline for proper rendering
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(fullHtml, 'text/html');
+            const bodyContent = doc.body.innerHTML;
+            const styleContent = doc.head.querySelector('style')?.innerHTML || '';
+            
+            // Wrap content with inline styles
+            html = `<style>${styleContent}</style>${bodyContent}`;
+            
             // Clear highlights since we are in a fault state
             pageName = null; 
         } else {
@@ -128,6 +169,23 @@ async function navigateTo(pageName) {
             mainContent.innerHTML = html;
             mainContent.style.opacity = '1';
             updateNavHighlights(pageName);
+        }, 200);
+
+        setTimeout(() => {
+            mainContent.innerHTML = html;
+            mainContent.style.opacity = '1';
+
+            // --- DATA TRIGGER ---
+            if (pageName === 'logbook') {
+                wolfData.loadLogbook();
+                setTimeout(() => wolfData.loadLogbook(), 100);
+            } else if (pageName === 'sales') {
+                wolfData.loadSales();
+                setTimeout(() => wolfData.loadSales(), 100);
+            }
+            
+
+            window.applyVersioning();
         }, 200);
 
         // 3. Update URL if valid page
@@ -152,6 +210,17 @@ async function loadHTML(path) {
 
 async function initUI() {
     themeManager.init();
+
+    // Start loading sequence
+    createLoadingStars();
+
+    // Show stars for 2 seconds, then transition to loading screen
+    setTimeout(() => {
+        // Hide stars and show loading screen immediately
+        document.getElementById('stars-container').style.display = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        document.getElementById('loading-screen').classList.add('show');
+    }, 2000);
 
     try {
         // 1. Load Components
@@ -228,8 +297,21 @@ async function initUI() {
         const urlParams = new URLSearchParams(window.location.search);
         await navigateTo(urlParams.get('p') || 'dashboard');
 
+        // 4. Fade out loading overlay after everything is loaded (minimum 2s total)
+        setTimeout(() => {
+            document.getElementById('loading-overlay').classList.add('fade-out');
+            setTimeout(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 500);
+        }, 2000);
+
     } catch (err) {
         console.error("Wolf OS Boot Error:", err);
+        // Hide loading overlay on error
+        document.getElementById('loading-overlay').classList.add('fade-out');
+        setTimeout(() => {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }, 500);
     }
 }
 
