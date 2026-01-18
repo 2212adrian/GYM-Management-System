@@ -3,69 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Main Panel - Wolf OS</title>
+    <title>Wolf OS - Terminal</title>
     
-    <!-- Styles -->
+    <!-- CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="/assets/css/main.css">
 
-    <!-- Security Guard (Always First) -->
-     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-     <script>
-window.WOLF_INTERNAL_SHELL = true;
-</script>
-
+    <!-- Frameworks -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Shell Security & Config -->
+    <script>window.WOLF_INTERNAL_SHELL = true;</script>
+    <script src="/assets/js/utils/system-config.js"></script>
     <script src="/assets/js/utils/auth-guard.js"></script> 
-     <style>
-        /* Smooth transition for the content swap */
+
+    <style>
         .htmx-fade-in.htmx-added { opacity: 0; }
         .htmx-fade-in { opacity: 1; transition: opacity 0.3s ease-out; }
-        
-        /* Default state: Hide everything until we know it's a shell */
-        #main-content { min-height: 500px; }
     </style>
 </head>
 <body id="wolf-terminal">
     
-    <!-- Background Elements -->
     <div id="sidebar-backdrop"></div> 
-
-    <!-- Components Containers -->
     <div id="topbar-container"></div>
     <div id="sidebar-container"></div>
 
-    <!-- AJAX INJECTION POINT -->
     <div id="wolf-layout">
-        <!-- Column 1: Sidebar Space -->
         <div id="sidebar-container"></div>
-
-        <!-- Column 2: Content Space -->
-        <main id="main-content" class="htmx-fade-in">
-        <div class="brand" style="text-align:center; padding-top:100px;">WOLF <span>OS</span></div>
-        <div id="page-wrapper">
-                <!-- AJAX Content Slapped Here -->
+        <main id="main-content">
+            <!-- DEFAULT WELCOME SCREEN -->
+             <div class="version sys-full-version" style="color:var(--text-muted); font-size:10px; letter-spacing:2px; margin-top:5px;"></div>
+                
+                <p style="margin-top:30px; color:#444; font-size:12px; font-weight:bold; letter-spacing:1px;">
+                    SYSTEM READY. AUTHORIZED ACCESS ONLY.
+                </p>
+             <div class="brand brand-container">WOLF <span>PALOMAR</span></div>
+            <div id="page-wrapper" style="text-align:center; padding-top:150px;">
+                <!-- Using brand-container to protect your CSS span styling -->
+                 <!-- DO NOT ADD ANYTHING-->
             </div>
-    </main>
+            
+        </main>
     </div>
-    <!-- Navigation Bar -->
-    <div id="nav-container">
-        <button hx-get="/pages/logbook.html" hx-target="#main-content" hx-push-url="true">LOGBOOK</button>
-        <button hx-get="/pages/sales.html" hx-target="#main-content" hx-push-url="true">SALES</button>
-    </div>
-    
 
-    <!-- UI Logic Engine -->
+    <div id="nav-container"></div>
+
+    <!-- UI Logic -->
     <script src="/assets/js/utils/ui-loader.js"></script>
+
+    <!-- Internal Security (Direct Access Redirect) -->
     <script>
-(function () {
-    if (!window.WOLF_INTERNAL_SHELL) {
-        document.documentElement.style.display = 'none';
-        window.location.replace('/pages/main.html?p=logbook');
-    }
-})();
-</script>
+    (function () {
+        if (!window.WOLF_INTERNAL_SHELL) {
+            document.documentElement.style.display = 'none';
+            window.location.replace('/index.html');
+        }
+    })();
+    </script>
+
+    <!-- "Ghost" Footer (Versioning) -->
+    <footer style="position:fixed; bottom:12px; width:100%; text-align:center; font-size:9px; color:#222; pointer-events:none; z-index:1; text-transform:uppercase; letter-spacing:1px;">
+        <span class="sys-copyright"></span> | <span class="sys-version"></span>
+    </footer>
 
 </body>
 </html>

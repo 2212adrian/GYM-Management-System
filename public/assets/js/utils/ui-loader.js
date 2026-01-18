@@ -33,6 +33,7 @@ themeManager.init();
 
 // --- 1. CORE UTILS ---
 async function loadComponent(id, path) {
+    if (window.applySystemConfig) window.applySystemConfig(); // Apply system config if available
     const el = document.getElementById(id);
     if (!el) return;
     try {
@@ -217,6 +218,10 @@ async function initUI() {
                 const mobileMoreIcon = document.getElementById('navMoreIcon');
                 if (isMobile && mobileMoreIcon) mobileMoreIcon.className = isActive ? 'bx bx-x' : 'bx bx-menu';
             }
+            // E. Re-apply Versioning after component loads
+            if (typeof window.applyVersioning === 'function') {
+            window.applyVersioning();
+        }
         });
 
         // 3. LOAD INITIAL PAGE
