@@ -1,114 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wolf OS - Palomar Gym Login</title>
-  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/utils/auth-guard.js"></script>
-  <link rel="stylesheet" href="assets/css/auth.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf OS - Login Terminal</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/utils/system-config.js"></script>
+    <link rel="stylesheet" href="assets/css/auth.css">
 </head>
 <body>
 
-  <!-- SUCCESS MODAL -->
-  <div id="successModal" class="modal-overlay">
-    <div class="modal-content">
-        <div class="success-icon"><i class='bx bx-check-circle'></i></div>
-        <h3>PASSWORD RESET</h3>
-        <p>Password updated successfully. Access granted to login console.</p>
-        <button id="closeModalBtn">RETURN TO LOGIN</button>
-    </div>
-  </div>
-
-  <div class="flip-card">
-    <div class="flip-card-inner" id="flipCardInner">
-
-      <!-- FRONT: LOGIN -->
-      <div class="flip-card-front">
-        <div class="brand">WOLF <span>PALOMAR</span></div>
-        <p class="system-subtitle">Gym Management System</p>
-        <div class="version">SECURE ACCESS V0.1.0</div>
-        
-        <form id="loginForm">
-          <label>Email Address</label>
-          <input type="email" id="email" placeholder="e.g: admin@wolfpalomar.com" required>
-          
-          <label>Password</label>
-          <input type="password" id="password" placeholder="••••••••" required>
-
-          <!-- NEW: AGREEMENT CHECKBOX -->
-          <div class="checkbox-group">
-            <input type="checkbox" id="loginAgreement" required>
-            <label for="loginAgreement" class="checkbox-label">
-                I agree to the security protocols and data privacy policy.
-            </label>
-          </div>
-
-          <button type="submit" id="loginBtn">AUTHORIZE ACCESS</button>
-        </form>
-
-        <a href="#" class="link-muted" id="forgotLink">Forgot System Password?</a>
-        <div id="loginOutput"></div>
-
-        <!-- NEW: FOOTER -->
-        <div class="auth-footer">
-            &copy; 2026 WOLF PALOMAR. All Rights Reserved.<br>
-            <span>Authorized Personnel Only.</span>
+    <!-- SUCCESS MODAL -->
+    <div id="successModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="success-icon animate-check"><i class='bx bx-check-circle'></i></div>
+            <h3>SYSTEM RESTORED</h3>
+            <p>Access granted to login console.</p>
+            <button id="closeModalBtn">RETURN TO LOGIN</button>
         </div>
-      </div>
+    </div>
 
-
-      <!-- BACK: RECOVERY MODE -->
-      <div class="flip-card-back">
-        <div class="brand">RECOVERY <span>MODE</span></div>
-        <p class="system-subtitle">System Restoration Utility</p>
-
-        <div id="recoveryContainer" class="recovery-container">
-            <div id="recoveryStep1" class="recovery-step active-step">
-                <p class="desc">Wolf Palomar uses encrypted OTP verification. Enter your authorized email to begin.</p>
-                <form id="otpForm">
-                    <input type="email" id="forgotEmail" placeholder="Authorized Email" required>
-                    <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
-                </form>
+    <!-- EXIT CONFIRMATION MODAL -->
+    <div id="confirmExitModal" class="modal-overlay">
+        <div class="modal-content warning-modal">
+            <!-- Keep only one icon for a clean look -->
+            <div class="success-icon animate-pulse-red">
+                <i class='bx bx-shield-quarter'></i>
             </div>
-          
-            <div id="recoveryStep2" class="recovery-step">
-                <p class="desc">A 6-digit security key has been transmitted to your email. Enter it below to reconfigure access.</p>
-                <form id="verifyResetForm">
-                    <div class="otp-input-group">
-                        <input type="text" class="otp-field" maxlength="1">
-                        <input type="text" class="otp-field" maxlength="1">
-                        <input type="text" class="otp-field" maxlength="1">
-                        <input type="text" class="otp-field" maxlength="1">
-                        <input type="text" class="otp-field" maxlength="1">
-                        <input type="text" class="otp-field" maxlength="1">
-                    </div>
-                    <input type="password" id="newPassword" placeholder="New Access Password" required>
-                    <button type="submit" id="resetBtn">RESET SYSTEM PASSWORD</button>
+            <h3>ABANDON RECOVERY?</h3>
+            <p>If you return to the login screen, you will need to wait 1 minute before requesting a new security code. Are you sure you want to leave?</p>
+
+            <div class="modal-btn-group">
+                <button id="cancelExitBtn">NO, KEEP VERIFYING</button>
+                <button id="confirmExitBtn" class="btn-secondary">YES, GO BACK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-split-container">
+        <!-- LEFT: LOGIN & STARS -->
+        <div class="auth-left" id="starContainer">
+            <div class="flip-card">
+                <div class="flip-card-inner" id="flipCardInner">
                     
-                    <div class="resend-wrap" style="text-align: center; margin-top: 15px;">
-                        <button type="button" id="resendOtpBtn" style="background:none; border:none; color: var(--wolf-red); font-size: 11px; cursor:pointer; font-weight: bold;">
-                            RESEND SECURITY CODE
-                        </button>
+                    <!-- FRONT: LOGIN -->
+                    <div class="flip-card-front">
+                        <div class="brand">WOLF <span>PALOMAR</span></div>
+                        <p class="system-subtitle">Gym Management System</p>
+                        <div class="version sys-version"></div>
+
+                        <form id="loginForm">
+                            <!-- REFINED LABELS -->
+                            <label><i class='bx bx-id-card'></i> Administrative Email</label>
+                            <input type="email" id="email" placeholder="admin@wolfpalomar.com" required>
+
+                            <label><i class='bx bx-lock-alt'></i> Access Password</label>
+                            <input type="password" id="password" placeholder="••••••••" required>
+                        
+                           
+                          
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="loginAgreement" checked>
+                                <label for="loginAgreement" class="checkbox-label">I acknowledge the security protocol.</label>
+                            </div>
+                          
+                            <button type="submit" id="loginBtn">LOGIN NOW</button>
+                        </form>
+                      
+                        <a href="#" class="link-muted" id="forgotLink">Forgot password?</a>
+                        <div id="loginOutput"></div>
+                        
+                        
+                            <div class="protocol-notice-box login-notice" style="margin-top: -10px;">
+                                <div class="notice-header">
+                                    <i class='bx bx-shield-quarter'></i>
+                                    <span>ACCESS PROTOCOL</span>
+                                </div>
+                                <div class="notice-body">
+                                    This terminal is exclusively for authorized staff members including trainers and coaches, as well as family members with administrative privileges. Access requires valid credentials and proper authorization.
+                                </div>
+                            </div>
+
+                        <div class="auth-footer">
+                            <div class="sys-copyright"></div>
+                        </div>
                     </div>
-                </form>
+
+                    <div class="flip-card-back">
+                        <div class="brand">RECOVERY <span>MODE</span></div>
+                        <div id="recoveryContainer">
+                            <!-- STEP 1: INITIAL VIEW -->
+                            <div id="recoveryStep1" class="active-step">
+                                <p class="desc">Enter authorized email to receive security key.</p>
+                                <form id="otpForm">
+                                    <input type="email" id="forgotEmail" placeholder="Email Address" required>
+                                    <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
+                                </form>
+                                
+                                <!-- NOTICE BOX -->
+                                <div class="protocol-notice-box">
+                                    <div class="notice-header"><i class='bx bx-info-circle'></i><span>SYSTEM PROTOCOL</span></div>
+                                    <div class="notice-body">Recovery Mode sends a secure OTP (One-Time Password) to your registered email address. This is used to request password changes and restore access to your account.</div>
+                                </div>
+
+                                <!-- MOVED HERE: Below notice box -->
+                                <a href="#" class="link-muted" id="backToLoginTrigger">Already have an account?</a>
+
+                                <div class="auth-footer">
+                                    <div class="sys-copyright"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="resetOutput"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <a href="#" class="link-muted" id="backToLogin">Return to Login Console</a>
-        <div id="resetOutput"></div>
-
-        <div class="auth-footer">
-             &copy; 2026 WOLF PALOMAR. All Rights Reserved.<br>
-            <span>Only registered email addresses are valid.</span>
+        <!-- RIGHT: CAROUSEL & TYPEWRITER -->
+        <div class="auth-right">
+            <div class="carousel-bg-wrapper">
+                <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070')"></div>
+                <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=2070')"></div>
+            </div>
+            <div class="carousel-overlay"></div>
+            <div class="carousel-content">
+                <h2 id="typewriterText">Beyond <br> <span>Strength</span></h2>
+                
+                <div class="description-expandable-container" id="descContainer">
+                    <p class="expandable-text">
+                        The ultimate terminal for Palomar Gym administrative control. Encrypted, fast, and precise.
+                        <span class="extra-content">
+                            Wolf OS provides end-to-end telemetry for modern fitness centers. 
+                            Managing membership lifecycles, financial encryption, and real-time 
+                            staff coordination through a high-velocity industrial interface.
+                        </span>
+                    </p>
+                    <div class="expand-hint">CLICK TO EXPAND PROTOCOL</div>
+                </div>
+                <div class="sys-name watermark"></div>
+            </div>
         </div>
-      </div>
-
     </div>
-  </div>
 
-  <script src="assets/js/auth.js"></script>
+    <script src="assets/js/auth.js"></script>
 </body>
 </html>

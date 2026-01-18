@@ -1,95 +1,30 @@
-<script src="/assets/js/utils/gatekeeper.js"></script><!-- INTERNAL VIEW GUARD -->
-<!-- LOGBOOK VIEW CONTENT -->
+<div class="page-wrapper" id="page-wrapper">
 <div class="page-top-actions">
     <div class="brand">GYM <span>LOGBOOK</span></div>
     <div class="action-icons">
-        <button class="icon-btn" title="Clear Records">
-            <i class='bx bx-trash'></i>
-        </button>
-        <button class="icon-btn" title="Fullscreen">
-            <i class='bx bx-fullscreen'></i>
-        </button>
+        <button class="icon-btn" title="Clear Records"><i class='bx bx-trash'></i></button>
+        <button class="icon-btn" title="Fullscreen"><i class='bx bx-fullscreen'></i></button>
     </div>
 </div>
 
 <div class="summary-container">
     <div class="summary-card">
-        <label>Friday Floor Revenue</label>
-        <div class="value">₱80</div>
+        <!-- ID added for dynamic day and value -->
+        <label id="logbook-summary-label">Floor Revenue</label>
+        <div class="value" id="logbook-total-revenue">₱0</div>
     </div>
 </div>
 
-<div class="day-selector">
-    <button class="day-btn">SUN</button>
-    <button class="day-btn">MON</button>
-    <button class="day-btn">TUE</button>
-    <button class="day-btn">WED</button>
-    <button class="day-btn">THU</button>
-    <button class="day-btn active">FRI</button>
-    <button class="day-btn">SAT</button>
+<div class="day-selector" id="logbook-day-picker">
+    <button class="day-btn" data-day="0">SUN</button>
+    <button class="day-btn" data-day="1">MON</button>
+    <button class="day-btn" data-day="2">TUE</button>
+    <button class="day-btn" data-day="3">WED</button>
+    <button class="day-btn" data-day="4">THU</button>
+    <button class="day-btn" data-day="5">FRI</button>
+    <button class="day-btn" data-day="6">SAT</button>
 </div>
 
-<!-- ENTRY: MEMBER -->
-<div class="list-item-card">
-    <div class="card-header">
-        <div class="status-icon">
-            <i class='bx bx-check'></i>
-        </div>
-
-        <div class="item-info">
-            <h4>Juan Dela Cruz</h4>
-            <div class="sub">Monthly Membership</div>
-            <div class="time">IN: 08:00 AM</div>
-        </div>
-
-        <div class="card-actions">
-            <span class="badge-paid">PAID</span>
-            <i class='bx bx-refresh action-small' title="Refresh"></i>
-            <i class='bx bx-trash action-small' title="Delete"></i>
-        </div>
-    </div>
-
-    <div class="card-details">
-        <div class="detail-group">
-            <label>Entry Fee</label>
-            <div class="val">₱0</div>
-        </div>
-
-        <div class="detail-group" style="text-align:right;">
-            <label>Session End</label>
-            <div class="val" style="font-size:0.9rem;">10:00 AM</div>
-        </div>
-    </div>
-
-    <button class="re-open-btn">
-        <i class='bx bx-undo'></i> Re-open Session
-    </button>
-</div>
-
-<!-- ENTRY: WALK-IN -->
-<div class="list-item-card">
-    <div class="card-header">
-        <div class="status-icon active">
-            <i class='bx bx-time-five'></i>
-        </div>
-
-        <div class="item-info">
-            <h4>Pedro Penduko</h4>
-            <div class="sub">Regular (Non-Member)</div>
-            <div class="time">IN: 09:30 AM</div>
-        </div>
-
-        <div class="card-actions">
-            <span class="badge-paid">PAID</span>
-            <i class='bx bx-refresh action-small' title="Refresh"></i>
-            <i class='bx bx-trash action-small' title="Delete"></i>
-        </div>
-    </div>
-
-    <div class="card-details">
-        <div class="detail-group">
-            <label>Entry Fee</label>
-            <div class="val">₱80</div>
-        </div>
-    </div>
+<!-- Container for Dynamic Cards -->
+<div id="logbook-list-container"></div>
 </div>

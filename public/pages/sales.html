@@ -1,49 +1,46 @@
 <script src="/assets/js/utils/gatekeeper.js"></script><!-- INTERNAL VIEW GUARD -->
 <script src="/assets/js/utils/auth-guard.js"></script> 
+
 <div class="page-wrapper" id="page-wrapper">
+    <!-- HEADER ACTIONS -->
     <div class="page-top-actions">
         <div class="brand" style="font-size: 1.5rem; font-weight: 900;">SALES</div>
         <div class="action-icons">
-            <button class="icon-btn"><i class='bx bx-trash'></i></button>
-            <button class="icon-btn red"><i class='bx bx-plus'></i></button>
+            <button class="icon-btn" title="Clear Day Records"><i class='bx bx-trash'></i></button>
+            <button class="icon-btn red" title="New Transaction"><i class='bx bx-plus'></i></button>
         </div>
     </div>
     
+    <!-- DYNAMIC SUMMARY CARD -->
     <div class="summary-container">
         <div class="summary-card shadow-sm">
-            <label style="font-size: 10px; color: #666; text-transform: uppercase; font-weight: 800;">Fri Total Income</label>
-            <div class="value" style="font-size: 1.8rem; font-weight: 900; font-style: italic; color: #fff;">₱5,900</div>
+            <label id="sales-summary-label" style="font-size: 10px; color: #666; text-transform: uppercase; font-weight: 800;">Income Summary</label>
+            <div class="value" id="sales-total-amount" style="font-size: 1.8rem; font-weight: 900; font-style: italic; color: #fff;">₱0</div>
         </div>
     </div>
     
-    <div class="day-selector">
-        <button class="day-btn">SUN</button>
-        <button class="day-btn">MON</button>
-        <button class="day-btn">TUE</button>
-        <button class="day-btn">WED</button>
-        <button class="day-btn">THU</button>
-        <button class="day-btn active">FRI</button>
-        <button class="day-btn">SAT</button>
+    <!-- DAY SELECTOR -->
+    <div class="day-selector" id="sales-day-picker">
+        <button class="day-btn" data-day="0">SUN</button>
+        <button class="day-btn" data-day="1">MON</button>
+        <button class="day-btn" data-day="2">TUE</button>
+        <button class="day-btn" data-day="3">WED</button>
+        <button class="day-btn" data-day="4">THU</button>
+        <button class="day-btn" data-day="5">FRI</button>
+        <button class="day-btn" data-day="6">SAT</button>
     </div>
     
-    <!-- Search Input -->
+    <!-- LIVE SEARCH -->
     <div class="filter-container mb-4" style="background: #111; border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; gap: 10px;">
         <i class='bx bx-search' style="color: #444;"></i>
-        <input type="text" placeholder="Search sales history..." style="background: none; border: none; color: #fff; width: 100%; outline: none; font-size: 14px;">
+        <input type="text" id="sales-search" placeholder="Search product or reference..." style="background: none; border: none; color: #fff; width: 100%; outline: none; font-size: 14px;">
     </div>
     
-    <!-- ITEM CARD -->
-    <div class="list-item-card" style="padding: 15px 20px;">
-        <div class="card-header">
-            <div class="status-icon" style="background: #222; padding: 10px; border-radius: 12px; color: var(--accent-red);"><i class='bx bx-shopping-bag'></i></div>
-            <div class="item-info">
-                <h4 style="font-weight: 800;">Whey Protein (1kg)</h4>
-                <div class="time" style="font-size: 11px; color: #555;">08:00 AM • x2 Units</div>
-            </div>
-            <div class="card-actions">
-                <div style="color: var(--accent-red); font-weight: 900; font-style: italic; font-size: 1.1rem;">₱2,500</div>
-                <i class='bx bx-trash' style="color: #333; cursor: pointer; font-size: 18px;"></i>
-            </div>
+    <!-- DATA INJECTION POINT (Moved inside wrapper) -->
+    <div id="sales-list-container" style="min-height: 200px;">
+        <!-- Real data from Supabase will be injected here -->
+        <div class="text-center p-5" style="opacity: 0.2;">
+            <i class='bx bx-loader-alt bx-spin' style="font-size: 2rem;"></i>
         </div>
     </div>
 </div>

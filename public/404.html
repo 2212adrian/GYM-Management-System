@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wolf OS - ERR_404</title>
+    <title>Wolf OS - SYSTEM_FAULT_404</title>
     
-    <!-- CDNs -->
+    <!-- Boxicons for the recovery icon -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 
@@ -14,120 +14,168 @@
             --bg-dark: #0f0f0f;
             --wolf-red: #a63429;
             --text-main: #ffffff;
-            --text-muted: #444444;
+            --text-muted: #888888;
         }
 
-        body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        .error-page-container {
+            width: 100%;
+            height: 100%;
+            min-height: 60vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            position: relative;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
         }
 
-        .error-container {
+        /* THE BIG SAD FACE IN BACKGROUND */
+        .background-face {
+            position: absolute;
+            font-size: 30vw;
+            color: var(--wolf-red);
+            opacity: 0.03;
+            user-select: none;
+            pointer-events: none;
+            z-index: 0;
+            font-weight: 900;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .error-wrapper {
+            position: relative;
+            z-index: 10;
             text-align: center;
-            max-width: 400px;
             padding: 20px;
         }
 
-        .error-code {
-            font-size: 120px;
-            font-weight: 900;
-            color: var(--wolf-red);
-            margin: 0;
-            line-height: 1;
-            letter-spacing: -5px;
-            position: relative;
+        .error-header {
             display: inline-block;
-        }
-
-        /* Subtle Glitch Effect */
-        .error-code::before {
-            content: '404';
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            color: #fff;
-            opacity: 0.1;
-            transform: translate(-2px, 2px);
-        }
-
-        h1 {
-            font-weight: 900;
-            font-size: 1.2rem;
-            letter-spacing: 3px;
-            margin-top: 20px;
-            text-transform: uppercase;
-            color: var(--text-main);
-        }
-
-        .sys-message {
-            color: var(--text-muted);
-            font-size: 12px;
-            margin-top: 10px;
-            letter-spacing: 1px;
-            line-height: 1.6;
-            text-transform: uppercase;
-        }
-
-        .btn-console {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: none;
-            border: 1px solid var(--wolf-red);
-            color: var(--wolf-red);
-            padding: 12px 25px;
-            border-radius: 8px;
-            margin-top: 40px;
-            font-weight: bold;
-            font-size: 12px;
-            text-decoration: none;
-            transition: 0.3s;
-            letter-spacing: 1px;
-        }
-
-        .btn-console:hover {
             background: var(--wolf-red);
             color: white;
-            box-shadow: 0 0 20px rgba(166, 52, 41, 0.4);
+            padding: 5px 15px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            border-radius: 4px;
         }
 
-        .footer-logo {
-            position: fixed;
-            bottom: 30px;
-            font-size: 10px;
-            color: #222;
-            letter-spacing: 5px;
+        .huge-404 {
+            font-size: 8rem;
             font-weight: 900;
+            line-height: 0.8;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 20px rgba(166, 52, 41, 0.4));
+        }
+
+        .fault-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+
+        .fault-title span { color: var(--wolf-red); }
+
+        .description {
+            color: var(--text-muted);
+            max-width: 400px;
+            margin: 0 auto 40px auto;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .tech-info {
+            font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 15px;
+            display: inline-block;
+            text-align: left;
+            border-radius: 8px;
+            margin-bottom: 40px;
+        }
+
+        .tech-info p { font-size: 11px; color: #555; margin-bottom: 5px; }
+        .tech-info p span { color: var(--wolf-red); font-weight: bold; }
+
+        .btn-recovery {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--wolf-red);
+            color: white;
+            padding: 16px 35px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .btn-recovery:hover {
+            transform: translateY(-5px);
+            filter: brightness(1.2);
+        }
+
+        .system-footer {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: var(--text-muted);
+            letter-spacing: 3px;
+            font-weight: 800;
+            text-transform: uppercase;
+            z-index: 2;
         }
     </style>
 </head>
 <body>
 
-    <div class="error-container">
-        <div class="error-code">404</div>
-        <h1>SYSTEM_FAULT</h1>
-        <p class="sys-message">
-            [ERR_503] Directory linkage failed.<br>
-            The requested console path does not exist in the Wolf OS database.
+    <div class="background-face">:(</div>
+
+    <div class="error-wrapper">
+        <div class="error-header">CRITICAL_EXCEPTION_DETECTED</div>
+        
+        <h1 class="huge-404">404</h1>
+        
+        <h2 class="fault-title">SYSTEM <span>LINK_FAULT</span></h2>
+        
+        <p class="description">
+            Looks like this page got lost in the digital void! It might have been moved, removed, or there could be a little glitch in the system.
         </p>
 
-        <a href="/index.html" class="btn-console">
-            <i class='bx bx-terminal'></i> RETURN TO CONSOLE
+        <div class="tech-info">
+            <p>STATUS: <span>OFFLINE</span></p>
+            <!-- Fixed ID for the script to target -->
+            <p>LOC_ID: <span id="display-path">/detecting...</span></p>
+            <p>PROTOCOL: <span>RESTRICTED_ACCESS</span></p>
+        </div>
+
+        <br>
+
+        <a href="/index.html" class="btn-recovery">
+            <i class='bx bx-refresh'></i> Initiate Recovery
         </a>
     </div>
 
-    <div class="footer-logo">WOLF PALOMAR SYSTEMS</div>
+    <div class="system-footer">WOLF PALOMAR GYM MANAGEMENT SYSTEMS</div>
 
     <script>
-        // Automatic logging for your Netlify Analytics
-        console.error("Wolf OS: Route Fault Detected. Redirecting user options...");
+        // THIS FIXES THE PATH DISPLAY
+        document.getElementById('display-path').textContent = window.location.pathname;
     </script>
 </body>
 </html>
