@@ -26,7 +26,7 @@ body {
 }
 
 main {
-    display: flex;
+    display: block;
     justify-content: center; /* THE MAGIC: Flex centering inside a Grid cell */
     align-items: flex-start;
     padding: 80px 20px 120px 20px;
@@ -130,22 +130,48 @@ body.sidebar-open #wolf-layout {
         margin-left: 280px;
     }
 }
-/* Adjust for mobile navbar height */
+/* --- MOBILE RESPONSIVENESS --- */
 @media (max-width: 767px) {
-        #sidebar-backdrop.active {
-        opacity: 1 !important;
-        visibility: visible !important;
+    /* 1. Kill the Grid Columns on Mobile so 'main' stays full width */
+    #wolf-layout {
+        display: block !important; /* Change from Grid to Block */
+        grid-template-columns: none !important;
+        width: 100% !important;
+        transition: none !important; /* Remove the 0.4s movement */
     }
-        main {
+
+    /* 2. Prevent the body from reacting to the .sidebar-open class on Mobile */
+    body.sidebar-open #wolf-layout {
+        grid-template-columns: none !important;
+    }
+
+    body {
+        padding-left: 0 !important; /* Ensure body doesn't shift */
+    }
+
+    /* 3. Ensure the Main content area is static and full width */
+    main {
         margin-left: 0 !important;
+        width: 100% !important;
         padding: 80px 15px 100px 15px;
+        transition: none !important; /* Remove any margin/padding animations */
+        transform: none !important;
     }
-        #sidebar-backdrop.active {
-            opacity: 1;
-            visibility: visible;
+
+    /* 4. Fix Topbar positioning so it doesn't jump */
+    #topbar-container {
+        margin-left: 0 !important;
+        width: 100% !important;
+        transition: none !important;
+    }
+
+    /* 5. Ensure the sidebar is truly an overlay (floating above everything) */
+    .sidebar-panel {
+        position: fixed !important;
+        z-index: 10000 !important;
+        /* Ensure it doesn't push the layout */
     }
 }
-
 .cta-card-red {
         display: flex;
         align-items: center;
