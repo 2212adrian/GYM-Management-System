@@ -70,58 +70,6 @@ function updateNavHighlights(pageName) {
     });
 }
 
-async function navigateTo(pageName) {
-    const mainContent = document.getElementById('main-content');
-    if (!mainContent) return;
-
-    // 1. Start Transition (Fade out current view)
-    mainContent.style.opacity = '0';
-
-    try {
-        // Attempt to fetch the specific snippet
-        const path = `/pages/${pageName}.html`;
-        const res = await fetch(path);
-        
-        if (!res.ok) {
-            // --- THE FIX: If snippet is missing, fetch the custom 404 design instead ---
-            console.warn(`Wolf OS: Path fault at /pages/${pageName}.html. Triggering 404 protocol.`);
-            const errorPage = await fetch('/404.html');
-            const errorHtml = await errorPage.text();
-            
-            setTimeout(() => {
-                mainContent.innerHTML = errorHtml;
-                mainContent.style.opacity = '1';
-                // Remove active highlights since we are in a fault state
-                document.querySelectorAll('[data-page]').forEach(el => el.classList.remove('active'));
-            }, 150);
-            return; // Stop execution here
-        }
-        
-        // --- Normal Load Protocol ---
-        const html = await res.text();
-        
-        setTimeout(() => {
-            mainContent.innerHTML = html;
-            mainContent.style.opacity = '1';
-            
-            // Sync highlights and swap icons (bx to bxs)
-            updateNavHighlights(pageName);
-        }, 150);
-
-        // Update URL state
-        window.history.pushState({page: pageName}, '', `?p=${pageName}`);
-
-    } catch (err) {
-        console.error("Critical System Fault:", err);
-        // Fallback in case even 404.html is missing
-        mainContent.innerHTML = `<div style="color:var(--accent-red); padding:50px; text-align:center;"><h1>[ERR_503]</h1><p>SECURITY LINK OFFLINE</p></div>`;
-        mainContent.style.opacity = '1';
-    }
-}
-
-// --- 3. UI HIGHLIGHT SYNCHRONIZATION ---
-
-// 1. Navigation Listeners (Only targets elements with data-page)
 // --- 1. SETUP PAGE NAVIGATION ---
 document.querySelectorAll('[data-page]').forEach(button => {
     button.onclick = (e) => {

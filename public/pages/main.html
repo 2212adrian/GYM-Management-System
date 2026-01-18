@@ -11,10 +11,23 @@
     <link rel="stylesheet" href="/assets/css/main.css">
 
     <!-- Security Guard (Always First) -->
+     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+     <script>
+window.WOLF_INTERNAL_SHELL = true;
+</script>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/assets/js/utils/auth-guard.js"></script> 
+     <style>
+        /* Smooth transition for the content swap */
+        .htmx-fade-in.htmx-added { opacity: 0; }
+        .htmx-fade-in { opacity: 1; transition: opacity 0.3s ease-out; }
+        
+        /* Default state: Hide everything until we know it's a shell */
+        #main-content { min-height: 500px; }
+    </style>
 </head>
-<body>
+<body id="wolf-terminal">
     
     <!-- Background Elements -->
     <div id="sidebar-backdrop"></div> 
@@ -29,16 +42,30 @@
         <div id="sidebar-container"></div>
 
         <!-- Column 2: Content Space -->
-        <main id="main-content">
-            <div id="page-wrapper">
+        <main id="main-content" class="htmx-fade-in">
+        <div class="brand" style="text-align:center; padding-top:100px;">WOLF <span>OS</span></div>
+        <div id="page-wrapper">
                 <!-- AJAX Content Slapped Here -->
             </div>
-        </main>
+    </main>
     </div>
     <!-- Navigation Bar -->
-    <div id="nav-container"></div>
+    <div id="nav-container">
+        <button hx-get="/pages/logbook.html" hx-target="#main-content" hx-push-url="true">LOGBOOK</button>
+        <button hx-get="/pages/sales.html" hx-target="#main-content" hx-push-url="true">SALES</button>
+    </div>
+    
 
     <!-- UI Logic Engine -->
     <script src="/assets/js/utils/ui-loader.js"></script>
+    <script>
+(function () {
+    if (!window.WOLF_INTERNAL_SHELL) {
+        document.documentElement.style.display = 'none';
+        window.location.replace('/pages/main.html?p=logbook');
+    }
+})();
+</script>
+
 </body>
 </html>
