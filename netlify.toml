@@ -11,3 +11,18 @@
   
   # The port your local server will run on
   port = 8888
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/pages/dashboard.html"
+  status = 200
+
+[[redirects]]
+  from = "/login"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+from = "/*"
+status = 404
+force = false

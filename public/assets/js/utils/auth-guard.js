@@ -1,62 +1,100 @@
 (async function() {
-    // 1. Setup Supabase
+    // 1. Setup Supabase with Mobile-optimized flags
     const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
     const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT';
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-    // 2. Define our "One Path" system
-    const PATH_LOGIN = "/index.html";
-    const PATH_DASHBOARD = "dashboard.html";
-    const PATH_UNAUTHORIZED = "/pages/unauthorized.html";
-
-    // Detect where we are
-    const path = window.location.pathname;
-    const isLoginPage = path === "/" || path.endsWith("index.html");
-    const isProtectedPage = path.includes("dashboard.html");
-    const isUnauthorizedPage = path.includes("unauthorized.html");
-
-    async function evaluateSecurity() {
-        // Get session (Supabase "Cookie")
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // Ensure we have a user, an email, and the admin role
-        const user = session?.user;
-        const hasAccess = user && user.email && user.user_metadata?.role === 'admin';
-
-        // --- THE SIMPLE LOGIC ---
-
-        // 1. If I'm on Login and I have a session/email -> GO TO DASHBOARD
-        if (isLoginPage && hasAccess) {
-            console.log("Wolf OS: Admin detected. Forwarding to Dashboard...");
-            window.location.replace(PATH_DASHBOARD);
-            return;
-        }
-
-        // 2. If I'm on Dashboard and I DON'T have a session -> GO TO UNAUTHORIZED
-        if (isProtectedPage && !user) {
-            window.location.replace(PATH_UNAUTHORIZED);
-            return;
-        }
-
-        // 3. If I'm on Dashboard and I have a session but NO email/admin role -> GO TO UNAUTHORIZED
-        if (isProtectedPage && !hasAccess) {
-            window.location.replace(PATH_UNAUTHORIZED);
-            return;
-        }
-
-        console.log("Wolf OS Guard: System standing by.");
-    }
-
-    // Run immediately
-    await evaluateSecurity();
-
-    // Watch for state changes (Logout button or session expiry)
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-            window.location.replace(PATH_LOGIN);
-        }
-        if (event === 'SIGNED_IN' && isLoginPage) {
-            evaluateSecurity(); // Re-run logic if they just logged in
+    
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
         }
     });
+
+    // 2. Define Absolute Paths
+    const PATH_LOGIN = "/index.html";
+    const PATH_MAIN = "/pages/main.html";
+    const PATH_UNAUTHORIZED = "/pages/unauthorized.html";
+
+    // 3. Normalize Environment Detection (Supports Pretty URLs)
+    const fullPath = window.location.pathname.toLowerCase();
+    const cleanPath = fullPath.replace(/\.html$/, ''); 
+
+    const isLoginPage = cleanPath === "/" || cleanPath === "/index" || cleanPath === "";
+    const isProtectedPage = cleanPath.includes("main") || cleanPath.includes("/pages/");
+
+    // --- UTILS: IP SECURITY ---
+    async function getTerminalIP() {
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return data.ip;
+        } catch { return "unknown_terminal"; }
+    }
+
+    async function checkIPLockout(ip) {
+        const { data } = await supabase.from('login_attempts').select('*').eq('ip_address', ip).single();
+        
+        if (data && data.attempts >= 5) {
+            const diff = (Date.now() - new Date(data.last_attempt_at).getTime()) / 1000;
+            const remaining = Math.ceil(600 - diff); // 10 minutes (600s)
+            if (remaining > 0) return remaining;
+        }
+        return 0;
+    }
+
+    // --- CORE SECURITY ENGINE ---
+    async function evaluateSecurity() {
+        const userIP = await getTerminalIP();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const user = session?.user;
+        const isAdmin = user && user.user_metadata?.role === 'admin';
+
+        // RULE 1: IP LOCKOUT PROTECTION [ERR_403]
+        const lockoutSeconds = await checkIPLockout(userIP);
+        if (lockoutSeconds > 0) {
+            console.warn(`[ERR_403] Terminal Locked: ${userIP}`);
+            if (isProtectedPage || isLoginPage) {
+                window.location.replace(`${PATH_UNAUTHORIZED}?err=403&time=${lockoutSeconds}`);
+                return;
+            }
+        }
+
+        // RULE 2: ACCESS REDIRECTS (Already Logged In)
+        if (isLoginPage && user && isAdmin) {
+            console.log("Wolf OS: Session active. Accessing Main Panel...");
+            window.location.replace(PATH_MAIN);
+            return;
+        }
+
+        // RULE 3: PROTECTED AREA VALIDATION
+        if (isProtectedPage) {
+            if (!user) {
+                console.error("[ERR_101] No session detected.");
+                window.location.replace(`${PATH_UNAUTHORIZED}?err=101`);
+                return;
+            }
+            if (!isAdmin) {
+                console.error("[ERR_102] Administrative privileges required.");
+                window.location.replace(`${PATH_UNAUTHORIZED}?err=102`);
+                return;
+            }
+        }
+
+        console.log("Wolf OS Guard: Terminal Secure.");
+    }
+
+    // Run Logic
+    await evaluateSecurity();
+
+    // 4. THE REAL-TIME LISTENER (Kicks out instantly on logout)
+    supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.replace(PATH_LOGIN);
+        }
+    });
+
 })();

@@ -1,0 +1,252 @@
+:root {
+  --bg-dark: #0f0f0f;
+  --card-bg: #1a1a1a;
+  --wolf-red: #a63429;
+  --wolf-blue: #2b3674;
+  --text-main: #ffffff;
+  --text-muted: #888888;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --input-bg: #111111;
+}
+/* Light Mode Overrides */
+body.light-theme {
+  --bg-dark: #fde0e0;
+  --card-bg: #e7e7e7;
+  --text-main: #1a1a1a;
+  --text-muted: #666666;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --input-bg: #eeeeee;
+}
+
+body { 
+    padding-left: var(--sidebar-width);
+    background-color: var(--bg-dark) !important; 
+    color: var(--text-main);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+main {
+    display: flex;
+    justify-content: center; /* THE MAGIC: Flex centering inside a Grid cell */
+    align-items: flex-start;
+    padding: 80px 20px 120px 20px;
+    min-width: 0; /* Prevents overflow content from breaking the grid */
+}
+
+#wolf-layout {
+    display: grid;
+    /* 1. Define two columns: [Sidebar Width] [Remaining Space] */
+    grid-template-columns: 80px 1fr; 
+    width: 100vw;
+    min-height: 100vh;
+    /* 2. Animate the columns changing size */
+    transition: grid-template-columns 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+body.sidebar-open #wolf-layout {
+    grid-template-columns: 280px 1fr;
+}
+
+#page-wrapper {
+    /* Centering logic for block elements */
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1150px; /* Optimal width for readability and cards */
+    display: block;
+    transition: opacity 0.3s ease;
+}
+
+.wolf-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 25px;
+    border-radius: 20px;
+    color: var(--text-main);
+    transition: background-color 0.3s ease;
+}
+.wolf-card, .list-item-card, .cta-card-red {
+    width: 100%;
+    min-width: 0; /* Allows flex items to shrink below content width */
+    box-sizing: border-box;
+}
+
+/* Update list items to use variables */
+.list-item-card { 
+    background: var(--card-bg); 
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+}
+
+    #sidebar-backdrop {
+    position: fixed;
+    top: 0; 
+    left: 0;
+    width: 100vw; 
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5); /* Essential for blur to show up */
+    backdrop-filter: blur(10px) !important; 
+    -webkit-backdrop-filter: blur(10px) !important; 
+    z-index: 9999; /* Set this LOWER than your sidebar */
+    
+    /* Use these for smooth transitions */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Add this class to handle the toggle */
+#sidebar-backdrop.active {
+        display: block !important;
+        opacity: 1 !important;
+        /* Force hardware acceleration for the blur */
+        transform: translateZ(0);
+        visibility: visible;
+}
+/* Prevent sidebar overlap on PC */
+@media (min-width: 768px) {
+    main {
+        margin-left: 80px; 
+    }
+    #sidebar-backdrop {
+        display: none !important;
+    }
+    
+    body.sidebar-open main {
+        margin-left: 280px;
+    }
+
+    /* Ensure the Topbar also shifts with the sidebar on PC */
+    #topbar-container {
+        margin-left: 80px;
+        transition: margin-left 0.4s ease;
+    }
+    body.sidebar-open #topbar-container {
+        margin-left: 280px;
+    }
+}
+/* Adjust for mobile navbar height */
+@media (max-width: 767px) {
+        #sidebar-backdrop.active {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+        main {
+        margin-left: 0 !important;
+        padding: 80px 15px 100px 15px;
+    }
+        #sidebar-backdrop.active {
+            opacity: 1;
+            visibility: visible;
+    }
+}
+
+.cta-card-red {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: nowrap; /* Prevents the arrow from dropping to the next line */
+        min-height: 80px;
+}
+/* Ensure inner text doesn't shrink to zero */
+.cta-card-red div {
+        min-width: 0; 
+}
+/* --- AJAX ERROR STATE --- */
+.error-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        text-align: center;
+        padding: 20px;
+        animation: errorPulse 2s infinite ease-in-out;
+}
+.error-face {
+        font-size: 80px;
+        color: var(--accent-red);
+        margin-bottom: 20px;
+        opacity: 0.6;
+}
+.btn-error-recovery {
+        margin-top: 30px;
+        background: transparent;
+        border: 1px solid var(--accent-red);
+        color: var(--accent-red);
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 900;
+        font-size: 11px;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: 0.3s;
+}
+.btn-error-recovery:hover {
+        background: var(--accent-red);
+        color: white;
+        box-shadow: 0 0 20px rgba(166, 52, 41, 0.4);
+}
+@keyframes errorPulse {
+        0% { opacity: 0.8; }
+        50% { opacity: 1; }
+        100% { opacity: 0.8; }
+}
+/* --- SHARED PAGE UI --- */
+.page-top-actions {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.action-icons { display: flex; gap: 10px; }
+.icon-btn { background: #222; border: none; color: white; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; }
+.icon-btn.red { background: var(--accent-red); }
+
+/* --- SUMMARY CARD --- */
+.summary-container { display: flex; justify-content: center; margin-bottom: 20px; max-width: 400px; }
+.summary-card { background: #1a1515; border: 1px solid #222; padding: 15px 40px; border-radius: 15px; text-align: center; }
+.summary-card label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px; }
+.summary-card .value { font-size: 1.8rem; font-weight: 900; color: white; font-style: italic; }
+
+/* --- DAY SELECTOR --- */
+.day-selector { display: flex; background: #111; padding: 5px; border-radius: 12px; margin-bottom: 25px; gap: 5px; }
+    .day-btn { flex: 1; padding: 12px; border: none; background: transparent; color: #444; font-size: 0.7rem; font-weight: 900; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+
+.day-btn.active { background: #222; color: var(--accent-red); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+/* --- LIST CARDS (Logbook & Sales) --- */
+.list-item-card {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+.status-icon { width: 45px; height: 45px; border-radius: 50%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; color: #444; font-size: 1.2rem; border: 1px solid #222; }
+.status-icon.active { color: var(--accent-red); border-color: rgba(166, 52, 41, 0.3); }
+.item-info { flex-grow: 1; }
+.item-info h4 { font-size: 0.9rem; font-weight: 900; color: #eee; margin: 0; text-transform: uppercase; }
+.item-info .sub { font-size: 0.7rem; color: var(--accent-red); font-weight: 700; text-transform: uppercase; margin: 3px 0; }
+.item-info .time { font-size: 0.7rem; color: #666; font-weight: 600; }
+.card-actions { display: flex; align-items: center; gap: 15px; }
+.badge-paid { background: #008f4c; color: white; font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 20px; }
+.action-small { color: #444; cursor: pointer; font-size: 1.1rem; }
+.card-details { border-top: 1px solid #1a1a1a; padding-top: 15px; display: flex; justify-content: space-between; align-items: center; }
+.detail-group label { font-size: 10px; color: #444; font-weight: 800; text-transform: uppercase; display: block; }
+.detail-group .val { font-size: 1.2rem; font-weight: 900; color: #fff; font-style: italic; }
+.re-open-btn { background: none; border: none; color: #666; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; gap: 5px; margin: 15px auto 0; cursor: pointer; text-transform: uppercase; }
+/* --- FILTER SEARCH (Sales Only) --- */
+.filter-container { background: #111; border: 1px solid #1a1a1a; padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.filter-container i { color: #444; }
+.filter-container input { background: transparent; border: none; color: white; font-size: 0.8rem; outline: none; width: 100%; }

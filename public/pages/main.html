@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Panel - Wolf OS</title>
+    
+    <!-- Styles -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="/assets/css/main.css">
+
+    <!-- Security Guard (Always First) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/assets/js/utils/auth-guard.js"></script> 
+</head>
+<body>
+    
+    <!-- Background Elements -->
+    <div id="sidebar-backdrop"></div> 
+
+    <!-- Components Containers -->
+    <div id="topbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <!-- AJAX INJECTION POINT -->
+    <div id="wolf-layout">
+        <!-- Column 1: Sidebar Space -->
+        <div id="sidebar-container"></div>
+
+        <!-- Column 2: Content Space -->
+        <main id="main-content">
+            <div id="page-wrapper">
+                <!-- AJAX Content Slapped Here -->
+            </div>
+        </main>
+    </div>
+    <!-- Navigation Bar -->
+    <div id="nav-container"></div>
+
+    <!-- UI Logic Engine -->
+    <script src="/assets/js/utils/ui-loader.js"></script>
+</body>
+</html>
