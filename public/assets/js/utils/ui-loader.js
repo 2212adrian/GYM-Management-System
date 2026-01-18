@@ -202,89 +202,78 @@ async function loadHTML(path) {
 }
 
 async function initUI() {
+    themeManager.init();
+
     try {
-        // 1. Load Shell Components (Topbar, Sidebar, and Floating Nav)
-        const elTopbar = document.getElementById('topbar-container');
-        const elSidebar = document.getElementById('sidebar-container');
-        const elNav = document.getElementById('nav-container');
+        // 1. Load Components
+        const [topbar, sidebar, nav] = await Promise.all([
+            loadHTML('/assets/components/topbar.html'),
+            loadHTML('/assets/components/sidebar.html'),
+            loadHTML('/assets/components/floating-nav.html')
+        ]);
 
-        if (elTopbar) elTopbar.innerHTML = await loadHTML('/assets/components/topbar.html');
-        if (elSidebar) elSidebar.innerHTML = await loadHTML('/assets/components/sidebar.html');
-        if (elNav) elNav.innerHTML = await loadHTML('/assets/components/floating-nav.html');
+        document.getElementById('topbar-container').innerHTML = topbar;
+        document.getElementById('sidebar-container').innerHTML = sidebar;
+        document.getElementById('nav-container').innerHTML = nav;
 
-        // 2. ATTACH NAVIGATION LISTENERS (Targeting both Sidebar + Navbar)
-        document.querySelectorAll('[data-page]').forEach(button => {
-            button.onclick = (e) => {
+        // 2. GLOBAL CLICK DELEGATION
+        // This is the "Magic Fix" - it handles clicks even for items not loaded yet.
+        document.addEventListener('click', async (e) => {
+            
+            // A. Handle Navigation (data-page)
+            const navBtn = e.target.closest('[data-page]');
+            if (navBtn) {
                 e.preventDefault();
-                const page = button.getAttribute('data-page');
-                if (page) navigateTo(page); // navigateTo handles the icon swap (bx to bxs)
-            };
+                navigateTo(navBtn.getAttribute('data-page'));
+                return;
+            }
+
+            // B. Handle Logout (.logout-btn)
+            const logoutBtn = e.target.closest('.logout-btn');
+            if (logoutBtn) {
+                e.preventDefault();
+                logoutBtn.style.opacity = "0.5";
+                logoutBtn.innerText = "ENDING...";
+
+                const supabase = window.supabase.createClient('https://xhahdzyjhwutgqfcrzfc.supabase.co', 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT');
+                await supabase.auth.signOut();
+                localStorage.clear();
+                window.location.replace("/index.html");
+                return;
+            }
+
+            // C. Handle Theme Toggle (#themeToggleBtn)
+            const themeBtn = e.target.closest('#themeToggleBtn');
+            if (themeBtn) {
+                e.preventDefault();
+                themeManager.toggle();
+                return;
+            }
+
+            // D. Sidebar Toggle Logic
+            const sidebar = document.getElementById('wolfSidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            
+            if (e.target.closest('#moreNavBtn') || e.target.closest('#sidebarClose') || e.target === backdrop) {
+                if (!sidebar) return;
+                const isActive = sidebar.classList.toggle('active');
+                const isMobile = window.innerWidth < 768;
+
+                document.body.classList.toggle('sidebar-open', isActive);
+                if (document.getElementById('moreNavBtn')) document.getElementById('moreNavBtn').classList.toggle('sidebar-active', isActive);
+                if (isMobile && backdrop) backdrop.classList.toggle('active', isActive);
+                
+                const closeIcon = document.getElementById('closeIcon');
+                if (!isMobile && closeIcon) closeIcon.className = isActive ? 'bx bx-chevron-left' : 'bx bx-chevron-right';
+                
+                const mobileMoreIcon = document.getElementById('navMoreIcon');
+                if (isMobile && mobileMoreIcon) mobileMoreIcon.className = isActive ? 'bx bx-x' : 'bx bx-menu';
+            }
         });
 
-        // 3. ATTACH THEME TOGGLE LISTENER
-        const themeBtn = document.getElementById('themeToggleBtn');
-        if (themeBtn) {
-        // Apply saved theme on load
-        if (localStorage.getItem('wolf-theme') === 'light') {
-            document.body.classList.add('light-theme');
-        }
-
-        themeBtn.onclick = (e) => {
-            e.preventDefault();
-            // Toggle the class on the BODY
-            const isLight = document.body.classList.toggle('light-theme');
-            
-            // Save preference so it doesn't reset on refresh
-            localStorage.setItem('wolf-theme', isLight ? 'light' : 'dark');
-
-            // Optional: Swap icon visually
-            const icon = themeBtn.querySelector('i');
-            if (icon) {
-                icon.className = isLight ? 'bx bx-sun' : 'bx bx-moon';
-            }
-            
-            console.log("Wolf OS: Theme switched to " + (isLight ? "Light" : "Dark"));
-        };
-    }
-
-        // 4. LOAD DEFAULT PAGE: 'main'
+        // 3. LOAD INITIAL PAGE
         const urlParams = new URLSearchParams(window.location.search);
-        const startPage = urlParams.get('p') || 'main'; 
-        await navigateTo(startPage);
-
-        // 5. SIDEBAR TOGGLE LOGIC
-        const sidebar = document.getElementById('wolfSidebar');
-        const backdrop = document.getElementById('sidebar-backdrop');
-        const moreBtn = document.getElementById('moreNavBtn');
-        const closeBtn = document.getElementById('sidebarClose');
-        const closeIcon = document.getElementById('closeIcon'); // The Chevron icon
-
-        const toggleSidebar = () => {
-            if (!sidebar) return;
-            const isActive = sidebar.classList.toggle('active');
-            const isMobile = window.innerWidth < 768;
-
-            // Sync UI state to Body (for PC Margin shifting)
-            document.body.classList.toggle('sidebar-open', isActive);
-            
-            // Sync highlight to the "More" button on the Nav bar
-            if (moreBtn) moreBtn.classList.toggle('sidebar-active', isActive);
-
-            // Handle Backdrop Blur (Mobile Only)
-            if (isMobile && backdrop) {
-                backdrop.classList.toggle('active', isActive);
-            }
-
-            // Handle PC Chevron direction (pointing toward the exit)
-            if (!isMobile && closeIcon) {
-                closeIcon.className = isActive ? 'bx bx-chevron-left' : 'bx bx-chevron-right';
-            }
-        };
-
-        // Attach toggle events
-        if (moreBtn) moreBtn.onclick = toggleSidebar;
-        if (backdrop) backdrop.onclick = toggleSidebar;
-        if (closeBtn) closeBtn.onclick = toggleSidebar;
+        await navigateTo(urlParams.get('p') || 'dashboard');
 
     } catch (err) {
         console.error("Wolf OS Boot Error:", err);
