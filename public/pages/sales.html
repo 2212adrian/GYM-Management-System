@@ -1,58 +1,47 @@
-<div class="page-top-actions">
-    <div class="brand">SALES</div>
-    <div class="action-icons">
-        <button class="icon-btn"><i class='bx bx-trash'></i></button>
-        <button class="icon-btn red"><i class='bx bx-plus'></i></button>
-    </div>
-</div>
-
-<div class="summary-container">
-    <div class="summary-card">
-        <label>Fri Total Income</label>
-        <div class="value">₱5,900</div>
-    </div>
-</div>
-
-<div class="day-selector">
-    <button class="day-btn">SUN</button>
-    <button class="day-btn">MON</button>
-    <button class="day-btn">TUE</button>
-    <button class="day-btn">WED</button>
-    <button class="day-btn">THU</button>
-    <button class="day-btn active">FRI</button>
-    <button class="day-btn">SAT</button>
-</div>
-
-<div class="filter-container">
-    <i class='bx bx-search'></i>
-    <input type="text" placeholder="Filter...">
-</div>
-
-<!-- SALES ITEMS -->
-<div class="list-item-card" style="padding: 15px 20px;">
-    <div class="card-header" style="margin-bottom: 0;">
-        <div class="status-icon"><i class='bx bx-shopping-bag'></i></div>
-        <div class="item-info">
-            <h4>Whey Protein (1kg)</h4>
-            <div class="time">08:00 AM • x2</div>
-        </div>
-        <div class="card-actions">
-            <div style="color: var(--accent-red); font-weight: 900; font-style: italic;">₱2500</div>
-            <i class='bx bx-trash action-small'></i>
+<div class="page-wrapper" id="page-wrapper">
+    <div class="page-top-actions">
+        <div class="brand" style="font-size: 1.5rem; font-weight: 900;">SALES</div>
+        <div class="action-icons">
+            <button class="icon-btn"><i class='bx bx-trash'></i></button>
+            <button class="icon-btn red"><i class='bx bx-plus'></i></button>
         </div>
     </div>
-</div>
-
-<div class="list-item-card" style="padding: 15px 20px;">
-    <div class="card-header" style="margin-bottom: 0;">
-        <div class="status-icon"><i class='bx bx-shopping-bag'></i></div>
-        <div class="item-info">
-            <h4>Water Bottle XL</h4>
-            <div class="time">09:30 AM • x5</div>
+    
+    <div class="summary-container">
+        <div class="summary-card shadow-sm">
+            <label style="font-size: 10px; color: #666; text-transform: uppercase; font-weight: 800;">Fri Total Income</label>
+            <div class="value" style="font-size: 1.8rem; font-weight: 900; font-style: italic; color: #fff;">₱5,900</div>
         </div>
-        <div class="card-actions">
-            <div style="color: var(--accent-red); font-weight: 900; font-style: italic;">₱1000</div>
-            <i class='bx bx-trash action-small'></i>
+    </div>
+    
+    <div class="day-selector">
+        <button class="day-btn">SUN</button>
+        <button class="day-btn">MON</button>
+        <button class="day-btn">TUE</button>
+        <button class="day-btn">WED</button>
+        <button class="day-btn">THU</button>
+        <button class="day-btn active">FRI</button>
+        <button class="day-btn">SAT</button>
+    </div>
+    
+    <!-- Search Input -->
+    <div class="filter-container mb-4" style="background: #111; border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; gap: 10px;">
+        <i class='bx bx-search' style="color: #444;"></i>
+        <input type="text" placeholder="Search sales history..." style="background: none; border: none; color: #fff; width: 100%; outline: none; font-size: 14px;">
+    </div>
+    
+    <!-- ITEM CARD -->
+    <div class="list-item-card" style="padding: 15px 20px;">
+        <div class="card-header">
+            <div class="status-icon" style="background: #222; padding: 10px; border-radius: 12px; color: var(--accent-red);"><i class='bx bx-shopping-bag'></i></div>
+            <div class="item-info">
+                <h4 style="font-weight: 800;">Whey Protein (1kg)</h4>
+                <div class="time" style="font-size: 11px; color: #555;">08:00 AM • x2 Units</div>
+            </div>
+            <div class="card-actions">
+                <div style="color: var(--accent-red); font-weight: 900; font-style: italic; font-size: 1.1rem;">₱2,500</div>
+                <i class='bx bx-trash' style="color: #333; cursor: pointer; font-size: 18px;"></i>
+            </div>
         </div>
     </div>
 </div>

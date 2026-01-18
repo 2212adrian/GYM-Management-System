@@ -46,176 +46,249 @@ async function loadComponent(id, path) {
 
 // --- 2. AJAX PAGE LOADER ---
 
+function updateNavHighlights(pageName) {
+    // Select both Sidebar and Nav bar items
+    const navItems = document.querySelectorAll('[data-page]');
+
+    navItems.forEach(el => {
+        const isTarget = el.getAttribute('data-page') === pageName;
+        const icon = el.querySelector('i');
+
+        if (isTarget) {
+            el.classList.add('active');
+            // SWAP TO SOLID (bxs)
+            if (icon) {
+                icon.className = icon.className.replace(/\bbx-([a-z0-9-]+)\b/g, 'bxs-$1');
+            }
+        } else {
+            el.classList.remove('active');
+            // REVERT TO OUTLINE (bx)
+            if (icon) {
+                icon.className = icon.className.replace(/\bbxs-([a-z0-9-]+)\b/g, 'bx-$1');
+            }
+        }
+    });
+}
+
 async function navigateTo(pageName) {
-    const mainContent = document.querySelector('main');
+    const mainContent = document.getElementById('main-content');
     if (!mainContent) return;
 
-    // Transition Out
-    mainContent.style.transition = 'opacity 0.3s ease';
+    // 1. Start Transition (Fade out current view)
     mainContent.style.opacity = '0';
 
     try {
-        // Path logic: dashboard content is separate from the shell dashboard.html
-        const path = pageName === 'dashboard' ? '/dashboard.html' : `/pages/${pageName}.html`;
-        
+        // Attempt to fetch the specific snippet
+        const path = `/pages/${pageName}.html`;
         const res = await fetch(path);
-        if (!res.ok) throw new Error("Page not found");
         
+        if (!res.ok) {
+            // --- THE FIX: If snippet is missing, fetch the custom 404 design instead ---
+            console.warn(`Wolf OS: Path fault at /pages/${pageName}.html. Triggering 404 protocol.`);
+            const errorPage = await fetch('/404.html');
+            const errorHtml = await errorPage.text();
+            
+            setTimeout(() => {
+                mainContent.innerHTML = errorHtml;
+                mainContent.style.opacity = '1';
+                // Remove active highlights since we are in a fault state
+                document.querySelectorAll('[data-page]').forEach(el => el.classList.remove('active'));
+            }, 150);
+            return; // Stop execution here
+        }
+        
+        // --- Normal Load Protocol ---
         const html = await res.text();
         
-        // Delay slightly for smooth transition
         setTimeout(() => {
             mainContent.innerHTML = html;
             mainContent.style.opacity = '1';
+            
+            // Sync highlights and swap icons (bx to bxs)
             updateNavHighlights(pageName);
-        }, 300);
-        
-        // Update URL
+        }, 150);
+
+        // Update URL state
         window.history.pushState({page: pageName}, '', `?p=${pageName}`);
-        
+
     } catch (err) {
-        console.error("Navigation Error:", err);
-        mainContent.innerHTML = `
-            <div class="error-container">
-                <i class='bx bx-sad error-face'></i>
-                <div class="brand">SYSTEM <span>ERROR 404</span></div>
-                <p class="desc">The requested resource is missing, offline, or restricted.</p>
-                <button onclick="navigateTo('dashboard')" class="btn-error-recovery">
-                    INITIATE RECOVERY PROTOCOL
-                </button>
-            </div>
-        `;
+        console.error("Critical System Fault:", err);
+        // Fallback in case even 404.html is missing
+        mainContent.innerHTML = `<div style="color:var(--accent-red); padding:50px; text-align:center;"><h1>[ERR_503]</h1><p>SECURITY LINK OFFLINE</p></div>`;
         mainContent.style.opacity = '1';
     }
 }
 
 // --- 3. UI HIGHLIGHT SYNCHRONIZATION ---
 
-function updateNavHighlights(pageName) {
-    // Update all elements with data-page (Sidebar + Floating Nav)
-    document.querySelectorAll('[data-page]').forEach(el => {
-        if (el.getAttribute('data-page') === pageName) {
-            el.classList.add('active');
-            // If it's a sidebar item, we also apply the specific color
-            if (el.classList.contains('nav-item-side')) {
-                el.style.color = 'var(--accent-red)';
-            }
-        } else {
-            el.classList.remove('active');
-            if (el.classList.contains('nav-item-side')) {
-                el.style.color = '';
-            }
+// 1. Navigation Listeners (Only targets elements with data-page)
+// --- 1. SETUP PAGE NAVIGATION ---
+document.querySelectorAll('[data-page]').forEach(button => {
+    button.onclick = (e) => {
+        e.preventDefault();
+        const page = button.getAttribute('data-page');
+        if (page) navigateTo(page); // This handles the fetch and calling updateNavHighlights
+    };
+});
+
+// --- 2. SETUP DARK MODE (THE THEME FIX) ---
+const themeBtn = document.getElementById('themeToggleBtn');
+if (themeBtn) {
+    themeBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // Stops it from interfering with page navigation
+        
+        console.log("Wolf OS: Switching Theme...");
+        document.body.classList.toggle('dark-theme'); // Or your specific class
+        
+        // Bonus: Swap the icon between moon and sun
+        const themeIcon = themeBtn.querySelector('i');
+        if (themeIcon) {
+            themeIcon.classList.toggle('bx-moon');
+            themeIcon.classList.toggle('bx-sun');
         }
-    });
+    };
+}
+
+async function navigateTo(pageName) {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    // 1. Transition Out
+    mainContent.style.transition = 'opacity 0.2s ease';
+    mainContent.style.opacity = '0';
+
+    try {
+        const path = `/pages/${pageName}.html`;
+        const res = await fetch(path);
+        
+        let html;
+        if (!res.ok) {
+            // --- THE 404 PROTOCOL: Fetch your actual 404.html design ---
+            console.warn(`Wolf OS: Protocol ${pageName} fault. Loading 404 UI.`);
+            const errRes = await fetch('/404.html');
+            html = await errRes.text();
+            // Clear highlights since we are in a fault state
+            pageName = null; 
+        } else {
+            html = await res.text();
+        }
+
+        // 2. Slap HTML and Transition In
+        setTimeout(() => {
+            mainContent.innerHTML = html;
+            mainContent.style.opacity = '1';
+            updateNavHighlights(pageName);
+        }, 200);
+
+        // 3. Update URL if valid page
+        if (pageName) {
+            window.history.pushState({page: pageName}, '', `?p=${pageName}`);
+        }
+        
+    } catch (err) {
+        console.error("Critical link fault:", err);
+        mainContent.innerHTML = `<div style="color:var(--accent-red); padding:50px; text-align:center;"><h1>[ERR_500]</h1><p>SYSTEM LINK OFFLINE</p></div>`;
+        mainContent.style.opacity = '1';
+    }
 }
 
 // --- 4. MAIN UI INITIALIZATION ---
 
-async function initUI() {
-    // 1. Load Components
-    await loadComponent('topbar-container', '/assets/components/topbar.html');
-    await loadComponent('sidebar-container', '/assets/components/sidebar.html');
-    await loadComponent('nav-container', '/assets/components/floating-nav.html');
-
-    // 2. Identify Elements
-    const sidebar = document.getElementById('wolfSidebar');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    const moreBtn = document.getElementById('moreNavBtn'); 
-
-    // 3. GLOBAL EVENT DELEGATION (Clicks)
-    document.addEventListener('click', async (e) => {
-        
-        // THEME TOGGLE HANDLER
-        const themeBtn = e.target.closest('#themeToggleBtn');
-        if (themeBtn) {
-            e.preventDefault();
-            themeManager.toggle();
-            return;
-        }
-
-
-        // A. Handle Navigation Clicks
-        const navItem = e.target.closest('[data-page]');
-        if (navItem) {
-            const page = navItem.getAttribute('data-page');
-            navigateTo(page);
-            
-            // Auto-close sidebar on mobile after choosing a page
-            if (window.innerWidth < 768 && sidebar.classList.contains('active')) {
-                toggleSidebar();
-            }
-            return;
-        }
-
-        // B. Handle Logout Clicks
-        const logoutBtn = e.target.closest('.logout-btn');
-        if (logoutBtn) {
-            e.preventDefault();
-            logoutBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> <span>ENDING...</span>";
-            
-            const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
-            const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT';
-            const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-            try {
-                await supabase.auth.signOut();
-                localStorage.clear();
-                sessionStorage.clear();
-                window.location.replace("/index.html");
-            } catch (err) {
-                window.location.replace("/index.html");
-            }
-            return;
-        }
-
-        // C. Sidebar Specific Toggles (More Button, Close Button, Backdrop)
-        if (e.target.closest('#moreNavBtn') || e.target.closest('#sidebarClose') || e.target === backdrop) {
-            toggleSidebar();
-        }
-    });
-
-    // 4. SIDEBAR TOGGLE CORE LOGIC
-    const toggleSidebar = () => {
-        if (!sidebar) return;
-
-        const isActive = sidebar.classList.toggle('active');
-        const isMobile = window.innerWidth < 768;
-        const pcIcon = document.getElementById('closeIcon'); // Desktop chevron
-        const mobileMoreIcon = document.getElementById('navMoreIcon'); // Floating bar burger
-
-        // Handle Body Shift (Desktop Only)
-        document.body.classList.toggle('sidebar-open', isActive);
-
-        // Highlight the "More" button on floating nav if sidebar is active
-        if (moreBtn) {
-            moreBtn.classList.toggle('sidebar-active', isActive);
-        }
-
-        // Desktop Icon Flip (Chevron left/right)
-        if (!isMobile && pcIcon) {
-            pcIcon.className = isActive ? 'bx bx-chevron-left' : 'bx bx-chevron-right';
-        }
-
-        // Mobile Icon Swap (Burger to X)
-        if (isMobile && mobileMoreIcon) {
-            mobileMoreIcon.className = 'bx bx-menu';
-        }
-
-        // Backdrop Logic (Mobile Only)
-        if (backdrop) {
-            if (isMobile && isActive) {
-                backdrop.classList.add('active');
-            } else {
-                backdrop.classList.remove('active');
-            }
-        }
-    };
-
-    // 5. INITIAL STATE: Check URL for page parameter (e.g., ?p=sales)
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialPage = urlParams.get('p') || 'dashboard';
-    updateNavHighlights(initialPage);
+async function loadHTML(path) {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`[ERR_503] Failed to fetch: ${path}`);
+    return await res.text();
 }
 
-// Launch
+async function initUI() {
+    try {
+        // 1. Load Shell Components (Topbar, Sidebar, and Floating Nav)
+        const elTopbar = document.getElementById('topbar-container');
+        const elSidebar = document.getElementById('sidebar-container');
+        const elNav = document.getElementById('nav-container');
+
+        if (elTopbar) elTopbar.innerHTML = await loadHTML('/assets/components/topbar.html');
+        if (elSidebar) elSidebar.innerHTML = await loadHTML('/assets/components/sidebar.html');
+        if (elNav) elNav.innerHTML = await loadHTML('/assets/components/floating-nav.html');
+
+        // 2. ATTACH NAVIGATION LISTENERS (Targeting both Sidebar + Navbar)
+        document.querySelectorAll('[data-page]').forEach(button => {
+            button.onclick = (e) => {
+                e.preventDefault();
+                const page = button.getAttribute('data-page');
+                if (page) navigateTo(page); // navigateTo handles the icon swap (bx to bxs)
+            };
+        });
+
+        // 3. ATTACH THEME TOGGLE LISTENER
+        const themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+        // Apply saved theme on load
+        if (localStorage.getItem('wolf-theme') === 'light') {
+            document.body.classList.add('light-theme');
+        }
+
+        themeBtn.onclick = (e) => {
+            e.preventDefault();
+            // Toggle the class on the BODY
+            const isLight = document.body.classList.toggle('light-theme');
+            
+            // Save preference so it doesn't reset on refresh
+            localStorage.setItem('wolf-theme', isLight ? 'light' : 'dark');
+
+            // Optional: Swap icon visually
+            const icon = themeBtn.querySelector('i');
+            if (icon) {
+                icon.className = isLight ? 'bx bx-sun' : 'bx bx-moon';
+            }
+            
+            console.log("Wolf OS: Theme switched to " + (isLight ? "Light" : "Dark"));
+        };
+    }
+
+        // 4. LOAD DEFAULT PAGE: 'main'
+        const urlParams = new URLSearchParams(window.location.search);
+        const startPage = urlParams.get('p') || 'main'; 
+        await navigateTo(startPage);
+
+        // 5. SIDEBAR TOGGLE LOGIC
+        const sidebar = document.getElementById('wolfSidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const moreBtn = document.getElementById('moreNavBtn');
+        const closeBtn = document.getElementById('sidebarClose');
+        const closeIcon = document.getElementById('closeIcon'); // The Chevron icon
+
+        const toggleSidebar = () => {
+            if (!sidebar) return;
+            const isActive = sidebar.classList.toggle('active');
+            const isMobile = window.innerWidth < 768;
+
+            // Sync UI state to Body (for PC Margin shifting)
+            document.body.classList.toggle('sidebar-open', isActive);
+            
+            // Sync highlight to the "More" button on the Nav bar
+            if (moreBtn) moreBtn.classList.toggle('sidebar-active', isActive);
+
+            // Handle Backdrop Blur (Mobile Only)
+            if (isMobile && backdrop) {
+                backdrop.classList.toggle('active', isActive);
+            }
+
+            // Handle PC Chevron direction (pointing toward the exit)
+            if (!isMobile && closeIcon) {
+                closeIcon.className = isActive ? 'bx bx-chevron-left' : 'bx bx-chevron-right';
+            }
+        };
+
+        // Attach toggle events
+        if (moreBtn) moreBtn.onclick = toggleSidebar;
+        if (backdrop) backdrop.onclick = toggleSidebar;
+        if (closeBtn) closeBtn.onclick = toggleSidebar;
+
+    } catch (err) {
+        console.error("Wolf OS Boot Error:", err);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', initUI);

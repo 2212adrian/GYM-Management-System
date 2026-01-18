@@ -112,26 +112,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- AJAX: REQUEST OTP ---
     async function handleOtpRequest() {
         const email = document.getElementById('forgotEmail').value;
-        if (!email) {
-            resetOutput.textContent = "[ERR_001] Email required.";
-            return;
-        }
-        resetOutput.style.color = "#888";
-        resetOutput.textContent = "Verifying your email request...";
+        if (!email) { resetOutput.textContent = "[ERR_001] Email required."; return; }
+        
         const userIP = await getClientIP();
-
-        const { data: cooldown } = await supabaseClient.from('otp_cooldowns').select('*').eq('ip_address', userIP).single();
-        if (cooldown) {
-            const diff = (Date.now() - new Date(cooldown.last_sent_at).getTime()) / 1000;
-            if (diff < OTP_COOLDOWN_SECONDS) {
-                resetOutput.style.color = "var(--wolf-red)";
-                resetOutput.textContent = `[ERR_429] Cooldown active. Wait ${Math.ceil(OTP_COOLDOWN_SECONDS - diff)}s.`;
-                return;
-            }
-        }
-
+        
         sendOtpBtn.disabled = true;
-        sendOtpBtn.textContent = "VERIFYING...";
+        sendOtpBtn.textContent = "TRANSMITTING...";
+        resetOutput.style.color = "#888";
+        resetOutput.textContent = "Initiating secure key transmission...";
 
         try {
             const res = await fetch('/.netlify/functions/request-otp', {
@@ -155,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sendOtpBtn.textContent = "SEND SECURITY OTP";
             }
         } catch (err) {
-            resetOutput.textContent = "[ERR_503] Gateway timeout.";
+            resetOutput.textContent = "[ERR_503] Gateway unreachable.";
             sendOtpBtn.disabled = false;
         }
     }
@@ -251,7 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else if (data.user.user_metadata.role === 'admin') {
                 await supabaseClient.from('login_attempts').delete().eq('ip_address', userIP);
-                window.location.replace("dashboard.html");
+                window.location.replace("/pages/main.html");
             } else {
                 loginOutput.textContent = "[ERR_102] Unauthorized administrative role.";
                 await supabaseClient.auth.signOut();

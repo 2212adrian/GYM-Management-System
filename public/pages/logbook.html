@@ -1,75 +1,58 @@
-<div class="page-top-actions">
-    <div class="brand">GYM <span>LOGBOOK</span></div>
-    <div class="action-icons">
-        <button class="icon-btn"><i class='bx bx-trash'></i></button>
-        <button class="icon-btn"><i class='bx bx-fullscreen'></i></button>
+<div class="page-wrapper" id="page-wrapper">
+    <div class="page-top-actions">
+        <div class="brand">GYM <span>LOGBOOK</span></div>
+        <div class="action-icons">
+            <button class="icon-btn"><i class='bx bx-trash'></i></button>
+            <button class="icon-btn red"><i class='bx bx-fullscreen'></i></button>
+        </div>
     </div>
-</div>
 
-<div class="summary-container">
-    <div class="summary-card">
-        <label>Fri Floor Revenue</label>
-        <div class="value">₱80</div>
+    <div class="summary-container">
+        <div class="summary-card">
+            <label>Fri Floor Revenue</label>
+            <div class="value">₱80</div>
+        </div>
     </div>
-</div>
 
-<div class="day-selector">
-    <button class="day-btn">SUN</button>
-    <button class="day-btn">MON</button>
-    <button class="day-btn">TUE</button>
-    <button class="day-btn">WED</button>
-    <button class="day-btn">THU</button>
-    <button class="day-btn active">FRI</button>
-    <button class="day-btn">SAT</button>
-</div>
+    <div class="day-selector">
+        <button class="day-btn">SUN</button>
+        <button class="day-btn">MON</button>
+        <button class="day-btn">TUE</button>
+        <button class="day-btn">WED</button>
+        <button class="day-btn">THU</button>
+        <button class="day-btn active">FRI</button>
+        <button class="day-btn">SAT</button>
+    </div>
 
-<!-- ENTRY 1 -->
-<div class="list-item-card">
-    <div class="card-header">
-        <div class="status-icon"><i class='bx bx-check'></i></div>
-        <div class="item-info">
-            <h4>Juan Dela Cruz</h4>
-            <div class="sub">Monthly Membership</div>
-            <div class="time">IN: 08:00 AM</div>
+    <!-- ITEM CARD -->
+    <div class="list-item-card shadow-sm">
+        <div class="card-header">
+            <!-- Using bxs for active icons as requested previously -->
+            <div class="status-icon active"><i class='bx bxs-time-five'></i></div>
+            <div class="item-info">
+                <h4>Juan Dela Cruz</h4>
+                <div class="sub">Monthly Membership</div>
+                <div class="time">IN: 08:00 AM</div>
+            </div>
+            <div class="card-actions">
+                <span class="badge-paid">PAID</span>
+                <i class='bx bx-refresh action-small'></i>
+                <i class='bx bx-trash action-small'></i>
+            </div>
         </div>
-        <div class="card-actions">
-            <span class="badge-paid">PAID</span>
-            <i class='bx bx-refresh action-small'></i>
-            <i class='bx bx-trash action-small'></i>
-        </div>
-    </div>
-    <div class="card-details">
-        <div class="detail-group">
-            <label>Entry Fee</label>
-            <div class="val">₱0</div>
-        </div>
-        <div class="detail-group" style="text-align: right;">
-            <label>Session End</label>
-            <div class="val" style="font-size: 0.9rem;">10:00 AM</div>
-        </div>
-    </div>
-    <button class="re-open-btn"><i class='bx bx-undo'></i> Re-open Session</button>
-</div>
 
-<!-- ENTRY 2 -->
-<div class="list-item-card">
-    <div class="card-header">
-        <div class="status-icon active"><i class='bx bx-time-five'></i></div>
-        <div class="item-info">
-            <h4>Pedro Penduko</h4>
-            <div class="sub">Regular (Non-Member)</div>
-            <div class="time">IN: 09:30 AM</div>
+        <!-- Details Section with Flex -->
+        <div class="card-details d-flex justify-content-between align-items-end">
+            <div class="detail-group">
+                <label>Entry Fee</label>
+                <div class="val">₱0</div>
+            </div>
+            <div class="detail-group text-end">
+                <label>Session End</label>
+                <div class="val" style="font-size: 1rem;">10:00 AM</div>
+            </div>
         </div>
-        <div class="card-actions">
-            <span class="badge-paid">PAID</span>
-            <i class='bx bx-refresh action-small'></i>
-            <i class='bx bx-trash action-small'></i>
-        </div>
-    </div>
-    <div class="card-details">
-        <div class="detail-group">
-            <label>Entry Fee</label>
-            <div class="val">₱80</div>
-        </div>
+
+        <button class="re-open-btn"><i class='bx bx-undo'></i> RE-OPEN SESSION</button>
     </div>
 </div>

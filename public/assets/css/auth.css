@@ -5,6 +5,18 @@
   --wolf-blue: #2b3674;
   --text-main: #ffffff;
   --text-muted: #888888;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --input-bg: #111111;
+
+}
+/* Light Mode Overrides */
+body.light-theme {
+  --bg-dark: #f4f7f6;
+  --card-bg: #ffffff;
+  --text-main: #1a1a1a;
+  --text-muted: #666666;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --input-bg: #eeeeee;
 }
 
 body {

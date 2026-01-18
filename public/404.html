@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf OS - ERR_404</title>
+    
+    <!-- CDNs -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #0f0f0f;
+            --wolf-red: #a63429;
+            --text-main: #ffffff;
+            --text-muted: #444444;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .error-container {
+            text-align: center;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .error-code {
+            font-size: 120px;
+            font-weight: 900;
+            color: var(--wolf-red);
+            margin: 0;
+            line-height: 1;
+            letter-spacing: -5px;
+            position: relative;
+            display: inline-block;
+        }
+
+        /* Subtle Glitch Effect */
+        .error-code::before {
+            content: '404';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            color: #fff;
+            opacity: 0.1;
+            transform: translate(-2px, 2px);
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            margin-top: 20px;
+            text-transform: uppercase;
+            color: var(--text-main);
+        }
+
+        .sys-message {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 10px;
+            letter-spacing: 1px;
+            line-height: 1.6;
+            text-transform: uppercase;
+        }
+
+        .btn-console {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: none;
+            border: 1px solid var(--wolf-red);
+            color: var(--wolf-red);
+            padding: 12px 25px;
+            border-radius: 8px;
+            margin-top: 40px;
+            font-weight: bold;
+            font-size: 12px;
+            text-decoration: none;
+            transition: 0.3s;
+            letter-spacing: 1px;
+        }
+
+        .btn-console:hover {
+            background: var(--wolf-red);
+            color: white;
+            box-shadow: 0 0 20px rgba(166, 52, 41, 0.4);
+        }
+
+        .footer-logo {
+            position: fixed;
+            bottom: 30px;
+            font-size: 10px;
+            color: #222;
+            letter-spacing: 5px;
+            font-weight: 900;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="error-container">
+        <div class="error-code">404</div>
+        <h1>SYSTEM_FAULT</h1>
+        <p class="sys-message">
+            [ERR_503] Directory linkage failed.<br>
+            The requested console path does not exist in the Wolf OS database.
+        </p>
+
+        <a href="/index.html" class="btn-console">
+            <i class='bx bx-terminal'></i> RETURN TO CONSOLE
+        </a>
+    </div>
+
+    <div class="footer-logo">WOLF PALOMAR SYSTEMS</div>
+
+    <script>
+        // Automatic logging for your Netlify Analytics
+        console.error("Wolf OS: Route Fault Detected. Redirecting user options...");
+    </script>
+</body>
+</html>
