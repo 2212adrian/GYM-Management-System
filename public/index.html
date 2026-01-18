@@ -54,17 +54,17 @@
 
                         <form id="loginForm">
                             <!-- REFINED LABELS -->
-                            <label><i class='bx bx-id-card'></i> Administrative Email</label>
-                            <input type="email" id="email" placeholder="admin@wolfpalomar.com" required>
+                            <label><i class='bx bx-id-card'></i> Email Address</label>
+                            <input type="email" id="email" placeholder="e.g: johndoe@wolfpalomar.com" required>
 
-                            <label><i class='bx bx-lock-alt'></i> Access Password</label>
+                            <label><i class='bx bx-lock-alt'></i> Password</label>
                             <input type="password" id="password" placeholder="••••••••" required>
                         
                            
                           
                             <div class="checkbox-group">
                                 <input type="checkbox" id="loginAgreement" checked>
-                                <label for="loginAgreement" class="checkbox-label">I acknowledge the security protocol.</label>
+                                <label for="loginAgreement" class="checkbox-label">I agree to keep customer data secure and safe.</label>
                             </div>
                           
                             <button type="submit" id="loginBtn">LOGIN NOW</button>
@@ -74,7 +74,7 @@
                         <div id="loginOutput"></div>
                         
                         
-                            <div class="protocol-notice-box login-notice" style="margin-top: -10px;">
+                            <div class="protocol-notice-box login-notice" style="margin-top: 10px;">
                                 <div class="notice-header">
                                     <i class='bx bx-shield-quarter'></i>
                                     <span>ACCESS PROTOCOL</span>
@@ -96,16 +96,16 @@
                             <div id="recoveryStep1" class="active-step">
                                 <p class="desc">Enter authorized email to receive security key.</p>
                                 <form id="otpForm">
-                                    <input type="email" id="forgotEmail" placeholder="Email Address" required>
+                                  <label><i class='bx bx-id-card'></i> Email Address</label>
+                                    <input type="email" id="forgotEmail" placeholder="e.g: johndoe@wolfpalomar.com" required>
                                     <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
                                 </form>
-                                
+                                <div id="resetOutput"></div>
                                 <!-- NOTICE BOX -->
                                 <div class="protocol-notice-box">
                                     <div class="notice-header"><i class='bx bx-info-circle'></i><span>SYSTEM PROTOCOL</span></div>
                                     <div class="notice-body">Recovery Mode sends a secure OTP (One-Time Password) to your registered email address. This is used to request password changes and restore access to your account.</div>
                                 </div>
-
                                 <!-- MOVED HERE: Below notice box -->
                                 <a href="#" class="link-muted" id="backToLoginTrigger">Already have an account?</a>
 
@@ -114,7 +114,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="resetOutput"></div>
                     </div>
                 </div>
             </div>
@@ -149,7 +148,7 @@
             </div>
         </div>
     </div>
-
-    <script src="assets/js/auth.js"></script>
+    <script src="/assets/js/utils/audio-engine.js"></script>
+    <script src="/assets/js/auth.js"></script>
 </body>
 </html>

@@ -7,6 +7,69 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 const MAX_ATTEMPTS = 5;
 const OTP_COOLDOWN_SECONDS = 60; 
 const LOGIN_LOCKOUT_MINUTES = 5; 
+const words = ["Beyond Strength", "Beyond Limit", "Wolf Palomar", "Secure. Reliable. Fast."];
+// --- UTILS: LOGIN LOCKOUT TIMER ---
+let loginTimerInterval = null;
+
+// --- UTILS: GET IP ---
+    async function getClientIP() {
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            return data.ip;
+        } catch { return "unknown_device"; }
+    }
+
+function startLoginCountdown(seconds) {
+    if (loginTimerInterval) clearInterval(loginTimerInterval);
+    const loginBtn = document.getElementById('loginBtn');
+    const loginOutput = document.getElementById('loginOutput');
+
+    const updateUI = (secs) => {
+        if (secs <= 0) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = "AUTHORIZE ACCESS";
+            loginOutput.textContent = "";
+            clearInterval(loginTimerInterval);
+            return;
+        }
+        loginBtn.disabled = true;
+        const mins = Math.floor(secs / 60);
+        const remainingSecs = secs % 60;
+        loginBtn.textContent = `LOCKED: ${mins}m ${remainingSecs}s`;
+        loginOutput.style.color = "var(--wolf-red)";
+        loginOutput.textContent = `[ERR_403] Security protocol active. Terminal locked.`;
+    };
+
+    let timeLeft = seconds;
+    updateUI(timeLeft);
+    loginTimerInterval = setInterval(() => {
+        timeLeft--;
+        updateUI(timeLeft);
+    }, 1000);
+}
+
+// --- UTILS: CHECK DATABASE LOCKOUT ---
+async function checkLoginLockoutStatus() {
+    const userIP = await getClientIP();
+    const { data: log } = await supabaseClient.from('login_attempts').select('*').eq('ip_address', userIP).single();
+
+    if (log) {
+        const diff = (Date.now() - new Date(log.last_attempt_at).getTime()) / 60000;
+        
+        // If they hit max attempts and are still within the 5-minute window
+        if (log.attempts >= MAX_ATTEMPTS && diff < LOGIN_LOCKOUT_MINUTES) {
+            const remainingSeconds = Math.ceil((LOGIN_LOCKOUT_MINUTES - diff) * 60);
+            startLoginCountdown(remainingSeconds);
+            return true;
+        } 
+        // If 5 minutes passed, reset their record
+        else if (diff >= LOGIN_LOCKOUT_MINUTES) {
+            await supabaseClient.from('login_attempts').delete().eq('ip_address', userIP);
+        }
+    }
+    return false;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const inner = document.getElementById('flipCardInner');
@@ -16,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let otpTimerInterval = null;
     // --- restored: DYNAMIC STAR GENERATOR ---
     // Add this inside your DOMContentLoaded listener
+
     const createStars = () => {
         const container = document.getElementById('starContainer');
         if (!container) return;
@@ -57,7 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
     createStars();
 
     // --- restored: TYPEWRITER ENGINE ---
-    const words = ["Beyond Strength", "Beyond Limit", "Wolf Palomar", "Secure. Reliable. Fast."];
     let wordIdx = 0, charIdx = 0, isDeleting = false;
     function type() {
         const typewriterEl = document.getElementById('typewriterText');
@@ -81,14 +144,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     type();
 
-    // --- UTILS: GET IP ---
-    async function getClientIP() {
+    // --- LOGIN HANDLER WITH OUTRO ANIMATION ---
+    async function handleLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const loginBtn = document.getElementById('loginBtn');
+        const loginOutput = document.getElementById('loginOutput');
+        const userIP = await getClientIP();
+
+        // 1. Pre-check lockout
+        const isLocked = await checkLoginLockoutStatus();
+        if (isLocked) return;
+
+        loginBtn.disabled = true;
+        loginBtn.textContent = "AUTHORIZING...";
+
         try {
-            const res = await fetch('https://api.ipify.org?format=json');
-            const data = await res.json();
-            return data.ip;
-        } catch { return "unknown_device"; }
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                wolfAudio.play('denied');
+                const { data: check } = await supabaseClient.from('login_attempts').select('*').eq('ip_address', userIP).single();
+                let newCount = 1;
+
+                if (check) {
+                    const diff = (Date.now() - new Date(check.last_attempt_at).getTime()) / 60000;
+                    // If they wait > 5 mins, start fresh at 1, otherwise increment
+                    newCount = diff < LOGIN_LOCKOUT_MINUTES ? check.attempts + 1 : 1;
+                }
+
+                await supabaseClient.from('login_attempts').upsert({
+                    ip_address: userIP,
+                    attempts: newCount,
+                    last_attempt_at: new Date().toISOString()
+                });
+
+                if (newCount >= MAX_ATTEMPTS) {
+                    startLoginCountdown(LOGIN_LOCKOUT_MINUTES * 60);
+                } else {
+                    loginOutput.style.color = "var(--wolf-red)";
+                    loginOutput.textContent = `[ERR_101] Access denied. ${MAX_ATTEMPTS - newCount} attempts left.`;
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = "AUTHORIZE ACCESS";
+                    document.getElementById('password').value = '';
+                }
+            } else if (data.user.user_metadata.role === 'admin') {
+                // SUCCESS: Clear lockout record and animate out
+                wolfAudio.play('success');
+                await supabaseClient.from('login_attempts').delete().eq('ip_address', userIP);
+
+                const container = document.querySelector('.auth-split-container');
+                const card = document.querySelector('.flip-card');
+                if (container) container.classList.add('outro');
+                if (card) card.classList.add('outro');
+
+                setTimeout(() => {
+                    window.location.replace("/pages/main.html");
+                }, 2000);
+            } else {
+                wolfAudio.play('error'); 
+                loginOutput.textContent = "[ERR_102] Unauthorized role.";
+                await supabaseClient.auth.signOut();
+                loginBtn.disabled = false;
+                loginBtn.textContent = "AUTHORIZE ACCESS";
+            }
+        } catch (err) {
+            loginOutput.textContent = "[ERR_500] System Fault.";
+            loginBtn.disabled = false;
+        }
     }
+
+    checkLoginLockoutStatus();
 
     // --- UTILS: START COOLDOWN TIMER ---
     function startOtpCountdown(seconds) {
@@ -97,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const updateUI = (secs) => {
             const sendBtn = document.getElementById('sendOtpBtn');
             const resendBtn = document.getElementById('resendOtpBtn');
-            const text = secs > 0 ? `WAIT ${secs}s` : null;
+            const text = secs > 0 ? `OTP SENT! WAIT ANOTHER ${secs}s TO SEND AGAIN` : null;
 
             if (sendBtn) {
                 sendBtn.disabled = secs > 0;
@@ -137,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return 0;
     }
+    
 
     // --- UTILS: AJAX LOAD & TRANSITION ---
     async function loadVerifyFragment() {
@@ -166,190 +293,114 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- LOGIN HANDLER WITH OUTRO ANIMATION ---
-    async function handleLogin() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const loginBtn = document.getElementById('loginBtn');
-        const loginOutput = document.getElementById('loginOutput');
-
-        loginBtn.disabled = true;
-        loginBtn.textContent = "AUTHORIZING...";
-
-        try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-            if (error) {
-                loginOutput.style.color = "var(--wolf-red)";
-                loginOutput.textContent = "[ERR_401] Access denied.";
-                loginBtn.disabled = false;
-                loginBtn.textContent = "AUTHORIZE ACCESS";
-            } else if (data.user.user_metadata.role === 'admin') {
-                // restored: TRIGGER CINEMATIC OUTRO
-                const container = document.querySelector('.auth-split-container');
-                const card = document.querySelector('.flip-card');
-                
-                if (container) container.classList.add('outro');
-                if (card) card.classList.add('outro');
-
-                loginOutput.style.color = "#4ade80";
-                loginOutput.textContent = "Identity Verified. Accessing Terminal...";
-
-                // Wait for the CSS outro animation to finish (2 seconds)
-                setTimeout(() => {
-                    window.location.replace("/pages/main.html");
-                }, 2000);
-            } else {
-                loginOutput.textContent = "[ERR_102] Unauthorized role.";
-                await supabaseClient.auth.signOut();
-                loginBtn.disabled = false;
-                loginBtn.textContent = "AUTHORIZE ACCESS";
-            }
-        } catch (err) {
-            loginOutput.textContent = "[ERR_500] System Fault.";
-            loginBtn.disabled = false;
-        }
-    }
-
-    // --- OTP COOLDOWN MANAGEMENT ---
-    let countdownInterval = null;
-    let cooldownEndTime = null; // Store when cooldown should end
-    
-    async function checkOtpCooldown() {
-        try {
-            const response = await fetch('/.netlify/functions/check-otp-cooldown');
-            const data = await response.json();
-            return data;
-        } catch (err) {
-            console.error('Cooldown check failed:', err);
-            // For local development, implement client-side cooldown
-            if (cooldownEndTime && Date.now() < cooldownEndTime) {
-                const remainingTime = Math.ceil((cooldownEndTime - Date.now()) / 1000);
-                return { canSend: false, remainingTime };
-            }
-            return { canSend: true, remainingTime: 0 };
-        }
-    }
-    
-    async function updateOtpCooldown() {
-        try {
-            await fetch('/.netlify/functions/update-otp-cooldown', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (err) {
-            console.error('Cooldown update failed:', err);
-            // For local development, set client-side cooldown
-            cooldownEndTime = Date.now() + (60 * 1000); // 60 seconds from now
-        }
-    }
-    
-    function startCountdown(seconds, button) {
-        // Clear any existing countdown
-        if (countdownInterval) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
-        }
-        
-        // Store original button text
-        const originalText = button.getAttribute('data-original-text') || button.textContent;
-        if (!button.getAttribute('data-original-text')) {
-            button.setAttribute('data-original-text', originalText);
-        }
-        
-        let timeLeft = seconds;
-        button.disabled = true;
-        button.textContent = `WAIT ${timeLeft}s`;
-        
-        countdownInterval = setInterval(() => {
-            timeLeft--;
-            button.textContent = `WAIT ${timeLeft}s`;
-            
-            if (timeLeft <= 0) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-                button.disabled = false;
-                button.textContent = originalText;
-                button.removeAttribute('data-original-text');
-            }
-        }, 1000);
-    }
-
     // --- OTP REQUEST HANDLER ---
     // 1. Add this variable at the top of your script (outside handleOtpRequest)
     let isProcessingOtp = false;
 
     // 2. Update your handleOtpRequest function
     async function handleOtpRequest() {
-        if (isProcessingOtp) return; // Prevent spamming
+    if (isProcessingOtp) return; // Prevent spamming
 
-            const resetOutput = document.getElementById('resetOutput');
-            const sendBtn = document.getElementById('sendOtpBtn');
-            const resendBtn = document.getElementById('resendOtpBtn'); // Injected via AJAX
-        // INSTANT UI LOCK
-        isProcessingOtp = true;
-        if (sendBtn) sendBtn.disabled = true;
-        if (resendBtn) {
-            resendBtn.style.pointerEvents = "none";
-            resendBtn.style.opacity = "0.5";
-        }
+    const resetOutput = document.getElementById('resetOutput');
+    const sendBtn = document.getElementById('sendOtpBtn');
+    const resendBtn = document.getElementById('resendOtpBtn'); 
 
-        const email = document.getElementById('forgotEmail')?.value || '';
+    // --- 1. INSTANT FEEDBACK ---
+    isProcessingOtp = true;
+    resetOutput.style.color = "#888";
+    resetOutput.textContent = "Establishing connection to server..."; // Status message
 
-        try {
-            // 1. Check DB Cooldown
-            const remaining = await checkExistingCooldown();
-            if (remaining > 0) {
-                startOtpCountdown(remaining); // Resume visual timer
-                isProcessingOtp = false; // Unlock guard
-                return;
-            }
-
-            // 2. Request OTP from Netlify Function
-            const res = await fetch('/.netlify/functions/request-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-
-            if (res.ok) {
-                // 3. Log success to Supabase
-                await supabaseClient.from('otp_cooldowns').upsert({ 
-                    ip_address: await getClientIP(), 
-                    last_sent_at: new Date().toISOString() 
-                });
-
-                startOtpCountdown(60); // Start 1-minute timer
-
-                // 4. Load fragment only if it's the first time
-                if (!document.getElementById('recoveryStep2')) {
-                    await loadVerifyFragment();
-                } else {
-                    resetOutput.style.color = "#4ade80";
-                    resetOutput.textContent = "Your security code has been resent to your email.";
-                }
-            } else {
-                resetOutput.textContent = "[ERR_401] Authorization failed.";
-                isProcessingOtp = false; // Unlock guard on error
-            }
-        } catch (err) {
-            isProcessingOtp = false; // Unlock guard on network error
-        } finally {
-            // Ensure buttons return to a clickable state if no timer is running
-            setTimeout(() => { isProcessingOtp = false; }, 1000);
-        }
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.textContent = "TRANSMITTING..."; // Button loading state
+    }
+    if (resendBtn) {
+        resendBtn.style.pointerEvents = "none";
+        resendBtn.style.opacity = "0.5";
+        resendBtn.textContent = "RESENDING OTP CODES TO EMAIL...";
     }
 
+    const email = document.getElementById('forgotEmail')?.value || '';
+
+    try {
+        // Check cooldown in DB first
+        const remaining = await checkExistingCooldown();
+        if (remaining > 0) {
+            startOtpCountdown(remaining);
+            resetOutput.style.color = "var(--wolf-red)";
+            resetOutput.textContent = `[ERR_429] Security protocol active. Cooldown in progress.`;
+            isProcessingOtp = false;
+            return;
+        }
+
+        // --- 2. TRANSMISSION STATUS ---
+        resetOutput.textContent = "Checking existing email...";
+
+        const res = await fetch('/.netlify/functions/request-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+
+        if (res.ok) {
+            await supabaseClient.from('otp_cooldowns').upsert({ 
+                ip_address: await getClientIP(), 
+                last_sent_at: new Date().toISOString() 
+            });
+
+            startOtpCountdown(60);
+
+            // --- 3. SUCCESS STATUS ---
+            wolfAudio.play('notif'); 
+            resetOutput.style.color = "#4ade80";
+            resetOutput.textContent = "Your OTP key has been sent to your email.";
+
+            if (!document.getElementById('recoveryStep2')) {
+                await loadVerifyFragment();
+            }
+        } else {
+            // --- 4. ERROR STATUS ---
+            wolfAudio.play('error'); 
+            resetOutput.style.color = "var(--wolf-red)";
+            resetOutput.textContent = "[ERR_401] Identification failed. Email unauthorized.";
+            isProcessingOtp = false;
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = "SEND SECURITY OTP";
+            }
+        }
+    } catch (err) {
+        resetOutput.style.color = "var(--wolf-red)";
+        resetOutput.textContent = "[ERR_503] Gateway timeout. Terminal offline.";
+        isProcessingOtp = false;
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.textContent = "SEND SECURITY OTP";
+        }
+    } finally {
+        setTimeout(() => { isProcessingOtp = false; }, 1000);
+    }
+}
+
+    // --- RESET PASSWORD HANDLER (FOR AJAX INJECTED FORM) ---
     // --- RESET PASSWORD HANDLER (FOR AJAX INJECTED FORM) ---
     function initVerifyForm() {
         const verifyForm = document.getElementById('verifyResetForm');
-        if (!verifyForm) return;
+        const step2 = document.getElementById('recoveryStep2');
+        if (!verifyForm || !step2) return;
+
+        // Target the specific output inside Step 2
+        const localOutput = step2.querySelector('#resetOutput');
 
         verifyForm.onsubmit = async (e) => {
             e.preventDefault();
             const resetBtn = verifyForm.querySelector('button[type="submit"]');
+            
+            // 1. INSTANT FEEDBACK
             resetBtn.disabled = true;
-            resetBtn.textContent = "RESTORING...";
+            resetBtn.textContent = "RECONFIGURING...";
+            localOutput.style.color = "#888";
+            localOutput.textContent = "Verifying OTP Code Credential...";
 
             const email = document.getElementById('forgotEmail').value;
             const newPassword = document.getElementById('newPassword').value;
@@ -363,16 +414,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (res.ok) {
+                    wolfAudio.play('success')
+                    localOutput.style.color = "#4ade80";
+                    localOutput.textContent = "Protocol success. Password updated.";
                     document.getElementById('successModal').style.display = 'flex';
                 } else {
-                    resetOutput.style.color = "var(--wolf-red)";
-                    resetOutput.textContent = "[ERR_602] Invalid or expired key.";
+                    const data = await res.json();
+                    wolfAudio.play('denied')
+                    localOutput.style.color = "var(--wolf-red)";
+                    localOutput.textContent = "[ERR_602] Security key invalid or expired.";
                     resetBtn.disabled = false;
                     resetBtn.textContent = "RESTORE SYSTEM ACCESS";
                 }
             } catch (err) {
+                wolfAudio.play('error');
                 resetBtn.disabled = false;
-                resetOutput.textContent = "[ERR_500] Database fault.";
+                localOutput.style.color = "var(--wolf-red)";
+                localOutput.textContent = "[ERR_500] Database synchronization fault.";
             }
         };
     }
@@ -421,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'backToLoginTrigger' || e.target.id === 'backToLoginTriggerSecondary') {
             e.preventDefault();
             if (document.getElementById('recoveryStep2')) {
+                wolfAudio.play('notif');
                 exitModal.style.display = 'flex';
             } else {
                 inner.classList.remove('flipped');
@@ -440,16 +499,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initOtpFields() {
         const fields = document.querySelectorAll('.otp-field');
+        
         fields.forEach((f, idx) => {
-            f.oninput = () => { if (f.value && idx < 5) fields[idx+1].focus(); };
-            f.onkeydown = (e) => { if (e.key === 'Backspace' && !f.value && idx > 0) fields[idx-1].focus(); };
+            // 1. Handle Typing & Numeric Filter
+            f.oninput = (e) => {
+                // REGEX: Replace any character that is NOT 0-9 with an empty string
+                f.value = f.value.replace(/[^0-9]/g, '');
+
+                // Auto-focus next field
+                if (f.value && idx < 5) {
+                    fields[idx + 1].focus();
+                }
+            };
+
+            // 2. Handle Backspace Navigation
+            f.onkeydown = (e) => {
+                if (e.key === 'Backspace' && !f.value && idx > 0) {
+                    fields[idx - 1].focus();
+                }
+            };
+
+            // 3. Handle Numeric-Only Paste
             f.onpaste = (e) => {
                 e.preventDefault();
-                const pasteNumbers = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-                for (let i = 0; i < pasteNumbers.length && idx + i < fields.length; i++) {
-                    fields[idx + i].value = pasteNumbers[i];
-                    if (idx + i < 5) fields[idx + i + 1].focus();
+                const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+                
+                // Strip everything except numbers from the pasted text
+                const numbersOnly = pasteData.replace(/[^0-9]/g, ''); 
+
+                // Distribute the digits across the fields starting from current index
+                for (let i = 0; i < numbersOnly.length && (idx + i) < fields.length; i++) {
+                    fields[idx + i].value = numbersOnly[i];
                 }
+
+                // Move focus to the last filled box or the next empty one
+                const nextFocus = Math.min(idx + numbersOnly.length, 5);
+                fields[nextFocus].focus();
             };
         });
     }

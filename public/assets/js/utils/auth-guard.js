@@ -32,16 +32,16 @@
         } catch { return "unknown_terminal"; }
     }
 
-    async function checkIPLockout(ip) {
-        const { data } = await supabase.from('login_attempts').select('*').eq('ip_address', ip).single();
-        
-        if (data && data.attempts >= 5) {
-            const diff = (Date.now() - new Date(data.last_attempt_at).getTime()) / 1000;
-            const remaining = Math.ceil(600 - diff); // 10 minutes (600s)
-            if (remaining > 0) return remaining;
-        }
-        return 0;
-    }
+    //async function checkIPLockout(ip) {
+    //    const { data } = await supabase.from('login_attempts').select('*').eq('ip_address', ip).single();
+    //    
+    //    if (data && data.attempts >= 5) {
+    //        const diff = (Date.now() - new Date(data.last_attempt_at).getTime()) / 1000;
+    //        const remaining = Math.ceil(600 - diff); // 10 minutes (600s)
+    //        if (remaining > 0) return remaining;
+    //    }
+    //    return 0;
+    //}
 
     // --- CORE SECURITY ENGINE ---
     async function evaluateSecurity() {
@@ -52,23 +52,23 @@
         const isAdmin = user && user.user_metadata?.role === 'admin';
 
         // RULE 1: IP LOCKOUT PROTECTION [ERR_403]
-        const lockoutSeconds = await checkIPLockout(userIP);
-        if (lockoutSeconds > 0) {
-            console.warn(`[ERR_403] Terminal Locked: ${userIP}`);
-            if (isProtectedPage || isLoginPage) {
-                window.location.replace(`${PATH_UNAUTHORIZED}?err=403&time=${lockoutSeconds}`);
-                return;
-            }
-        }
+        //const lockoutSeconds = await checkIPLockout(userIP);
+        //if (lockoutSeconds > 0) {
+        //    console.warn(`[ERR_403] Terminal Locked: ${userIP}`);
+        //    if (isProtectedPage || isLoginPage) {
+        //        window.location.replace(`${PATH_UNAUTHORIZED}?err=403&time=${lockoutSeconds}`);
+        //        return;
+        //    }
+        //}
 
-        // RULE 2: ACCESS REDIRECTS (Already Logged In)
+        // RULE 1: ACCESS REDIRECTS (Already Logged In)
         if (isLoginPage && user && isAdmin) {
             console.log("Wolf OS: Session active. Accessing Main Panel...");
             window.location.replace(PATH_MAIN);
             return;
         }
 
-        // RULE 3: PROTECTED AREA VALIDATION
+        // RULE 2: PROTECTED AREA VALIDATION
         if (isProtectedPage) {
             if (!user) {
                 console.error("[ERR_101] No session detected.");

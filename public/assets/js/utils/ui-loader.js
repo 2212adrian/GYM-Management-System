@@ -210,7 +210,7 @@ async function loadHTML(path) {
 
 async function initUI() {
     themeManager.init();
-
+    
     // Start loading sequence
     createLoadingStars();
 
@@ -220,6 +220,23 @@ async function initUI() {
         document.getElementById('stars-container').style.display = 'none';
         document.getElementById('loading-screen').style.display = 'flex';
         document.getElementById('loading-screen').classList.add('show');
+        const overlay = document.getElementById('loading-overlay');
+            const layout = document.getElementById('wolf-layout');
+
+            if (overlay) overlay.classList.add('fade-out');
+            if (layout) layout.style.display = 'block';
+            
+            // PLAY INTRO HERE
+            // This triggers as the system "Boots" and becomes visible
+            if (window.wolfAudio) {
+                window.wolfAudio.play('intro');
+            } else {
+                alert('nope')
+            }
+
+            setTimeout(() => {
+                if (overlay) overlay.style.display = 'none';
+            }, 800);
     }, 2000);
 
     try {
@@ -238,6 +255,22 @@ async function initUI() {
         // This is the "Magic Fix" - it handles clicks even for items not loaded yet.
         document.addEventListener('click', async (e) => {
             
+            const muteBtn = e.target.closest('#muteToggleBtn');
+            if (muteBtn) {
+                e.preventDefault();
+                const isMuted = wolfAudio.toggleMute();
+                
+                // Update Icon visually
+                const icon = muteBtn.querySelector('i');
+                if (isMuted) {
+                    icon.className = 'bx bx-volume-mute';
+                    muteBtn.style.opacity = '0.5';
+                } else {
+                    icon.className = 'bx bx-volume-full';
+                    muteBtn.style.opacity = '1';
+                }
+            }
+
             // A. Handle Navigation (data-page)
             const navBtn = e.target.closest('[data-page]');
             if (navBtn) {

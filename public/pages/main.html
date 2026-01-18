@@ -24,12 +24,25 @@
     </style>
 </head>
 <body id="wolf-terminal">
-    
+
+    <div id="loading-overlay">
+        <!-- 1. Star container for the first 2 seconds -->
+        <div id="stars-container"></div>
+
+        <!-- 2. The actual loading info screen -->
+        <div id="loading-screen" style="display:none;">
+            <div class="boot-logo">WOLF <span>OS</span></div>
+            <div class="boot-spinner"></div>
+            <div class="boot-status">INITIALIZING CORE SYSTEMS...</div>
+        </div>
+    </div>
+
     <div id="sidebar-backdrop"></div> 
     <div id="topbar-container"></div>
     <div id="sidebar-container"></div>
 
 <!-- SYSTEM QR SCANNER (Hidden by default) -->
+
 <div id="wolf-scanner-overlay" style="display:none;">
     <div class="scanner-ui-wrapper">
         <div class="scanner-header-bar">
@@ -97,7 +110,6 @@
         <div class="modal-footer-glitch">ENCRYPTION: AES-256 | ACCESS LOGGED</div>
     </div>
 </div>
-
     <div id="wolf-layout">
         <div id="sidebar-container"></div>
         <main id="main-content">
@@ -119,6 +131,7 @@
     <div id="nav-container"></div>
 
     <!-- UI Logic -->
+    <script src="/assets/js/utils/audio-engine.js"></script>
     <script src="/assets/js/utils/supabase-init.js"></script>
     <script src="/assets/js/utils/ui-loader.js"></script>
     <script src="/assets/js/utils/data-loader.js"></script>
@@ -126,6 +139,7 @@
 
     <!-- Internal Security (Direct Access Redirect) -->
     <script>
+       
     (function () {
         if (!window.WOLF_INTERNAL_SHELL) {
             document.documentElement.style.display = 'none';

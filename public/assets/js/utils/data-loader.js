@@ -101,49 +101,55 @@ const wolfData = {
     },
 
     renderSales(day, searchTerm = "") {
-        const container = document.getElementById('sales-list-container');
-        const revenueEl = document.getElementById('sales-total-amount');
-        const labelEl = document.getElementById('sales-summary-label');
-        
-        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        if (labelEl) labelEl.innerText = `${dayNames[day]} Total Income`;
+    const container = document.getElementById('sales-list-container');
+    const revenueEl = document.getElementById('sales-total-amount');
+    const labelEl = document.getElementById('sales-summary-label');
+    
+    // --- THE FIX: Stop if elements are missing ---
+    if (!container) {
+        console.warn("Wolf OS: Sales container not found. Skipping render.");
+        return; 
+    }
 
-        const filtered = this.salesDataCache.filter(sale => {
-            const dateMatch = new Date(sale.created_at).getDay() == day;
-            const searchLower = searchTerm.toLowerCase();
-            const nameMatch = sale.products?.name.toLowerCase().includes(searchLower);
-            const refMatch = sale.sale_reference?.toLowerCase().includes(searchLower);
-            return dateMatch && (nameMatch || refMatch);
-        });
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    if (labelEl) labelEl.innerText = `${dayNames[day]} Total Income`;
 
-        let total = 0;
-        if (filtered.length === 0) {
-            container.innerHTML = `<p style="text-align:center; color:#444; margin-top:40px;">No sales found.</p>`;
-            if (revenueEl) revenueEl.innerText = `₱0`;
-            return;
-        }
+    const filtered = this.salesDataCache.filter(sale => {
+        const dateMatch = new Date(sale.created_at).getDay() == day;
+        const searchLower = searchTerm.toLowerCase();
+        const nameMatch = sale.products?.name?.toLowerCase().includes(searchLower);
+        const refMatch = sale.sale_reference?.toLowerCase().includes(searchLower);
+        return dateMatch && (nameMatch || refMatch);
+    });
 
-        container.innerHTML = filtered.map(sale => {
-            total += sale.total_amount;
-            const time = new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            return `
-            <div class="list-item-card" style="padding: 15px 20px; margin-bottom:10px;">
-                <div class="card-header" style="margin-bottom: 0;">
-                    <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);"><i class='bx bx-shopping-bag'></i></div>
-                    <div class="item-info">
-                        <h4 style="font-weight: 800;">${sale.products?.name || 'Item'}</h4>
-                        <div class="time" style="font-size: 11px; color: #555;">${time} • x${sale.qty} Units</div>
-                    </div>
-                    <div class="card-actions">
-                        <div style="color: var(--wolf-red); font-weight: 900; font-style: italic; font-size: 1.1rem;">₱${sale.total_amount.toLocaleString()}</div>
-                        <i class='bx bx-trash' style="color: #333; cursor: pointer; font-size: 18px;" onclick="wolfData.deleteSale('${sale.id}')"></i>
-                    </div>
+    let total = 0;
+    if (filtered.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:#444; margin-top:40px;">No sales found.</p>`;
+        if (revenueEl) revenueEl.innerText = `₱0`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(sale => {
+        total += sale.total_amount;
+        const time = new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `
+        <div class="list-item-card" style="padding: 15px 20px; margin-bottom:10px;">
+            <div class="card-header" style="margin-bottom: 0;">
+                <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);"><i class='bx bx-shopping-bag'></i></div>
+                <div class="item-info">
+                    <h4 style="font-weight: 800;">${sale.products?.name || 'Item'}</h4>
+                    <div class="time" style="font-size: 11px; color: #555;">${time} • x${sale.qty} Units</div>
                 </div>
-            </div>`;
-        }).join('');
+                <div class="card-actions">
+                    <div style="color: var(--wolf-red); font-weight: 900; font-style: italic; font-size: 1.1rem;">₱${sale.total_amount.toLocaleString()}</div>
+                    <i class='bx bx-trash' style="color: #333; cursor: pointer; font-size: 18px;" onclick="wolfData.deleteSale('${sale.id}')"></i>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 
-        if (revenueEl) revenueEl.innerText = `₱${total.toLocaleString()}`;
-    },
+    if (revenueEl) revenueEl.innerText = `₱${total.toLocaleString()}`;
+},
 
     // ==========================================
     // 3. UTILS & SHARED LOGIC
