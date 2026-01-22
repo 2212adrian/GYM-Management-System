@@ -117,14 +117,24 @@ window.wolfScanner = {
   },
 
   async launchCamera(cameraId) {
+    // STOP EXISTING CAMERA CLEANLY
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Failed to stop previous camera:', e);
+      }
+      html5QrCode.clear();
       html5QrCode = null;
     }
 
+    // CLEAR VIEWFINDER
+    const reader = document.getElementById('reader');
+    reader.innerHTML = '';
+
+    // CREATE NEW INSTANCE
     html5QrCode = new Html5Qrcode('reader');
+
     try {
       await html5QrCode.start(
         cameraId,
@@ -168,31 +178,30 @@ window.wolfScanner = {
   },
 
   async stop() {
-    if (html5QrCode && html5QrCode.isScanning) {
-      await html5QrCode.stop();
+    if (html5QrCode) {
+      try {
+        await html5QrCode.stop();
+      } catch (e) {
+        console.warn('Stop failed:', e);
+      }
+      try {
+        html5QrCode.clear();
+      } catch (e) {
+        console.warn('Clear failed:', e);
+      }
+      html5QrCode = null;
     }
 
     document.getElementById('wolf-scanner-overlay').style.display = 'none';
     document.querySelector('.btn-guest-entry')?.classList.remove('visible');
 
-    // We check if salesManager exists first to prevent errors
-    if (
-      window.salesManager &&
-      typeof window.salesManager.showTopInstruction === 'function'
-    ) {
-      window.salesManager.showTopInstruction(false);
-    }
-
-    this.isProcessingResult = false; // Always unlock on stop
-    if (html5QrCode && html5QrCode.isScanning) await html5QrCode.stop();
-    document.getElementById('wolf-scanner-overlay').style.display = 'none';
-
     if (this.onCloseCallback) {
       this.onCloseCallback();
       this.onCloseCallback = null;
     }
-  },
 
+    this.isProcessingResult = false;
+  },
   showInactiveUI(message) {
     const reader = document.getElementById('reader');
     if (window.wolfAudio) window.wolfAudio.play('error');
