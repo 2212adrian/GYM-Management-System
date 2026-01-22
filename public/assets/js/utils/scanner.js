@@ -57,36 +57,43 @@ window.wolfScanner = {
   },
   // salesManager.js or scanner.js
   async cycleCamera() {
-    // 1. Play feedback
     if (window.wolfAudio) window.wolfAudio.play('notif');
 
-    // 2. Toggle state
+    // Toggle the state
     this.isFrontFacing = !this.isFrontFacing;
     const mode = this.isFrontFacing ? 'user' : 'environment';
 
-    // 3. Update UI feedback
+    // Show status feedback
     const statusText = document.querySelector('.scanner-footer-status span');
     if (statusText)
-      statusText.textContent = `SWITCHING TO ${mode.toUpperCase()}...`;
+      statusText.textContent = `RE-LINKING OPTICS (${mode.toUpperCase()})...`;
 
-    // 4. Restart with facingMode (The "Safe" way for mobile)
+    // RESTART
     await this.launchCamera({ facingMode: mode });
   },
 
   async launchCamera(cameraConfig) {
-    // CRITICAL: Fully stop and clear before restarting
+    const readerDiv = document.getElementById('reader');
+
+    // 1. STEP 1: Aggressively kill the previous instance
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
         html5QrCode = null;
       } catch (e) {
-        console.warn('Stop failed, clearing anyway.');
+        console.warn('Clean stop failed, Proceeding to DOM wipe.');
       }
     }
 
-    // Small delay to let hardware release the camera sensor
-    await new Promise((r) => setTimeout(r, 100));
+    // 2. STEP 2: THE BRUTE FORCE FIX
+    // Completely empty the div to destroy any "stuck" video elements
+    readerDiv.innerHTML = '';
 
+    // 3. STEP 3: Hardware Cooldown
+    // We give the phone's OS 300ms to physically close the lens shutter
+    await new Promise((r) => setTimeout(r, 300));
+
+    // 4. STEP 4: Fresh Start
     html5QrCode = new Html5Qrcode('reader');
 
     try {
@@ -103,8 +110,18 @@ window.wolfScanner = {
       const statusText = document.querySelector('.scanner-footer-status span');
       if (statusText) statusText.textContent = 'CAMERA ACTIVE | OPTICS LINKED';
     } catch (err) {
-      console.error(err);
-      this.showInactiveUI('HARDWARE_FAULT');
+      console.error('Camera Start Error:', err);
+      // If environment fails, try a generic start as a last resort
+      if (!this.isFrontFacing) {
+        console.log('Environment failed, trying fallback...');
+        this.showInactiveUI('RE-TRYING LINK...');
+        setTimeout(
+          () => this.launchCamera({ facingMode: 'environment' }),
+          1000,
+        );
+      } else {
+        this.showInactiveUI('HARDWARE_FAULT');
+      }
     }
   },
 

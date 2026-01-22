@@ -223,6 +223,18 @@
       display: none !important;
     }
   }
+  #reader {
+    width: 100% !important;
+    height: 100% !important;
+    background: #000; /* Keeps it black during the 300ms reset */
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  /* Ensure the video fills the HUD area */
+  #reader video {
+    object-fit: cover !important;
+  }
 </style>
 <!-- SYSTEM QR SCANNER OVERLAY -->
 <div id="wolf-scanner-overlay" style="display: none">
