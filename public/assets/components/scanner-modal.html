@@ -156,12 +156,6 @@
     box-shadow: 0 0 15px rgba(166, 52, 41, 0.2);
   }
 
-  /* --- MOBILE RESPONSIVE HIDE --- */
-  @media (max-width: 767px) {
-    #camera-selector-wrap {
-      display: none !important;
-    }
-  }
   #camera-selector-wrap {
     flex-grow: 1;
     display: flex;
@@ -187,6 +181,48 @@
   #wolf-system-alert {
     z-index: 999999 !important;
   }
+  .scanner-action-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #eab308;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .scanner-action-btn:active {
+    background: #eab308;
+    color: #000;
+  }
+
+  /* --- DESKTOP LOGIC --- */
+  @media (min-width: 768px) {
+    .mobile-only-controls {
+      display: none !important;
+    }
+    .pc-only-controls {
+      display: block !important;
+    }
+  }
+
+  /* --- MOBILE LOGIC --- */
+  @media (max-width: 767px) {
+    .pc-only-controls {
+      display: none !important;
+    }
+    .mobile-only-controls {
+      display: block !important;
+      position: relative;
+      left: 35px;
+    }
+    #camera-selector-wrap {
+      display: none !important;
+    }
+  }
 </style>
 <!-- SYSTEM QR SCANNER OVERLAY -->
 <div id="wolf-scanner-overlay" style="display: none">
@@ -194,14 +230,27 @@
     <div class="scanner-header-bar">
       <div class="brand">SCAN <span>MODULE</span></div>
 
-      <!-- NEW: Camera Picker Dropdown (Hidden for mobile) -->
-      <div id="camera-selector-wrap" style="display: none; margin: 0 15px">
-        <select id="cameraSelect" class="scanner-dropdown"></select>
-      </div>
+      <div
+        id="camera-controls-group"
+        style="display: flex; gap: 10px; align-items: center"
+      >
+        <!-- 1. PC ONLY: Dropdown Selector -->
+        <div id="pc-camera-selector" class="pc-only-controls">
+          <select id="cameraSelect" class="scanner-dropdown"></select>
+        </div>
 
-      <button id="exitScannerBtn" class="scanner-close-x">
-        <i class="bx bx-x"></i>
-      </button>
+        <!-- 2. MOBILE ONLY: Switch Button -->
+        <div id="mobile-camera-selector" class="mobile-only-controls">
+          <button id="flipCameraBtn" class="scanner-action-btn">
+            <i class="bx bx-refresh"></i>
+          </button>
+        </div>
+
+        <!-- Existing Close Button -->
+        <button id="exitScannerBtn" class="scanner-close-x">
+          <i class="bx bx-x"></i>
+        </button>
+      </div>
     </div>
 
     <div class="viewfinder-container">

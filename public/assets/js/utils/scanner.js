@@ -28,38 +28,68 @@ window.wolfScanner = {
 
     this.activeCallback = callback;
     this.onCloseCallback = onClose;
-
-    const overlay = document.getElementById('wolf-scanner-overlay');
-    overlay.style.display = 'flex';
-
-    // Fix: Properly handle Guest Button visibility
-    const guestBtn = document.querySelector('.btn-guest-entry');
-    const quickAuthWrap = document.querySelector('.quick-auth-wrapper');
-    if (guestBtn) {
-      if (hideGuest) {
-        guestBtn.style.setProperty('display', 'none', 'important');
-        quickAuthWrap.style.setProperty('display', 'none', 'important');
-      } else {
-        guestBtn.style.setProperty('display', 'flex', 'important');
-        quickAuthWrap.style.setProperty('display', 'flex', 'important');
-      }
-    }
+    document.getElementById('wolf-scanner-overlay').style.display = 'flex';
 
     try {
-      // Force permission check to get labels for PC
-      await navigator.mediaDevices.getUserMedia({ video: true });
       const cameras = await Html5Qrcode.getCameras();
+      this.availableCameras = cameras;
 
       if (cameras && cameras.length > 0) {
-        this.setupCameraSelector(cameras);
-        const selectedId = this.currentCameraId || cameras[0].id;
-        this.launchCamera(selectedId);
-      } else {
-        throw new Error('No cameras found');
+        // 1. SETUP PC DROPDOWN
+        const selector = document.getElementById('cameraSelect');
+        selector.innerHTML = cameras
+          .map(
+            (cam, index) =>
+              `<option value="${cam.id}">${cam.label || 'Camera ' + (index + 1)}</option>`,
+          )
+          .join('');
+
+        selector.onchange = (e) => {
+          this.launchCamera(e.target.value);
+          // Sync index for mobile just in case window is resized
+          this.currentCamIndex = cameras.findIndex(
+            (c) => c.id === e.target.value,
+          );
+        };
+
+        // 2. SETUP MOBILE SWITCH
+        const flipBtn = document.getElementById('flipCameraBtn');
+        flipBtn.onclick = () => this.cycleCamera();
+
+        // 3. AUTO-SELECT BACK CAMERA
+        let backCamIndex = cameras.findIndex(
+          (cam) =>
+            cam.label.toLowerCase().includes('back') ||
+            cam.label.toLowerCase().includes('environment') ||
+            cam.label.toLowerCase().includes('rear'),
+        );
+
+        this.currentCamIndex = backCamIndex !== -1 ? backCamIndex : 0;
+
+        // Update dropdown to match auto-selected index
+        selector.value = cameras[this.currentCamIndex].id;
+
+        this.launchCamera(cameras[this.currentCamIndex].id);
       }
     } catch (err) {
       this.showInactiveUI('PERMISSION DENIED');
     }
+  },
+
+  // salesManager.js or scanner.js
+  async cycleCamera() {
+    if (this.availableCameras.length < 2) return;
+
+    // Play click sound
+    if (window.wolfAudio) window.wolfAudio.play('notif');
+
+    // Cycle index
+    this.currentCamIndex =
+      (this.currentCamIndex + 1) % this.availableCameras.length;
+    const nextCamId = this.availableCameras[this.currentCamIndex].id;
+
+    // Re-launch
+    await this.launchCamera(nextCamId);
   },
 
   setupCameraSelector(cameras) {
@@ -87,25 +117,22 @@ window.wolfScanner = {
   },
 
   async launchCamera(cameraId) {
-    const statusText = document.querySelector('.scanner-footer-status span');
     if (html5QrCode) {
-      if (html5QrCode.isScanning) await html5QrCode.stop();
+      try {
+        await html5QrCode.stop();
+      } catch (e) {}
       html5QrCode = null;
     }
 
     html5QrCode = new Html5Qrcode('reader');
-    this.currentCameraId = cameraId;
-
     try {
       await html5QrCode.start(
         cameraId,
         { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        (decodedText) => this.processResult(decodedText, 'DIGITAL_CODE'),
+        (text) => this.processResult(text, 'SCAN'),
       );
-      if (statusText)
-        statusText.textContent = 'CAMERA ACTIVE | TERMINAL SECURE';
     } catch (err) {
-      this.showInactiveUI('HARDWARE FAULT');
+      this.showInactiveUI('HARDWARE_FAULT');
     }
   },
 
