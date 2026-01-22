@@ -42,110 +42,70 @@ window.wolfScanner = {
 
     this.activeCallback = callback;
     this.onCloseCallback = onClose;
-    document.getElementById('wolf-scanner-overlay').style.display = 'flex';
+
+    const overlay = document.getElementById('wolf-scanner-overlay');
+    overlay.style.display = 'flex';
 
     try {
-      // 1. Get ALL hardware IDs
       const cameras = await Html5Qrcode.getCameras();
       this.availableCameras = cameras;
-      this.debug(`FOUND ${cameras.length} LENSES`);
 
       if (cameras && cameras.length > 0) {
-        // Find the index of the first back camera to start with
-        let backIdx = cameras.findIndex(
-          (c) =>
-            c.label.toLowerCase().includes('back') ||
-            c.label.toLowerCase().includes('environment'),
-        );
-        this.currentCamIndex = backIdx !== -1 ? backIdx : 0;
+        // 1. SETUP PC DROPDOWN
+        const selector = document.getElementById('cameraSelect');
+        selector.innerHTML = cameras
+          .map(
+            (cam, index) =>
+              `<option value="${cam.id}">${cam.label || 'Camera ' + (index + 1)}</option>`,
+          )
+          .join('');
 
-        this.debug(`STARTING WITH: ${cameras[this.currentCamIndex].label}`);
-        await this.launchCamera(cameras[this.currentCamIndex].id);
+        selector.onchange = (e) => {
+          this.launchCamera(e.target.value);
+          // Sync index for mobile just in case window is resized
+          this.currentCamIndex = cameras.findIndex(
+            (c) => c.id === e.target.value,
+          );
+        };
+
+        // 2. SETUP MOBILE SWITCH
+        const flipBtn = document.getElementById('flipCameraBtn');
+        flipBtn.onclick = () => this.cycleCamera();
+
+        // 3. AUTO-SELECT BACK CAMERA
+        let backCamIndex = cameras.findIndex(
+          (cam) =>
+            cam.label.toLowerCase().includes('back') ||
+            cam.label.toLowerCase().includes('environment') ||
+            cam.label.toLowerCase().includes('rear'),
+        );
+
+        this.currentCamIndex = backCamIndex !== -1 ? backCamIndex : 0;
+
+        // Update dropdown to match auto-selected index
+        selector.value = cameras[this.currentCamIndex].id;
+
+        this.launchCamera(cameras[this.currentCamIndex].id);
       }
     } catch (err) {
       this.debug(`INIT_ERROR: ${err.message}`);
     }
   },
 
+  // salesManager.js or scanner.js
   async cycleCamera() {
-    if (this.isProcessingSwitch) return; // Prevent double-clicks
-    this.isProcessingSwitch = true;
+    if (this.availableCameras.length < 2) return;
 
+    // Play click sound
     if (window.wolfAudio) window.wolfAudio.play('notif');
 
+    // Cycle index
     this.currentCamIndex =
       (this.currentCamIndex + 1) % this.availableCameras.length;
-    const nextCam = this.availableCameras[this.currentCamIndex];
+    const nextCamId = this.availableCameras[this.currentCamIndex].id;
 
-    this.debug(`INITIATING SWITCH: ${nextCam.label}`);
-
-    await this.launchCamera(nextCam.id);
-    this.isProcessingSwitch = false;
-  },
-
-  async launchCamera(cameraId) {
-    const readerDiv = document.getElementById('reader');
-
-    // 1. STOP & KILL (Strict Await)
-    if (html5QrCode) {
-      this.debug('DE-LINKING CURRENT OPTICS...');
-      try {
-        // We MUST wait for the stop promise to resolve completely
-        await html5QrCode.stop();
-        this.debug('OPTICS DE-LINKED');
-      } catch (e) {
-        this.debug('CLEANUP_FAULT: Force clearing...');
-      }
-      html5QrCode = null;
-    }
-
-    // 2. HARDWARE COOLDOWN (Increased for Camera2 API stability)
-    // Most mobile 'camera2' drivers need 500ms to cycle power
-    await new Promise((r) => setTimeout(r, 600));
-
-    // 3. RE-CREATE INSTANCE
-    // Note: We are NOT clearing innerHTML here to prevent the Interrupted error
-    html5QrCode = new Html5Qrcode('reader');
-
-    try {
-      this.debug(`LINKING TO: ${cameraId}`);
-
-      await html5QrCode.start(
-        cameraId,
-        {
-          fps: 24, // Smoother for mobile
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        (text) => this.processResult(text, 'SCAN'),
-      );
-
-      this.debug('SYSTEM_ONLINE: Feed established.');
-
-      // CRITICAL FIX: Manually check if the video is actually playing
-      // Sometimes the library says "Success" but the hardware is black
-      setTimeout(() => {
-        const video = readerDiv.querySelector('video');
-        if (video && video.paused) {
-          this.debug('FEED_STUCK: Attempting manual jumpstart...');
-          video.play().catch((e) => this.debug('JUMPSTART_FAILED'));
-        }
-      }, 1000);
-    } catch (err) {
-      this.debug(`LINK_FAILED: ${err}`);
-
-      // If it fails with "Media removed", it means the DOM shifted.
-      // We wait and try one more time automatically.
-      if (
-        err.toString().includes('removed') ||
-        err.toString().includes('interrupted')
-      ) {
-        this.debug('RETRIEVING LOST SIGNAL...');
-        setTimeout(() => this.launchCamera(cameraId), 1000);
-      } else {
-        this.showInactiveUI('HARDWARE_FAULT');
-      }
-    }
+    // Re-launch
+    await this.launchCamera(nextCamId);
   },
 
   setupCameraSelector(cameras) {
@@ -169,6 +129,26 @@ window.wolfScanner = {
       };
     } else {
       selectorWrap.style.display = 'none';
+    }
+  },
+
+  async launchCamera(cameraId) {
+    if (html5QrCode) {
+      try {
+        await html5QrCode.stop();
+      } catch (e) {}
+      html5QrCode = null;
+    }
+
+    html5QrCode = new Html5Qrcode('reader');
+    try {
+      await html5QrCode.start(
+        cameraId,
+        { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        (text) => this.processResult(text, 'SCAN'),
+      );
+    } catch (err) {
+      this.showInactiveUI('HARDWARE_FAULT');
     }
   },
 
