@@ -7,6 +7,18 @@ window.wolfScanner = {
   isProcessingResult: false,
   lastScanTime: 0,
   isFrontFacing: false,
+  currentCamIndex: 0,
+
+  debug(msg) {
+    const log = document.getElementById('scanner-debug-log');
+    if (log) {
+      log.style.display = 'block';
+      log.innerHTML += `<div>> ${msg}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+    console.log(`Scanner: ${msg}`);
+  },
+
   async init() {
     if (document.getElementById('wolf-scanner-overlay')) return true;
     try {
@@ -26,89 +38,75 @@ window.wolfScanner = {
   async start(callback = null, hideGuest = false, onClose = null) {
     const ready = await this.init();
     if (!ready) return;
+    this.debug('INITIALIZING OPTICS...');
 
     this.activeCallback = callback;
     this.onCloseCallback = onClose;
     document.getElementById('wolf-scanner-overlay').style.display = 'flex';
 
     try {
+      // 1. Get ALL hardware IDs
       const cameras = await Html5Qrcode.getCameras();
       this.availableCameras = cameras;
+      this.debug(`FOUND ${cameras.length} LENSES`);
 
-      // Setup PC Dropdown (Keep ID-based for PC)
-      if (cameras.length > 0) {
-        const selector = document.getElementById('cameraSelect');
-        selector.innerHTML = cameras
-          .map(
-            (cam, idx) =>
-              `<option value="${cam.id}">${cam.label || 'Camera ' + (idx + 1)}</option>`,
-          )
-          .join('');
+      if (cameras && cameras.length > 0) {
+        // Find the index of the first back camera to start with
+        let backIdx = cameras.findIndex(
+          (c) =>
+            c.label.toLowerCase().includes('back') ||
+            c.label.toLowerCase().includes('environment'),
+        );
+        this.currentCamIndex = backIdx !== -1 ? backIdx : 0;
 
-        selector.onchange = (e) => this.launchCamera(e.target.value);
+        this.debug(`STARTING WITH: ${cameras[this.currentCamIndex].label}`);
+        await this.launchCamera(cameras[this.currentCamIndex].id);
       }
-
-      // Start with BACK camera by default
-      this.isFrontFacing = false;
-      this.launchCamera({ facingMode: 'environment' });
     } catch (err) {
-      this.showInactiveUI('PERMISSION DENIED');
+      this.debug(`INIT_ERROR: ${err.message}`);
     }
   },
-  // salesManager.js or scanner.js
+
   async cycleCamera() {
     if (window.wolfAudio) window.wolfAudio.play('notif');
 
-    // Toggle the state
-    this.isFrontFacing = !this.isFrontFacing;
-    const mode = this.isFrontFacing ? 'user' : 'environment';
+    // Increment index to next hardware ID
+    this.currentCamIndex =
+      (this.currentCamIndex + 1) % this.availableCameras.length;
+    const nextCam = this.availableCameras[this.currentCamIndex];
 
-    // Show status feedback
-    const statusText = document.querySelector('.scanner-footer-status span');
-    if (statusText)
-      statusText.textContent = `RE-LINKING OPTICS (${mode.toUpperCase()})...`;
+    this.debug(`SWITCHING TO: ${nextCam.label}`);
 
-    // RESTART
-    await this.launchCamera({ facingMode: mode });
+    // Force a fresh launch with the specific ID
+    await this.launchCamera(nextCam.id);
   },
 
-  async launchCamera(cameraConfig) {
+  async launchCamera(cameraId) {
     const readerDiv = document.getElementById('reader');
 
-    // 1. STEP 1: STOP THE LIBRARY INSTANCE
+    // 1. KILL EXISTING
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
         html5QrCode = null;
+        this.debug('PREVIOUS STREAM TERMINATED');
       } catch (e) {
-        console.warn('Library stop failed, forcing track kill...');
+        this.debug('CLEANUP_RETRY...');
       }
     }
 
-    // 2. STEP 2: THE NUCLEAR OPTION (Stop all browser media tracks)
-    // This physically tells the phone "Turn off the light on the lens"
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices
-        .getUserMedia({ video: true })
-        .catch(() => null);
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    }
-
-    // 3. STEP 3: DOM WIPE
+    // 2. DOM RESET
     readerDiv.innerHTML = '';
 
-    // 4. STEP 4: COOLDOWN
-    // Increased to 500ms - Back cameras take longer to "warm up" than front cameras
-    await new Promise((r) => setTimeout(r, 500));
+    // 3. HARDWARE COOLDOWN (Essential for multi-lens)
+    await new Promise((r) => setTimeout(r, 400));
 
-    // 5. STEP 5: FRESH START
+    // 4. START FRESH WITH ID
     html5QrCode = new Html5Qrcode('reader');
 
     try {
       await html5QrCode.start(
-        cameraConfig,
+        cameraId, // Using exact ID instead of facingMode
         {
           fps: 20,
           qrbox: { width: 250, height: 250 },
@@ -116,23 +114,13 @@ window.wolfScanner = {
         },
         (text) => this.processResult(text, 'SCAN'),
       );
-
-      const statusText = document.querySelector('.scanner-footer-status span');
-      if (statusText) statusText.textContent = 'CAMERA ACTIVE | OPTICS LINKED';
+      this.debug('LINK_ESTABLISHED');
     } catch (err) {
-      console.error('Camera Start Error:', err);
-
-      // FALLBACK: If "environment" fails on the second swap,
-      // it's usually because the ID changed. Try to use the first available ID instead.
-      if (this.availableCameras && this.availableCameras.length > 0) {
-        console.log('FacingMode failed, falling back to ID-based launch...');
-        const backCam =
-          this.availableCameras.find((c) =>
-            c.label.toLowerCase().includes('back'),
-          ) || this.availableCameras[0];
-        await this.launchCamera(backCam.id);
-      } else {
-        this.showInactiveUI('HARDWARE_FAULT');
+      this.debug(`LINK_FAULT: ${err.message}`);
+      // If it crashes, it might be a locked lens. Try auto-cycling.
+      if (this.availableCameras.length > 1) {
+        this.debug('RE-ROUTING TO NEXT LENS...');
+        setTimeout(() => this.cycleCamera(), 500);
       }
     }
   },
