@@ -1,11 +1,11 @@
 <style>
-:root {
+  :root {
     --side-bg: #111111;
     --accent-red: #a63429;
     --text-primary: #ffffff;
-}
+  }
 
-.sidebar-panel {
+  .sidebar-panel {
     position: fixed;
     top: 0;
     height: 100vh;
@@ -16,37 +16,42 @@
     overflow: hidden; /* Vital to hide text when narrow */
     background: var(--card-bg); /* Changed from #111 */
     border-right: 1px solid var(--border-color);
-}
+  }
 
-/* 📱 MOBILE: Snap to RIGHT side */
-@media (max-width: 767px) {
+  /* 📱 MOBILE: Snap to RIGHT side */
+  @media (max-width: 767px) {
     .sidebar-panel {
-        right: 0;
-        width: 85%;
-        max-width: 320px;
-        transform: translateX(100%);
+      right: 0;
+      width: 85%;
+      max-width: 320px;
+      transform: translateX(100%);
     }
-    .sidebar-panel.active { transform: translateX(0); }
-    .nav-text { opacity: 1 !important; visibility: visible !important; } 
+    .sidebar-panel.active {
+      transform: translateX(0);
+    }
+    .nav-text {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
     .sidebar-header {
-        flex-direction: row; /* [Button] [Text] */
+      flex-direction: row; /* [Button] [Text] */
     }
-}
+  }
 
-/* 💻 PC: Snap to LEFT side */
-@media (min-width: 768px) {
+  /* 💻 PC: Snap to LEFT side */
+  @media (min-width: 768px) {
     /* Fixed: added the '.' before sidebar-panel */
     .sidebar-panel {
-        left: 0;
-        /* THE "MINI" STATE (Icons only) */
-        width: 80px; 
-        transform: translateX(0); /* Always visible */
-        border-right: 1px solid rgba(255,255,255,0.05);
+      left: 0;
+      /* THE "MINI" STATE (Icons only) */
+      width: 80px;
+      transform: translateX(0); /* Always visible */
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     /* THE "EXPANDED" STATE */
     .sidebar-panel.active {
-        width: 280px;
+      width: 280px;
     }
 
     /* Hide text/boxes when NOT active (mini mode) */
@@ -54,151 +59,227 @@
     .sidebar-panel:not(.active) .profile-area,
     .sidebar-panel:not(.active) .target-box,
     .sidebar-panel:not(.active) .label-gray {
-        opacity: 0;
-        visibility: hidden;
-        white-space: nowrap;
-    }
-    
-    .nav-text { transition: opacity 0.2s; }
-    
-    .sidebar-header {
-        flex-direction: row-reverse; /* [Text] [Button] */
+      opacity: 0;
+      visibility: hidden;
+      white-space: nowrap;
     }
 
-    .nav-item-side i, .btn-disconnect i, #sidebarClose i {
-        transition: font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s;
-        min-width: 30px;
-        width: 30px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+    .nav-text {
+      transition: opacity 0.2s;
+    }
+
+    .sidebar-header {
+      flex-direction: row-reverse; /* [Text] [Button] */
+    }
+
+    .nav-item-side i,
+    .btn-disconnect i,
+    #sidebarClose i {
+      transition:
+        font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        color 0.3s;
+      min-width: 30px;
+      width: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     /* 2. RAIL MODE: Icons are LARGE (No text visible) */
     .sidebar-panel:not(.active) .nav-item-side i,
     .sidebar-panel:not(.active) .btn-disconnect i {
-        font-size: 38px !important; 
+      font-size: 38px !important;
     }
 
     /* 3. FULL MODE: Icons shrink SMALLER (To match the text) */
     .sidebar-panel.active .nav-item-side i,
     .sidebar-panel.active .btn-disconnect i {
-        font-size: 22px !important;
+      font-size: 22px !important;
     }
-}
+  }
 
-/* 🔓 ACTIVE STATE: Shows the sidebar */
-.sidebar-panel.active {
+  /* 🔓 ACTIVE STATE: Shows the sidebar */
+  .sidebar-panel.active {
     transform: translateX(0) !important;
-}
+  }
 
-/* Sidebar Header */
-.sidebar-header {
+  /* Sidebar Header */
+  .sidebar-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 20px;
     margin-bottom: 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-}
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
 
-#sidebarClose {
+  #sidebarClose {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 28px; 
+    font-size: 28px;
     cursor: pointer;
     transition: 0.2s;
     display: flex;
     align-items: center;
-}
-#sidebarClose:hover {
+  }
+  #sidebarClose:hover {
     color: black;
-}
+  }
 
-/* User Details */
-.user-name { font-weight: 800; font-size: 1.1rem; color: var(--text-main); white-space: nowrap; }
-.user-email { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+  /* User Details */
+  .user-name {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--text-main);
+    white-space: nowrap;
+  }
+  .user-email {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
 
-/* Target Box */
-.target-box { background: var(--bg-dark); border-radius: 20px; padding: 20px; margin: 20px; transition: opacity 0.3s; border: 1px solid var(--border-color); }
-.progress-container { height: 6px; background: var(--input-bg); border-radius: 10px; margin: 10px 0; overflow: hidden; }
-.progress-fill { height: 100%; background: var(--accent-red); width: 85%; }
+  /* Target Box */
+  .target-box {
+    background: var(--bg-dark);
+    border-radius: 20px;
+    padding: 20px;
+    margin: 20px;
+    transition: opacity 0.3s;
+    border: 1px solid var(--border-color);
+  }
+  .progress-container {
+    height: 6px;
+    background: var(--input-bg);
+    border-radius: 10px;
+    margin: 10px 0;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent-red);
+    width: 85%;
+  }
 
-/* Nav Links */
-.nav-list { flex-grow: 1; margin-top: 10px; }
-.nav-item-side { display: flex; align-items: center; gap: 15px; padding: 15px 25px; color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; border-radius: 10px; white-space: nowrap; }
-.nav-item-side.active {
+  /* Nav Links */
+  .nav-list {
+    flex-grow: 1;
+    margin-top: 10px;
+  }
+  .nav-item-side {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 25px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .nav-item-side.active {
     color: var(--accent-red) !important;
     background: rgba(166, 52, 41, 0.05); /* Very subtle red tint */
-}
+  }
 
-.nav-item-side.active {
+  .nav-item-side.active {
     color: var(--accent-red) !important;
-}
+  }
 
-.nav-item-side.active i,
-.nav-item-side.active .nav-text {
+  .nav-item-side.active i,
+  .nav-item-side.active .nav-text {
     color: var(--accent-red) !important;
-}
-.nav-item-side:hover { background: rgba(255,255,255,0.05); color: #bbb; }
+  }
+  .nav-item-side:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #bbb;
+  }
 
-/* Disconnect Button */
-.btn-disconnect { color: var(--accent-red); font-weight: 900; padding: 20px 25px; position: relative; bottom: 60px; display: flex; align-items: center; gap: 15px; cursor: pointer; text-transform: uppercase; border-top: 1px solid #222; white-space: nowrap; }
+  /* Disconnect Button */
+  .btn-disconnect {
+    color: var(--accent-red);
+    font-weight: 900;
+    padding: 20px 25px;
+    position: relative;
+    bottom: 60px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-top: 1px solid #222;
+    white-space: nowrap;
+  }
 </style>
 
 <div class="sidebar-panel" id="wolfSidebar">
-    <div class="sidebar-header">
-        <button id="sidebarClose">
-            <i class='bx bx-chevron-left' id="closeIcon"></i>
-        </button>
-        <span class="label-gray sys-os-version"></span>
-    </div>
+  <div class="sidebar-header">
+    <button id="sidebarClose">
+      <i class="bx bx-chevron-left" id="closeIcon"></i>
+    </button>
+    <span class="label-gray sys-os-version"></span>
+  </div>
 
-    <!-- Wrapped text in .profile-area for hiding -->
-    <div class="profile-area" style="padding: 0 20px; transition: opacity 0.3s;">
-        <div class="user-name">PALOMAR ADMIN</div>
-        <div class="user-email">admin@palomargym.com</div>
-    </div>
+  <!-- Wrapped text in .profile-area for hiding -->
+  <div class="profile-area" style="padding: 0 20px; transition: opacity 0.3s">
+    <div class="user-name">PALOMAR ADMIN</div>
+    <div class="user-email">admin@palomargym.com</div>
+  </div>
 
-    <div class="target-box shadow">
-        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #888;">
-            <span>TODAY TARGET</span> <b style="color:#fff">100%</b>
-        </div>
-        <div class="progress-container"><div class="progress-fill"></div></div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #666;">
-            <span>REACHED</span> <b style="color:#fff">₱5,980 / ₱5,000</b>
-        </div>
+  <div class="target-box shadow">
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        color: #888;
+      "
+    >
+      <span>TODAY TARGET</span> <b style="color: #fff">100%</b>
     </div>
+    <div class="progress-container"><div class="progress-fill"></div></div>
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        color: #666;
+      "
+    >
+      <span>REACHED</span> <b style="color: #fff">₱5,980 / ₱5,000</b>
+    </div>
+  </div>
 
-    <div class="nav-list">
-        <a href="#" class="nav-item-side" data-page="dashboard">
-            <div class="nav-icon"><i class='bx bx-home-circle'></i></div>
-            <span class="nav-text">HOME</span>
-        </a>
-        <a href="#" class="nav-item-side" data-page="sales">
-            <div class="nav-icon"><i class='bx bx-shopping-bag'></i></div>
-            <span class="nav-text">SALES</span>
-        </a>
-        <a href="#" class="nav-item-side" data-page="logbook">
-            <i class='bx bx-detail'></i>
-            <span class="nav-text">LOGBOOK</span>
-        </a>
-        <a href="#" class="nav-item-side" data-page="management">
-            <i class='bx bx-cube'></i> 
-            <span class="nav-text">MANAGEMENT</span>
-        </a>
-            <a href="#" class="nav-item-side" data-page="audit">
-                <i class='bx bx-pulse'></i> 
-                <span class="nav-text">SYSTEM AUDIT</span>
-        </a>
-            <a href="#" class="nav-item-side" data-page="settings">
-                <i class='bx bx-cog'></i> 
-                <span class="nav-text">ACCOUNT SETTINGS</span>
-        </a>
-    </div>
-    <div class="btn-disconnect logout-btn">
-        <i class='bx bx-power-off'></i> 
-        <span class="nav-text">LOGOUT</span>
-    </div>
+  <div class="nav-list">
+    <a href="#" class="nav-item-side" data-page="dashboard">
+      <div class="nav-icon"><i class="bx bx-home-circle"></i></div>
+      <span class="nav-text">HOME</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="sales">
+      <div class="nav-icon"><i class="bx bx-shopping-bag"></i></div>
+      <span class="nav-text">SALES</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="logbook">
+      <i class="bx bx-detail"></i>
+      <span class="nav-text">LOGBOOK</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="management">
+      <i class="bx bx-cube"></i>
+      <span class="nav-text">MANAGEMENT</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="audit">
+      <i class="bx bx-pulse"></i>
+      <span class="nav-text">SYSTEM AUDIT</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="settings">
+      <i class="bx bx-cog"></i>
+      <span class="nav-text">ACCOUNT SETTINGS</span>
+    </a>
+  </div>
+  <div class="btn-disconnect logout-btn">
+    <i class="bx bx-power-off"></i>
+    <span class="nav-text">LOGOUT</span>
+  </div>
 </div>

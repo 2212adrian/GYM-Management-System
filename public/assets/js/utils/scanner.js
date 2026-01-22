@@ -1,111 +1,232 @@
-// --- SCANNER ENGINE ---
 let html5QrCode = null;
 
-const wolfScanner = {
-    async start() {
-        const overlay = document.getElementById('wolf-scanner-overlay');
-        overlay.style.display = 'flex';
-        
-        // Reset manual input
-        document.getElementById('manualCodeInput').value = '';
-        document.getElementById('manualConfirmBtn').style.opacity = '0';
-
-        html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
-
-        try {
-            await html5QrCode.start({ facingMode: "environment" }, config, this.onScanSuccess);
-        } catch (err) {
-            console.error(err);
-            document.getElementById('reader').innerHTML = `<div style="padding:20px; color:#666; font-size:10px;">CAMERA ERROR: ACCESS DENIED</div>`;
-        }
-    },
-
-    async stop() {
-        if (html5QrCode && html5QrCode.isScanning) {
-            await html5QrCode.stop();
-            await html5QrCode.clear();
-        }
-        document.getElementById('wolf-scanner-overlay').style.display = 'none';
-    },
-
-    onScanSuccess(decodedText) {
-        wolfScanner.processResult(decodedText, "DIGITAL_CODE");
-    },
-
-    processResult(text, type) {
-        if (navigator.vibrate) navigator.vibrate(100);
-        this.stop(); // Stop camera
-
-        const modal = document.getElementById('scanResultModal');
-        const body = document.getElementById('scan-data-body');
-        
-        // Show the centered modal
-        modal.style.display = 'flex';
-
-        // Inject the industrial design
-        body.innerHTML = `
-            <div class="scan-info-box">
-                <label>IDENTIFIED PAYLOAD</label>
-                <div class="data-text">${text}</div>
-                
-                <hr style="border-color: #111; margin: 15px 0;">
-                
-                <label>MODULE TYPE</label>
-                <div style="color: var(--wolf-red); font-weight: 900; font-size: 12px;">
-                    ${type}
-                </div>
-            </div>
-            <p style="font-size: 11px; color: #555; margin-bottom: 20px;">
-                Confirm authorization to proceed with system logging.
-            </p>
-        `;
+window.wolfScanner = {
+  currentCameraId: null,
+  activeCallback: null, // Stores the function to run after a successful scan
+  onCloseCallback: null,
+  isProcessingResult: false,
+  lastScanTime: 0,
+  async init() {
+    if (document.getElementById('wolf-scanner-overlay')) return true;
+    try {
+      const res = await fetch('/assets/components/scanner-modal.html');
+      if (!res.ok) throw new Error('Component not found');
+      const html = await res.text();
+      document.body.insertAdjacentHTML('beforeend', html);
+      this.attachListeners();
+      return true;
+    } catch (err) {
+      console.error('Wolf OS: Scanner Load Fault:', err);
+      return false;
     }
+  },
+
+  // ADDED: hideGuest parameter to control button visibility
+  async start(callback = null, hideGuest = false, onClose = null) {
+    const ready = await this.init();
+    if (!ready) return;
+
+    this.activeCallback = callback;
+    this.onCloseCallback = onClose;
+
+    const overlay = document.getElementById('wolf-scanner-overlay');
+    overlay.style.display = 'flex';
+
+    // Fix: Properly handle Guest Button visibility
+    const guestBtn = document.querySelector('.btn-guest-entry');
+    const quickAuthWrap = document.querySelector('.quick-auth-wrapper');
+    if (guestBtn) {
+      if (hideGuest) {
+        guestBtn.style.setProperty('display', 'none', 'important');
+        quickAuthWrap.style.setProperty('display', 'none', 'important');
+      } else {
+        guestBtn.style.setProperty('display', 'flex', 'important');
+        quickAuthWrap.style.setProperty('display', 'flex', 'important');
+      }
+    }
+
+    try {
+      // Force permission check to get labels for PC
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const cameras = await Html5Qrcode.getCameras();
+
+      if (cameras && cameras.length > 0) {
+        this.setupCameraSelector(cameras);
+        const selectedId = this.currentCameraId || cameras[0].id;
+        this.launchCamera(selectedId);
+      } else {
+        throw new Error('No cameras found');
+      }
+    } catch (err) {
+      this.showInactiveUI('PERMISSION DENIED');
+    }
+  },
+
+  setupCameraSelector(cameras) {
+    const selectorWrap = document.getElementById('camera-selector-wrap');
+    const selector = document.getElementById('cameraSelect');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // PC only selector (shown if more than 1 camera)
+    if (cameras.length > 1 && !isMobile) {
+      selectorWrap.style.display = 'flex';
+      selector.innerHTML = cameras
+        .map(
+          (cam) =>
+            `<option value="${cam.id}" ${cam.id === this.currentCameraId ? 'selected' : ''}>${cam.label || 'Camera ' + cam.id}</option>`,
+        )
+        .join('');
+
+      selector.onchange = (e) => {
+        this.currentCameraId = e.target.value;
+        this.launchCamera(this.currentCameraId);
+      };
+    } else {
+      selectorWrap.style.display = 'none';
+    }
+  },
+
+  async launchCamera(cameraId) {
+    const statusText = document.querySelector('.scanner-footer-status span');
+    if (html5QrCode) {
+      if (html5QrCode.isScanning) await html5QrCode.stop();
+      html5QrCode = null;
+    }
+
+    html5QrCode = new Html5Qrcode('reader');
+    this.currentCameraId = cameraId;
+
+    try {
+      await html5QrCode.start(
+        cameraId,
+        { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        (decodedText) => this.processResult(decodedText, 'DIGITAL_CODE'),
+      );
+      if (statusText)
+        statusText.textContent = 'CAMERA ACTIVE | TERMINAL SECURE';
+    } catch (err) {
+      this.showInactiveUI('HARDWARE FAULT');
+    }
+  },
+
+  processResult(text, type) {
+    const currentTime = Date.now();
+    // BLOCK if last scan was less than 2.5 seconds ago
+    if (currentTime - this.lastScanTime < 2500) return;
+    this.lastScanTime = currentTime;
+    if (this.isProcessingResult) return;
+    this.isProcessingResult = true;
+    if (navigator.vibrate) navigator.vibrate(100);
+    const quickAuth = document.getElementById('quickAuthToggle')?.checked;
+    this.stop();
+
+    if (this.activeCallback) {
+      this.activeCallback(text);
+      this.activeCallback = null;
+      this.isProcessingResult = false;
+      return;
+    }
+
+    if (window.salesManager) {
+      if (quickAuth) {
+        // Path A: Instant Addition
+        window.salesManager.processQuickSale(text);
+      } else {
+        // Path B: Open Modal with pre-filled data
+        window.salesManager.openSaleTerminal(text);
+      }
+    }
+
+    this.isProcessingResult = false;
+  },
+
+  async stop() {
+    if (html5QrCode && html5QrCode.isScanning) {
+      await html5QrCode.stop();
+    }
+
+    document.getElementById('wolf-scanner-overlay').style.display = 'none';
+    document.querySelector('.btn-guest-entry')?.classList.remove('visible');
+
+    // We check if salesManager exists first to prevent errors
+    if (
+      window.salesManager &&
+      typeof window.salesManager.showTopInstruction === 'function'
+    ) {
+      window.salesManager.showTopInstruction(false);
+    }
+
+    this.isProcessingResult = false; // Always unlock on stop
+    if (html5QrCode && html5QrCode.isScanning) await html5QrCode.stop();
+    document.getElementById('wolf-scanner-overlay').style.display = 'none';
+
+    if (this.onCloseCallback) {
+      this.onCloseCallback();
+      this.onCloseCallback = null;
+    }
+  },
+
+  showInactiveUI(message) {
+    const reader = document.getElementById('reader');
+    if (window.wolfAudio) window.wolfAudio.play('error');
+
+    reader.innerHTML = `<div class="camera-inactive-state"><i class='bx bx-camera-off' style="color:var(--wolf-red); opacity: 1;"></i><span style="color:var(--wolf-red)">${message}</span></div>`;
+  },
+
+  attachListeners() {
+    const input = document.getElementById('manualCodeInput');
+    const group = document.getElementById('manualInputGroup');
+    if (input) {
+      input.addEventListener('input', (e) => {
+        // NEW LOGIC: Force input to ALL CAPS
+        e.target.value = e.target.value.toUpperCase();
+
+        if (e.target.value.trim().length > 0) {
+          group.classList.add('has-content');
+        } else {
+          group.classList.remove('has-content');
+        }
+      });
+    }
+    document.getElementById('exitScannerBtn').onclick = () => {
+      this.stop();
+    };
+    document.getElementById('manualConfirmBtn').onclick = () => {
+      const val = document.getElementById('manualCodeInput').value;
+      if (val.trim()) this.processResult(val, 'MANUAL_ENTRY');
+    };
+  },
+
+  setupCameraSelector(cameras) {
+    const selectorWrap = document.getElementById('camera-selector-wrap');
+    const selector = document.getElementById('cameraSelect');
+
+    // Simple check for PC vs Mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (cameras.length > 1 && !isMobile) {
+      selectorWrap.style.display = 'flex';
+
+      // Clear and fill dropdown
+      selector.innerHTML = cameras
+        .map(
+          (cam) =>
+            `<option value="${cam.id}" ${cam.id === this.currentCameraId ? 'selected' : ''}>${cam.label || 'Camera ' + cam.id}</option>`,
+        )
+        .join('');
+
+      // ATTACH THE CHANGE EVENT
+      selector.onchange = (e) => {
+        console.log('Wolf OS: Switching camera source...');
+        this.launchCamera(e.target.value);
+      };
+    } else {
+      selectorWrap.style.display = 'none';
+    }
+  },
 };
 
-// --- INTERFACE LISTENERS ---
-document.addEventListener('input', (e) => {
-    // Show/Hide manual confirm button based on input length
-    if (e.target.id === 'manualCodeInput') {
-        const btn = document.getElementById('manualConfirmBtn');
-        if (e.target.value.trim().length > 0) {
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-        } else {
-            btn.style.opacity = '0';
-            btn.style.pointerEvents = 'none';
-        }
-    }
-});
-
+// Start logic
 document.addEventListener('click', (e) => {
-    // Open Scanner
-    if (e.target.closest('#qrScannerBtn')) wolfScanner.start();
-
-    // Close Scanner
-    if (e.target.closest('#exitScannerBtn')) wolfScanner.stop();
-
-    // Manual Input Confirm
-    if (e.target.closest('#manualConfirmBtn')) {
-        const val = document.getElementById('manualCodeInput').value;
-        wolfScanner.processResult(val, "MANUAL_ENTRY");
-    }
-
-    // Guest Button (Placeholder)
-    if (e.target.closest('.btn-guest-entry')) {
-        alert("WOLF OS: Directing to Guest Registration Module...");
-        wolfScanner.stop();
-    }
-
-    // Modal Actions
-    if (e.target.id === 'confirmScanBtn' || e.target.closest('#confirmScanBtn')) {
-        document.getElementById('scanResultModal').style.display = 'none';
-        console.log("Authorization Successful.");
-    }
-
-    // Cancel / Rescan
-    if (e.target.id === 'cancelScanBtn' || e.target.closest('#cancelScanBtn')) {
-        document.getElementById('scanResultModal').style.display = 'none';
-        wolfScanner.start(); // Re-open the camera
-    }
+  if (e.target.closest('#qrScannerBtn')) wolfScanner.start();
 });

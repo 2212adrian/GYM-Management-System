@@ -1,55 +1,68 @@
 <style>
-.topbar {
+  .topbar {
     height: 60px;
-    display: flex; align-items: center; justify-content: center;
-    position: fixed; top: 0; left: 0; right: 0;
-    z-index: 1000; border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    border-bottom: 1px solid #e0e0e0;
     background: var(--card-bg) !important; /* Uses variable */
     border-bottom: 1px solid var(--border-color);
     transition: background 0.3s ease;
-}
-.brand-name { font-weight: 800; color: var(--wolf-blue); font-size: 1.2rem; letter-spacing: 1px; }
-body.light-theme .brand-name {
-    color: #1a237e; 
-}
-.brand-name span { color: #a63429; }
-#themeToggleBtn {
+  }
+  .brand-name {
+    font-weight: 800;
+    color: var(--wolf-blue);
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+  }
+  body.light-theme .brand-name {
+    color: #1a237e;
+  }
+  .brand-name span {
+    color: #a63429;
+  }
+  #themeToggleBtn {
     /* Position */
-    position: absolute; 
-    right: 20px; 
-    top: 50%; 
+    position: absolute;
+    right: 20px;
+    top: 50%;
     transform: translateY(-50%);
-    
+
     /* Layout */
-    display: flex; 
-    align-items: center; 
+    display: flex;
+    align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 6px 12px;
-    
+
     /* Aesthetic */
     background: var(--input-bg); /* Darker than the header */
     border: 1px solid var(--border-color);
     border-radius: 8px; /* Matches your cards */
-    
+
     /* Typography */
-    color: var(--text-muted); 
-    font-weight: 800; 
+    color: var(--text-muted);
+    font-weight: 800;
     font-size: 0.7rem; /* Smaller, more technical look */
     letter-spacing: 1px;
     text-transform: uppercase;
-    
-    cursor: pointer; 
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
-#themeToggleBtn {
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #themeToggleBtn {
     /* Base Settings */
-    position: absolute; 
-    top: 50%; 
+    position: absolute;
+    top: 50%;
     transform: translateY(-50%);
-    display: flex; 
-    align-items: center; 
+    display: flex;
+    align-items: center;
     justify-content: center;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -58,59 +71,59 @@ body.light-theme .brand-name {
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1060;
-}
+  }
 
-/* 📱 MOBILE: Left side, Icon only */
-@media (max-width: 767px) {
+  /* 📱 MOBILE: Left side, Icon only */
+  @media (max-width: 767px) {
     #themeToggleBtn {
-        left: 15px; /* Snap to Left */
-        right: auto; /* Reset PC right positioning */
-        padding: 10px; /* Square box for icon only */
+      left: 15px; /* Snap to Left */
+      right: auto; /* Reset PC right positioning */
+      padding: 10px; /* Square box for icon only */
     }
-    
+
     #themeToggleBtn .nav-text {
-        display: none; /* Hide text */
+      display: none; /* Hide text */
     }
-    
+
     #themeToggleBtn i {
-        font-size: 1.3rem; /* Slightly larger icon for mobile touch */
+      font-size: 1.3rem; /* Slightly larger icon for mobile touch */
     }
-}
+  }
 
-/* 💻 PC: Right side, Pill shape with text */
-@media (min-width: 768px) {
+  /* 💻 PC: Right side, Pill shape with text */
+  @media (min-width: 768px) {
     #themeToggleBtn {
-        right: 20px; /* Snap to Right */
-        left: auto;
-        padding: 6px 12px;
-        gap: 8px;
+      right: 20px; /* Snap to Right */
+      left: auto;
+      padding: 6px 12px;
+      gap: 8px;
     }
-    
-    #themeToggleBtn .nav-text {
-        display: inline;
-        font-weight: 800;
-        font-size: 0.7rem;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-    }
-}
 
-/* Hover effect for both */
-#themeToggleBtn:hover {
+    #themeToggleBtn .nav-text {
+      display: inline;
+      font-weight: 800;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  }
+
+  /* Hover effect for both */
+  #themeToggleBtn:hover {
     border-color: var(--accent-red);
     color: var(--text-main);
     background: var(--card-bg);
-}
+  }
 </style>
 
 <header class="topbar shadow-sm">
-    <a href="#" class="nav-item-side" id="themeToggleBtn">
-        <i class='bx bx-moon'></i> 
-        <span class="nav-text">THEME TOGGLE</span>
-    </a>
-    <a href="#" class="nav-item-side" id="muteToggleBtn">
-    <i class='bx bx-volume-full' id="muteIcon"></i> 
+  <a href="#" class="nav-item-side" id="themeToggleBtn">
+    <i class="bx bx-moon"></i>
+    <span class="nav-text">THEME TOGGLE</span>
+  </a>
+  <a href="#" class="nav-item-side" id="muteToggleBtn">
+    <i class="bx bx-volume-full" id="muteIcon"></i>
     <span class="nav-text">AUDIO: NULL</span>
-    </a>
-    <div class="brand-name">WOLF <span>PALOMAR</span> GYM</div>
+  </a>
+  <div class="brand-name">WOLF <span>PALOMAR</span> GYM</div>
 </header>

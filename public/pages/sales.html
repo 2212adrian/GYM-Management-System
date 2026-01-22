@@ -1,46 +1,141 @@
-<script src="/assets/js/utils/gatekeeper.js"></script><!-- INTERNAL VIEW GUARD -->
-<script src="/assets/js/utils/auth-guard.js"></script> 
+<style>
+  /* --- TOP-DOWN SLIDING ALERT --- */
+  /* --- SYSTEM ALERT MODAL (TOP-MIDDLE) --- */
+  #wolf-system-alert {
+    position: fixed;
+    top: -100px; /* Hidden */
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 320px;
+    padding: 18px 30px;
+    border-radius: 0 0 20px 20px;
+    z-index: 300000;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    transition: top 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    font-family: 'Inter', sans-serif;
+  }
+
+  #wolf-system-alert.show {
+    top: 0;
+  }
+
+  #wolf-system-alert.success {
+    background: #4ade80;
+    color: #000;
+  }
+  #wolf-system-alert.error {
+    background: var(--wolf-red);
+    color: #fff;
+  }
+
+  .alert-icon {
+    font-size: 24px;
+  }
+  .alert-text {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+</style>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<!-- INTERNAL VIEW GUARD -->
+<script src="/assets/js/utils/auth-guard.js"></script>
 
 <div class="page-wrapper" id="page-wrapper">
-    <!-- HEADER ACTIONS -->
-    <div class="page-top-actions">
-        <div class="brand" style="font-size: 1.5rem; font-weight: 900;">SALES</div>
-        <div class="action-icons">
-            <button class="icon-btn" title="Clear Day Records"><i class='bx bx-trash'></i></button>
-            <button class="icon-btn red" title="New Transaction"><i class='bx bx-plus'></i></button>
-        </div>
+  <!-- HEADER ACTIONS -->
+  <div class="page-top-actions">
+    <div class="brand" style="font-size: 1.5rem; font-weight: 900">SALES</div>
+    <div class="action-icons">
+      <!-- Added ID for Day Clear logic -->
+      <button class="icon-btn" id="clear-sales-btn" title="Clear Day Records">
+        <i class="bx bx-trash"></i>
+      </button>
+      <!-- Added ID for the POS Terminal trigger -->
+      <button
+        class="icon-btn red"
+        id="open-sale-terminal-btn"
+        title="New Transaction"
+      >
+        <i class="bx bx-plus"></i>
+      </button>
     </div>
-    
-    <!-- DYNAMIC SUMMARY CARD -->
-    <div class="summary-container">
-        <div class="summary-card shadow-sm">
-            <label id="sales-summary-label" style="font-size: 10px; color: #666; text-transform: uppercase; font-weight: 800;">Income Summary</label>
-            <div class="value" id="sales-total-amount" style="font-size: 1.8rem; font-weight: 900; font-style: italic; color: #fff;">₱0</div>
-        </div>
+  </div>
+
+  <!-- DYNAMIC SUMMARY CARD -->
+  <div class="summary-container">
+    <div class="summary-card shadow-sm">
+      <label
+        id="sales-summary-label"
+        style="
+          font-size: 10px;
+          color: #666;
+          text-transform: uppercase;
+          font-weight: 800;
+        "
+        >Income Summary</label
+      >
+      <div
+        class="value"
+        id="sales-total-amount"
+        style="
+          font-size: 1.8rem;
+          font-weight: 900;
+          font-style: italic;
+          color: #fff;
+        "
+      >
+        ₱0
+      </div>
     </div>
-    
-    <!-- DAY SELECTOR -->
-    <div class="day-selector" id="sales-day-picker">
-        <button class="day-btn" data-day="0">SUN</button>
-        <button class="day-btn" data-day="1">MON</button>
-        <button class="day-btn" data-day="2">TUE</button>
-        <button class="day-btn" data-day="3">WED</button>
-        <button class="day-btn" data-day="4">THU</button>
-        <button class="day-btn" data-day="5">FRI</button>
-        <button class="day-btn" data-day="6">SAT</button>
+  </div>
+
+  <!-- DAY SELECTOR -->
+  <div class="day-selector" id="sales-day-picker">
+    <button class="day-btn" data-day="0">SUN</button>
+    <button class="day-btn" data-day="1">MON</button>
+    <button class="day-btn" data-day="2">TUE</button>
+    <button class="day-btn" data-day="3">WED</button>
+    <button class="day-btn" data-day="4">THU</button>
+    <button class="day-btn" data-day="5">FRI</button>
+    <button class="day-btn" data-day="6">SAT</button>
+  </div>
+
+  <!-- LIVE SEARCH -->
+  <div
+    class="filter-container mb-4"
+    style="
+      background: #111;
+      border-radius: 12px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    "
+  >
+    <i class="bx bx-search" style="color: #444"></i>
+    <input
+      type="text"
+      id="sales-search"
+      placeholder="Search product or reference..."
+      style="
+        background: none;
+        border: none;
+        color: #fff;
+        width: 100%;
+        outline: none;
+        font-size: 14px;
+      "
+    />
+  </div>
+
+  <!-- DATA INJECTION POINT -->
+  <div id="sales-list-container" style="min-height: 200px">
+    <div class="text-center p-5" style="opacity: 0.2">
+      <i class="bx bx-loader-alt bx-spin" style="font-size: 2rem"></i>
     </div>
-    
-    <!-- LIVE SEARCH -->
-    <div class="filter-container mb-4" style="background: #111; border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; gap: 10px;">
-        <i class='bx bx-search' style="color: #444;"></i>
-        <input type="text" id="sales-search" placeholder="Search product or reference..." style="background: none; border: none; color: #fff; width: 100%; outline: none; font-size: 14px;">
-    </div>
-    
-    <!-- DATA INJECTION POINT (Moved inside wrapper) -->
-    <div id="sales-list-container" style="min-height: 200px;">
-        <!-- Real data from Supabase will be injected here -->
-        <div class="text-center p-5" style="opacity: 0.2;">
-            <i class='bx bx-loader-alt bx-spin' style="font-size: 2rem;"></i>
-        </div>
-    </div>
+  </div>
 </div>

@@ -1,121 +1,176 @@
 <style>
-/* --- BASE NAV STYLES --- */
-.gcash-nav-container {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    width: 100%; height: 75px; 
+  /* --- BASE NAV STYLES --- */
+  .gcash-nav-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 75px;
     background: var(--card-bg) !important; /* Swaps #1a1a1a for variable */
     border-top: 1px solid var(--border-color);
     transition: background 0.3s ease;
     z-index: 1050;
-}
+  }
 
-.gcash-nav-content {
-    display: flex; justify-content: space-around; 
-    align-items: center; height: 100%;
-}
+  .gcash-nav-content {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+  }
 
- /* HIGHLIGHT STATE: When the sidebar is open */
-    .nav-item.sidebar-active {
-        color: #a63429 !important; /* Your Muted Red */
-        font-weight: bold;
-    }
+  /* HIGHLIGHT STATE: When the sidebar is open */
+  .nav-item.sidebar-active {
+    color: #a63429 !important; /* Your Muted Red */
+    font-weight: bold;
+  }
 
-/* --- ICON MAPPING (Mobile Default) --- */
-.item-home    { order: 1; }
-.item-sales   { order: 2; }
-.item-qr      { order: 3; }
-.item-logbook { order: 4; }
-.item-more    { order: 5; }
+  /* --- ICON MAPPING (Mobile Default) --- */
+  .item-home {
+    order: 1;
+  }
+  .item-sales {
+    order: 2;
+  }
+  .item-qr {
+    order: 3;
+  }
+  .item-logbook {
+    order: 4;
+  }
+  .item-more {
+    order: 5;
+  }
 
-/* --- PC REDESIGN (SNAP) --- */
-@media (min-width: 768px) {
+  /* --- PC REDESIGN (SNAP) --- */
+  @media (min-width: 768px) {
     .gcash-nav-container {
-        bottom: 25px; left: 50%; right: auto; transform: translateX(-50%);
-        width: 520px; border-radius: 100px; height: 85px;
-        border: 1px solid #333; background: rgba(26, 26, 26, 0.95);
-        backdrop-filter: blur(10px);
+      bottom: 25px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      width: 520px;
+      border-radius: 100px;
+      height: 85px;
+      border: 1px solid #333;
+      background: rgba(26, 26, 26, 0.95);
+      backdrop-filter: blur(10px);
     }
     .nav-item:hover:not(.active) {
-        color: #bbb;
+      color: #bbb;
     }
     /* ORDER: More > Home > Scan > Sales > Logbook */
-    .item-more    { order: 1 !important; }
-    .item-home    { order: 2 !important; }
-    .item-qr      { order: 3 !important; }
-    .item-sales   { order: 4 !important; }
-    .item-logbook { order: 5 !important; }
-}
+    .item-more {
+      order: 1 !important;
+    }
+    .item-home {
+      order: 2 !important;
+    }
+    .item-qr {
+      order: 3 !important;
+    }
+    .item-sales {
+      order: 4 !important;
+    }
+    .item-logbook {
+      order: 5 !important;
+    }
+  }
 
-/* Individual Item Styling */
-.nav-item {
-    display: flex; flex-direction: column; align-items: center;
-    color: #888; flex: 1; cursor: pointer; transition: 0.2s;
+  /* Individual Item Styling */
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #888;
+    flex: 1;
+    cursor: pointer;
+    transition: 0.2s;
     transition: color 0.3s ease;
-}
-.nav-item i { font-size: 26px; margin-bottom: 2px; }
-.nav-item span { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--text-muted); }
+  }
+  .nav-item i {
+    font-size: 26px;
+    margin-bottom: 2px;
+  }
+  .nav-item span {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+  }
 
-.nav-item.active span, .nav-item.active i {
+  .nav-item.active span,
+  .nav-item.active i {
     color: var(--accent-red) !important;
-}
+  }
 
-/* Active/Home Color */
-/* Active state for Bottom Nav links */
-.nav-item.active {
+  /* Active/Home Color */
+  /* Active state for Bottom Nav links */
+  .nav-item.active {
     color: var(--accent-red) !important;
     transform: translateY(-3px);
-}
+  }
 
-/* Specific state for the MORE button when sidebar is open */
-.nav-item#moreNavBtn.sidebar-active {
+  /* Specific state for the MORE button when sidebar is open */
+  .nav-item#moreNavBtn.sidebar-active {
     color: var(--accent-red) !important;
-}
+  }
 
-/* The Floating QR Button */
-.qr-wrapper { position: relative; width: 75px; display: flex; justify-content: center; }
-.qr-btn {
-    position: absolute; top: -45px;
-    width: 65px; height: 65px;
+  /* The Floating QR Button */
+  .qr-wrapper {
+    position: relative;
+    width: 75px;
+    display: flex;
+    justify-content: center;
+  }
+  .qr-btn {
+    position: absolute;
+    top: -45px;
+    width: 65px;
+    height: 65px;
     background: #a63429; /* Matched Red */
     border-radius: 50%;
     border: 6px solid var(--bg-dark) !important;
-    color: white; font-size: 32px;
-    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     box-shadow: 0 5px 20px rgba(166, 52, 41, 0.4);
-}
+  }
 </style>
 
 <nav class="gcash-nav-container shadow">
-    <div class="gcash-nav-content">
-        
-        <!-- More (Burger Icon) -->
-        <div class="nav-item item-more" id="moreNavBtn">
-            <i class='bx bx-menu'></i>
-            <span>MORE</span>
-        </div>
-
-        <!-- Home (AJAX) -->
-        <div class="nav-item item-home" data-page="dashboard">
-            <i class='bx bx-home-circle'></i>
-            <span>HOME</span>
-        </div>
-        <!-- Scan -->
-        <div class="qr-wrapper item-qr">
-            <button class="qr-btn" id="qrScannerBtn">
-                <i class='bx bx-scan'></i>
-            </button>
-        </div>
-
-        <!-- Sales (AJAX) -->
-        <div class="nav-item item-sales" data-page="sales">
-            <i class='bx bx-shopping-bag'></i>
-            <span>SALES</span>
-        </div>
-
-        <!-- Logbook (AJAX) -->
-        <div class="nav-item item-logbook" data-page="logbook">
-            <i class='bx bx-detail'></i>
-            <span>LOGBOOK</span>
-        </div>
+  <div class="gcash-nav-content">
+    <!-- More (Burger Icon) -->
+    <div class="nav-item item-more" id="moreNavBtn">
+      <i class="bx bx-menu"></i>
+      <span>MORE</span>
     </div>
+
+    <!-- Home (AJAX) -->
+    <div class="nav-item item-home" data-page="dashboard">
+      <i class="bx bx-home-circle"></i>
+      <span>HOME</span>
+    </div>
+    <!-- Scan -->
+    <div class="qr-wrapper item-qr">
+      <button class="qr-btn" id="qrScannerBtn">
+        <i class="bx bx-scan"></i>
+      </button>
+    </div>
+
+    <!-- Sales (AJAX) -->
+    <div class="nav-item item-sales" data-page="sales">
+      <i class="bx bx-shopping-bag"></i>
+      <span>SALES</span>
+    </div>
+
+    <!-- Logbook (AJAX) -->
+    <div class="nav-item item-logbook" data-page="logbook">
+      <i class="bx bx-detail"></i>
+      <span>LOGBOOK</span>
+    </div>
+  </div>
 </nav>

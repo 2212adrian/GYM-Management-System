@@ -1,22 +1,40 @@
-<script src="/assets/js/utils/gatekeeper.js"></script><!-- INTERNAL VIEW GUARD -->
+<style>
+  /* Disabled Future Days */
+  .day-btn:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+    filter: grayscale(1);
+  }
+
+  /* UI Hidden State for Read-Only mode */
+  .crud-hidden {
+    display: none !important;
+  }
+</style>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<!-- INTERNAL VIEW GUARD -->
 <div class="page-wrapper" id="page-wrapper">
-<div class="page-top-actions">
-    <div class="brand">GYM <span>LOGBOOK</span></div>
+  <div class="page-top-actions">
+    <div class="brand" style="font-size: 1.5rem; font-weight: 900">LOGBOOK</div>
     <div class="action-icons">
-        <button class="icon-btn" title="Clear Records"><i class='bx bx-trash'></i></button>
-        <button class="icon-btn" title="Fullscreen"><i class='bx bx-fullscreen'></i></button>
+      <button class="icon-btn" title="Clear Records">
+        <i class="bx bx-trash"></i>
+      </button>
+      <button class="icon-btn" title="Fullscreen">
+        <i class="bx bx-fullscreen"></i>
+      </button>
     </div>
-</div>
+  </div>
 
-<div class="summary-container">
+  <div class="summary-container">
     <div class="summary-card">
-        <!-- ID added for dynamic day and value -->
-        <label id="logbook-summary-label">Floor Revenue</label>
-        <div class="value" id="logbook-total-revenue">₱0</div>
+      <!-- ID added for dynamic day and value -->
+      <label id="logbook-summary-label">Floor Revenue</label>
+      <div class="value" id="logbook-total-revenue">₱0</div>
     </div>
-</div>
+  </div>
 
-<div class="day-selector" id="logbook-day-picker">
+  <div class="day-selector" id="logbook-day-picker">
     <button class="day-btn" data-day="0">SUN</button>
     <button class="day-btn" data-day="1">MON</button>
     <button class="day-btn" data-day="2">TUE</button>
@@ -24,8 +42,8 @@
     <button class="day-btn" data-day="4">THU</button>
     <button class="day-btn" data-day="5">FRI</button>
     <button class="day-btn" data-day="6">SAT</button>
-</div>
+  </div>
 
-<!-- Container for Dynamic Cards -->
-<div id="logbook-list-container"></div>
+  <!-- Container for Dynamic Cards -->
+  <div id="logbook-list-container"></div>
 </div>

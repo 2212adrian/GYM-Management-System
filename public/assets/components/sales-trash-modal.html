@@ -1,0 +1,342 @@
+<style>
+  /* --- 1. FONTS & RESET --- */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@500;800&display=swap');
+
+  /* --- 2. CORE OVERLAY --- */
+  .master-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(15px);
+    display: none; /* Controlled by JS */
+    justify-content: center;
+    align-items: center;
+    z-index: 110000;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* --- 3. TERMINAL CONTAINER --- */
+  .master-terminal-container {
+    background: #0d0d0d;
+    width: 100%;
+    max-width: 520px;
+    border-radius: 28px;
+    padding: 30px;
+    border: 1px solid #222;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+    animation: terminalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- 4. HEADER BRANDING --- */
+  .terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 25px;
+  }
+
+  .terminal-title {
+    font-weight: 900;
+    font-size: 1.6rem; /* Increased size */
+    letter-spacing: -0.5px;
+    margin: 0;
+    color: #fff;
+  }
+
+  .terminal-title span {
+    color: #eab308;
+  } /* Amber Accent */
+
+  .terminal-protocol {
+    font-size: 10px;
+    color: #555;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .terminal-close-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #666;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 24px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .terminal-close-btn:hover {
+    background: #eab308;
+    color: #000;
+    transform: rotate(90deg);
+    border-color: #eab308;
+  }
+
+  /* --- 5. ARCHIVE CONTENT --- */
+  .field-label {
+    font-size: 11px; /* Increased from 9px */
+    font-weight: 900;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .archive-list-box {
+    max-height: 400px; /* Increased height */
+    overflow-y: auto;
+    background: #050505;
+    border: 1px solid #1a1a1a;
+    border-radius: 20px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+
+  /* --- 6. ITEM CARDS --- */
+  .trash-item-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 16px;
+    padding: 18px; /* Increased padding */
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color 0.3s ease;
+  }
+
+  .trash-item-card:hover {
+    border-color: #333;
+    background: #141414;
+  }
+
+  .trash-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Product Name Hero Text */
+  .trash-prod-name {
+    font-size: 16px; /* High Readability */
+    font-weight: 800;
+    color: #ffffff;
+    text-transform: uppercase;
+  }
+
+  /* Metadata Row */
+  .trash-tech-row {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; /* Increased from 8px/9px */
+    color: #666;
+    font-weight: 500;
+  }
+
+  .trash-price-tag {
+    color: #ef4444; /* Alert Red for voided cash */
+    font-weight: 800;
+  }
+
+  /* --- 7. ACTION BUTTONS --- */
+  .trash-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-restore,
+  .btn-purge {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 18px; /* Increased touch area */
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+
+  /* Restore (Green) */
+  .btn-restore {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+  .btn-restore:hover {
+    background: #22c55e;
+    color: #000;
+    transform: translateY(-2px);
+  }
+
+  /* Purge (Permanent Delete) */
+  .btn-purge {
+    background: rgba(239, 68, 68, 0.05);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .btn-purge:hover {
+    background: #ef4444;
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  /* --- 8. FOOTER / CLOSE --- */
+  .btn-close-archive {
+    width: 100%;
+    background: #1a1a1a;
+    color: #666;
+    border: 1px solid #222;
+    padding: 16px;
+    border-radius: 16px;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-close-archive:hover {
+    background: #222;
+    color: #eee;
+    border-color: #444;
+  }
+
+  /* --- 9. SCROLLBAR & ANIMATIONS --- */
+  .archive-list-box::-webkit-scrollbar {
+    width: 4px;
+  }
+  .archive-list-box::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .archive-list-box::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+  }
+
+  @keyframes terminalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* --- 10. RESPONSIVENESS --- */
+  @media (min-width: 1024px) {
+    /* PC */
+    .master-terminal-container {
+      /* This creates the 50% middle block, leaving 25% space on each side */
+      width: 50vw;
+
+      /* Safety Limits: Prevent it from being too skinny or too wide on Ultrawide monitors */
+      max-width: 1000px;
+      min-width: 600px;
+
+      padding: 40px; /* More breathing room on PC */
+    }
+
+    /* Expand the list height for PC users */
+    .archive-list-box {
+      max-height: 60vh;
+    }
+
+    /* Increase font sizes slightly for large screens */
+    .trash-prod-name {
+      font-size: 18px;
+    }
+    .trash-tech-row {
+      font-size: 13px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    /* Mobile */
+    .master-terminal-container {
+      max-width: 95%;
+      padding: 20px;
+      border-radius: 24px;
+    }
+
+    .btn-text {
+      display: none;
+    } /* Show symbols only on mobile */
+
+    .btn-restore,
+    .btn-purge {
+      padding: 14px;
+      font-size: 20px; /* Large icons for touch */
+    }
+
+    .trash-prod-name {
+      font-size: 14px;
+    }
+    .trash-tech-row {
+      font-size: 11px;
+    }
+  }
+</style>
+
+<div id="sales-trash-overlay" class="master-modal-overlay">
+  <div class="master-terminal-container">
+    <div class="terminal-header">
+      <div class="terminal-title-group">
+        <h1 class="terminal-title">SALES <span>ARCHIVE</span></h1>
+        <p
+          style="color: #444; font-size: 8px; font-weight: 800; margin-top: 4px"
+        >
+          VOIDED_PROTOCOL_LOG V2.0
+        </p>
+      </div>
+      <button
+        class="terminal-close-btn"
+        id="closeTrashModal"
+        style="
+          background: none;
+          border: none;
+          color: #555;
+          cursor: pointer;
+          font-size: 24px;
+        "
+      >
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+
+    <div id="trash-list-container" class="archive-list-box">
+      <!-- JS Injected items -->
+    </div>
+
+    <button
+      id="closeTrashBtn"
+      style="
+        width: 100%;
+        margin-top: 20px;
+        background: #1a1a1a;
+        color: #555;
+        border: 1px solid #222;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 900;
+        font-size: 10px;
+        cursor: pointer;
+      "
+    >
+      RETURN TO TERMINAL
+    </button>
+  </div>
+</div>

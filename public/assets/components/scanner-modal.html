@@ -1,0 +1,281 @@
+<style>
+  .quick-auth-wrapper {
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .cyber-checkbox-blue {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .cyber-checkbox-blue input {
+    display: none;
+  }
+
+  .cyber-checkbox-blue .check-mark {
+    width: 18px;
+    height: 18px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid #333;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .cyber-checkbox-blue .check-mark i {
+    display: none;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  /* State: Checked */
+  .cyber-checkbox-blue input:checked + .check-mark {
+    background: #00d9ff;
+    border-color: #00d9ff;
+    box-shadow: 0 0 12px rgba(0, 217, 255, 0.5);
+  }
+
+  /* Show icon when checked */
+  .cyber-checkbox-blue input:checked + .check-mark i {
+    display: block;
+  }
+
+  .cyber-checkbox-blue .check-text {
+    font-size: 9px;
+    font-weight: 900;
+    color: #444;
+    letter-spacing: 1px;
+    transition: color 0.3s;
+  }
+
+  .cyber-checkbox-blue input:checked ~ .check-text {
+    color: #00d9ff;
+  }
+  /* --- SCANNER MANUAL INPUT SHRINK LOGIC --- */
+  .manual-input-group {
+    display: flex;
+    gap: 0; /* Gap handles by transitions */
+    height: 50px;
+    width: 100%;
+    transition: all 0.3s ease;
+  }
+
+  .manual-input-group input {
+    flex: 1; /* Takes full width initially */
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 0 15px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .manual-btn-submit {
+    width: 0; /* Hidden initially */
+    opacity: 0;
+    overflow: hidden;
+    background: var(--wolf-red);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    margin-left: 0;
+  }
+
+  /* State when user types: Input shrinks, Button appears */
+  .manual-input-group.has-content input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .manual-input-group.has-content .manual-btn-submit {
+    width: 60px;
+    opacity: 1;
+    margin-left: 8px;
+  }
+  .camera-inactive-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #333;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+  .camera-inactive-state i {
+    font-size: 40px;
+    margin-bottom: 10px;
+    opacity: 0.2;
+  }
+
+  .scanner-dropdown {
+    background: #111;
+    color: #fff;
+    border: 1px solid #333;
+    padding: 8px 35px 8px 15px; /* Extra right padding for custom arrow */
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.3s ease;
+
+    /* Reset default browser appearance */
+    appearance: none;
+    -webkit-appearance: none;
+
+    /* Custom Wolf Red Arrow Icon */
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23a63429" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+  }
+  .scanner-dropdown:hover {
+    border-color: #555;
+    background-color: #151515;
+  }
+
+  .scanner-dropdown:focus {
+    border-color: var(--wolf-red);
+    box-shadow: 0 0 15px rgba(166, 52, 41, 0.2);
+  }
+
+  /* --- MOBILE RESPONSIVE HIDE --- */
+  @media (max-width: 767px) {
+    #camera-selector-wrap {
+      display: none !important;
+    }
+  }
+  #camera-selector-wrap {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.5s ease;
+  }
+  /* Hide the guest button initially in the scanner component */
+  .btn-guest-entry {
+    display: none !important;
+  }
+  .btn-guest-entry.visible {
+    display: flex !important;
+  }
+
+  /* Change the icon when the checkbox is checked */
+  #quickAuthToggle:checked + .quick-auth-label #quick-auth-icon::before {
+    content: '\eb96'; /* This is the Boxicon code for a solid square 'bxs-square' */
+    color: var(--wolf-red); /* Or your system accent color */
+  }
+
+  /* Optional: Make the alert stay on top of everything */
+  #wolf-system-alert {
+    z-index: 999999 !important;
+  }
+</style>
+<!-- SYSTEM QR SCANNER OVERLAY -->
+<div id="wolf-scanner-overlay" style="display: none">
+  <div class="scanner-ui-wrapper">
+    <div class="scanner-header-bar">
+      <div class="brand">SCAN <span>MODULE</span></div>
+
+      <!-- NEW: Camera Picker Dropdown (Hidden for mobile) -->
+      <div id="camera-selector-wrap" style="display: none; margin: 0 15px">
+        <select id="cameraSelect" class="scanner-dropdown"></select>
+      </div>
+
+      <button id="exitScannerBtn" class="scanner-close-x">
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+
+    <div class="viewfinder-container">
+      <div id="reader">
+        <!-- Inactive Icon (Shows before camera starts) -->
+        <div class="camera-inactive-state">
+          <i class="bx bx-camera-off"></i>
+          <span>LINKING OPTICS...</span>
+        </div>
+      </div>
+      <div class="viewfinder-frame">
+        <div class="corner t-l"></div>
+        <div class="corner t-r"></div>
+        <div class="corner b-l"></div>
+        <div class="corner b-r"></div>
+        <div class="laser-line"></div>
+      </div>
+    </div>
+
+    <div class="scanner-manual-area">
+      <!-- Manual input group with shrink logic -->
+      <div class="manual-input-group" id="manualInputGroup">
+        <input
+          type="text"
+          id="manualCodeInput"
+          placeholder="MANUAL SYSTEM ID..."
+          autocomplete="off"
+        />
+        <button id="manualConfirmBtn" class="manual-btn-submit">
+          <i class="bx bx-subdirectory-left"></i>
+        </button>
+      </div>
+
+      <div class="quick-auth-wrapper">
+        <label class="cyber-checkbox-blue">
+          <input type="checkbox" id="quickAuthToggle" checked />
+          <span class="check-mark">
+            <i class="bx bxs-square"></i>
+            <!-- This is the square icon -->
+          </span>
+          <span class="check-text">QUICK AUTH (SKIP PROTOCOL)</span>
+        </label>
+      </div>
+
+      <button class="btn-guest-entry">
+        <i class="bx bx-user-plus"></i> GUEST / WALK-IN CUSTOMER
+      </button>
+    </div>
+
+    <div class="scanner-footer-status">
+      <div class="pulse-dot"></div>
+      <span>CAMERA ACTIVE | TERMINAL SECURE</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNED DATA MODAL -->
+<div id="scanResultModal" class="modal-overlay" style="display: none">
+  <div class="cyber-modal-container">
+    <div class="cyber-modal-header">
+      <i class="bx bx-scan"></i><span>SYSTEM DECRYPTOR</span>
+    </div>
+    <div class="modal-content cyber-modal-box">
+      <div class="brand">DATA <span>EXTRACTED</span></div>
+      <div id="scan-data-body"></div>
+      <div class="modal-actions-grid">
+        <button class="btn-authorize" id="confirmScanBtn">
+          <i class="bx bx-check-shield"></i> AUTHORIZE
+        </button>
+        <button class="btn-rescan" id="cancelScanBtn">
+          <i class="bx bx-refresh"></i> RE-SCAN
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer-glitch">ENCRYPTION: AES-256 | ACCESS LOGGED</div>
+  </div>
+</div>
