@@ -117,6 +117,10 @@ window.wolfScanner = {
   },
 
   async launchCamera(cameraId) {
+    // Prevent multiple launches at the same time
+    if (this.isSwitchingCamera) return;
+    this.isSwitchingCamera = true;
+
     // STOP EXISTING CAMERA CLEANLY
     if (html5QrCode) {
       try {
@@ -124,15 +128,21 @@ window.wolfScanner = {
       } catch (e) {
         console.warn('Failed to stop previous camera:', e);
       }
-      html5QrCode.clear();
+
+      try {
+        html5QrCode.clear();
+      } catch (e) {
+        console.warn('Failed to clear previous camera:', e);
+      }
+
       html5QrCode = null;
     }
 
-    // CLEAR VIEWFINDER
+    // CLEAR VIEWFINDER (safe now)
     const reader = document.getElementById('reader');
     reader.innerHTML = '';
 
-    // CREATE NEW INSTANCE
+    // START NEW CAMERA
     html5QrCode = new Html5Qrcode('reader');
 
     try {
@@ -143,9 +153,10 @@ window.wolfScanner = {
       );
     } catch (err) {
       this.showInactiveUI('HARDWARE_FAULT');
+    } finally {
+      this.isSwitchingCamera = false;
     }
   },
-
   processResult(text, type) {
     const currentTime = Date.now();
     // BLOCK if last scan was less than 2.5 seconds ago
@@ -178,29 +189,28 @@ window.wolfScanner = {
   },
 
   async stop() {
+    if (this.isSwitchingCamera) return;
+
+    this.isSwitchingCamera = true;
+
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
       } catch (e) {
         console.warn('Stop failed:', e);
       }
+
       try {
         html5QrCode.clear();
       } catch (e) {
         console.warn('Clear failed:', e);
       }
+
       html5QrCode = null;
     }
 
     document.getElementById('wolf-scanner-overlay').style.display = 'none';
-    document.querySelector('.btn-guest-entry')?.classList.remove('visible');
-
-    if (this.onCloseCallback) {
-      this.onCloseCallback();
-      this.onCloseCallback = null;
-    }
-
-    this.isProcessingResult = false;
+    this.isSwitchingCamera = false;
   },
   showInactiveUI(message) {
     const reader = document.getElementById('reader');
