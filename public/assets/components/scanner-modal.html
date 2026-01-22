@@ -241,7 +241,11 @@
 
         <!-- 2. MOBILE ONLY: Switch Button -->
         <div id="mobile-camera-selector" class="mobile-only-controls">
-          <button id="flipCameraBtn" class="scanner-action-btn">
+          <button
+            id="flipCameraBtn"
+            class="scanner-action-btn"
+            onclick="wolfScanner.cycleCamera()"
+          >
             <i class="bx bx-refresh"></i>
           </button>
         </div>

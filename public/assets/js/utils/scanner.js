@@ -6,6 +6,7 @@ window.wolfScanner = {
   onCloseCallback: null,
   isProcessingResult: false,
   lastScanTime: 0,
+  isFrontFacing: false,
   async init() {
     if (document.getElementById('wolf-scanner-overlay')) return true;
     try {
@@ -34,62 +35,77 @@ window.wolfScanner = {
       const cameras = await Html5Qrcode.getCameras();
       this.availableCameras = cameras;
 
-      if (cameras && cameras.length > 0) {
-        // 1. SETUP PC DROPDOWN
+      // Setup PC Dropdown (Keep ID-based for PC)
+      if (cameras.length > 0) {
         const selector = document.getElementById('cameraSelect');
         selector.innerHTML = cameras
           .map(
-            (cam, index) =>
-              `<option value="${cam.id}">${cam.label || 'Camera ' + (index + 1)}</option>`,
+            (cam, idx) =>
+              `<option value="${cam.id}">${cam.label || 'Camera ' + (idx + 1)}</option>`,
           )
           .join('');
 
-        selector.onchange = (e) => {
-          this.launchCamera(e.target.value);
-          // Sync index for mobile just in case window is resized
-          this.currentCamIndex = cameras.findIndex(
-            (c) => c.id === e.target.value,
-          );
-        };
-
-        // 2. SETUP MOBILE SWITCH
-        const flipBtn = document.getElementById('flipCameraBtn');
-        flipBtn.onclick = () => this.cycleCamera();
-
-        // 3. AUTO-SELECT BACK CAMERA
-        let backCamIndex = cameras.findIndex(
-          (cam) =>
-            cam.label.toLowerCase().includes('back') ||
-            cam.label.toLowerCase().includes('environment') ||
-            cam.label.toLowerCase().includes('rear'),
-        );
-
-        this.currentCamIndex = backCamIndex !== -1 ? backCamIndex : 0;
-
-        // Update dropdown to match auto-selected index
-        selector.value = cameras[this.currentCamIndex].id;
-
-        this.launchCamera(cameras[this.currentCamIndex].id);
+        selector.onchange = (e) => this.launchCamera(e.target.value);
       }
+
+      // Start with BACK camera by default
+      this.isFrontFacing = false;
+      this.launchCamera({ facingMode: 'environment' });
     } catch (err) {
       this.showInactiveUI('PERMISSION DENIED');
     }
   },
-
   // salesManager.js or scanner.js
   async cycleCamera() {
-    if (this.availableCameras.length < 2) return;
-
-    // Play click sound
+    // 1. Play feedback
     if (window.wolfAudio) window.wolfAudio.play('notif');
 
-    // Cycle index
-    this.currentCamIndex =
-      (this.currentCamIndex + 1) % this.availableCameras.length;
-    const nextCamId = this.availableCameras[this.currentCamIndex].id;
+    // 2. Toggle state
+    this.isFrontFacing = !this.isFrontFacing;
+    const mode = this.isFrontFacing ? 'user' : 'environment';
 
-    // Re-launch
-    await this.launchCamera(nextCamId);
+    // 3. Update UI feedback
+    const statusText = document.querySelector('.scanner-footer-status span');
+    if (statusText)
+      statusText.textContent = `SWITCHING TO ${mode.toUpperCase()}...`;
+
+    // 4. Restart with facingMode (The "Safe" way for mobile)
+    await this.launchCamera({ facingMode: mode });
+  },
+
+  async launchCamera(cameraConfig) {
+    // CRITICAL: Fully stop and clear before restarting
+    if (html5QrCode) {
+      try {
+        await html5QrCode.stop();
+        html5QrCode = null;
+      } catch (e) {
+        console.warn('Stop failed, clearing anyway.');
+      }
+    }
+
+    // Small delay to let hardware release the camera sensor
+    await new Promise((r) => setTimeout(r, 100));
+
+    html5QrCode = new Html5Qrcode('reader');
+
+    try {
+      await html5QrCode.start(
+        cameraConfig,
+        {
+          fps: 20,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (text) => this.processResult(text, 'SCAN'),
+      );
+
+      const statusText = document.querySelector('.scanner-footer-status span');
+      if (statusText) statusText.textContent = 'CAMERA ACTIVE | OPTICS LINKED';
+    } catch (err) {
+      console.error(err);
+      this.showInactiveUI('HARDWARE_FAULT');
+    }
   },
 
   setupCameraSelector(cameras) {
@@ -113,26 +129,6 @@ window.wolfScanner = {
       };
     } else {
       selectorWrap.style.display = 'none';
-    }
-  },
-
-  async launchCamera(cameraId) {
-    if (html5QrCode) {
-      try {
-        await html5QrCode.stop();
-      } catch (e) {}
-      html5QrCode = null;
-    }
-
-    html5QrCode = new Html5Qrcode('reader');
-    try {
-      await html5QrCode.start(
-        cameraId,
-        { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        (text) => this.processResult(text, 'SCAN'),
-      );
-    } catch (err) {
-      this.showInactiveUI('HARDWARE_FAULT');
     }
   },
 
