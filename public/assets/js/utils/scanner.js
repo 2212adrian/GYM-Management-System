@@ -75,25 +75,35 @@ window.wolfScanner = {
   async launchCamera(cameraConfig) {
     const readerDiv = document.getElementById('reader');
 
-    // 1. STEP 1: Aggressively kill the previous instance
+    // 1. STEP 1: STOP THE LIBRARY INSTANCE
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
         html5QrCode = null;
       } catch (e) {
-        console.warn('Clean stop failed, Proceeding to DOM wipe.');
+        console.warn('Library stop failed, forcing track kill...');
       }
     }
 
-    // 2. STEP 2: THE BRUTE FORCE FIX
-    // Completely empty the div to destroy any "stuck" video elements
+    // 2. STEP 2: THE NUCLEAR OPTION (Stop all browser media tracks)
+    // This physically tells the phone "Turn off the light on the lens"
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const stream = await navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .catch(() => null);
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    }
+
+    // 3. STEP 3: DOM WIPE
     readerDiv.innerHTML = '';
 
-    // 3. STEP 3: Hardware Cooldown
-    // We give the phone's OS 300ms to physically close the lens shutter
-    await new Promise((r) => setTimeout(r, 300));
+    // 4. STEP 4: COOLDOWN
+    // Increased to 500ms - Back cameras take longer to "warm up" than front cameras
+    await new Promise((r) => setTimeout(r, 500));
 
-    // 4. STEP 4: Fresh Start
+    // 5. STEP 5: FRESH START
     html5QrCode = new Html5Qrcode('reader');
 
     try {
@@ -111,14 +121,16 @@ window.wolfScanner = {
       if (statusText) statusText.textContent = 'CAMERA ACTIVE | OPTICS LINKED';
     } catch (err) {
       console.error('Camera Start Error:', err);
-      // If environment fails, try a generic start as a last resort
-      if (!this.isFrontFacing) {
-        console.log('Environment failed, trying fallback...');
-        this.showInactiveUI('RE-TRYING LINK...');
-        setTimeout(
-          () => this.launchCamera({ facingMode: 'environment' }),
-          1000,
-        );
+
+      // FALLBACK: If "environment" fails on the second swap,
+      // it's usually because the ID changed. Try to use the first available ID instead.
+      if (this.availableCameras && this.availableCameras.length > 0) {
+        console.log('FacingMode failed, falling back to ID-based launch...');
+        const backCam =
+          this.availableCameras.find((c) =>
+            c.label.toLowerCase().includes('back'),
+          ) || this.availableCameras[0];
+        await this.launchCamera(backCam.id);
       } else {
         this.showInactiveUI('HARDWARE_FAULT');
       }
