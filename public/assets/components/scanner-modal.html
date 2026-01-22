@@ -156,12 +156,6 @@
     box-shadow: 0 0 15px rgba(166, 52, 41, 0.2);
   }
 
-  /* --- MOBILE RESPONSIVE HIDE --- */
-  @media (max-width: 767px) {
-    #camera-selector-wrap {
-      display: none !important;
-    }
-  }
   #camera-selector-wrap {
     flex-grow: 1;
     display: flex;
@@ -233,35 +227,17 @@
 <!-- SYSTEM QR SCANNER OVERLAY -->
 <div id="wolf-scanner-overlay" style="display: none">
   <div class="scanner-ui-wrapper">
-    <div
-      id="scanner-debug-log"
-      style="
-        position: absolute;
-        bottom: 80px;
-        left: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: #00ff00;
-        font-family: monospace;
-        font-size: 9px;
-        padding: 10px;
-        border: 1px solid #333;
-        pointer-events: none;
-        z-index: 100;
-        max-height: 100px;
-        overflow-y: auto;
-        display: none;
-      "
-    >
-      [SYSTEM_LOG READY]
-    </div>
     <div class="scanner-header-bar">
       <div class="brand">SCAN <span>MODULE</span></div>
 
-      <!-- NEW: Camera Picker Dropdown (Hidden for mobile) -->
-      <div id="camera-selector-wrap" style="display: none; margin: 0 15px">
-        <select id="cameraSelect" class="scanner-dropdown"></select>
-      </div>
+      <div
+        id="camera-controls-group"
+        style="display: flex; gap: 10px; align-items: center"
+      >
+        <!-- 1. PC ONLY: Dropdown Selector -->
+        <div id="pc-camera-selector" class="pc-only-controls">
+          <select id="cameraSelect" class="scanner-dropdown"></select>
+        </div>
 
         <!-- 2. MOBILE ONLY: Switch Button -->
         <div id="mobile-camera-selector" class="mobile-only-controls">

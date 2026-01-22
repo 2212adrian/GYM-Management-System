@@ -6,19 +6,6 @@ window.wolfScanner = {
   onCloseCallback: null,
   isProcessingResult: false,
   lastScanTime: 0,
-  isFrontFacing: false,
-  currentCamIndex: 0,
-
-  debug(msg) {
-    const log = document.getElementById('scanner-debug-log');
-    if (log) {
-      log.style.display = 'block';
-      log.innerHTML += `<div>> ${msg}</div>`;
-      log.scrollTop = log.scrollHeight;
-    }
-    console.log(`Scanner: ${msg}`);
-  },
-
   async init() {
     if (document.getElementById('wolf-scanner-overlay')) return true;
     try {
@@ -38,13 +25,10 @@ window.wolfScanner = {
   async start(callback = null, hideGuest = false, onClose = null) {
     const ready = await this.init();
     if (!ready) return;
-    this.debug('INITIALIZING OPTICS...');
 
     this.activeCallback = callback;
     this.onCloseCallback = onClose;
-
-    const overlay = document.getElementById('wolf-scanner-overlay');
-    overlay.style.display = 'flex';
+    document.getElementById('wolf-scanner-overlay').style.display = 'flex';
 
     try {
       const cameras = await Html5Qrcode.getCameras();
@@ -88,7 +72,7 @@ window.wolfScanner = {
         this.launchCamera(cameras[this.currentCamIndex].id);
       }
     } catch (err) {
-      this.debug(`INIT_ERROR: ${err.message}`);
+      this.showInactiveUI('PERMISSION DENIED');
     }
   },
 
