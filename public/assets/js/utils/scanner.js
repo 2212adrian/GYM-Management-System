@@ -68,59 +68,82 @@ window.wolfScanner = {
   },
 
   async cycleCamera() {
+    if (this.isProcessingSwitch) return; // Prevent double-clicks
+    this.isProcessingSwitch = true;
+
     if (window.wolfAudio) window.wolfAudio.play('notif');
 
-    // Increment index to next hardware ID
     this.currentCamIndex =
       (this.currentCamIndex + 1) % this.availableCameras.length;
     const nextCam = this.availableCameras[this.currentCamIndex];
 
-    this.debug(`SWITCHING TO: ${nextCam.label}`);
+    this.debug(`INITIATING SWITCH: ${nextCam.label}`);
 
-    // Force a fresh launch with the specific ID
     await this.launchCamera(nextCam.id);
+    this.isProcessingSwitch = false;
   },
 
   async launchCamera(cameraId) {
     const readerDiv = document.getElementById('reader');
 
-    // 1. KILL EXISTING
+    // 1. STOP & KILL (Strict Await)
     if (html5QrCode) {
+      this.debug('DE-LINKING CURRENT OPTICS...');
       try {
+        // We MUST wait for the stop promise to resolve completely
         await html5QrCode.stop();
-        html5QrCode = null;
-        this.debug('PREVIOUS STREAM TERMINATED');
+        this.debug('OPTICS DE-LINKED');
       } catch (e) {
-        this.debug('CLEANUP_RETRY...');
+        this.debug('CLEANUP_FAULT: Force clearing...');
       }
+      html5QrCode = null;
     }
 
-    // 2. DOM RESET
-    readerDiv.innerHTML = '';
+    // 2. HARDWARE COOLDOWN (Increased for Camera2 API stability)
+    // Most mobile 'camera2' drivers need 500ms to cycle power
+    await new Promise((r) => setTimeout(r, 600));
 
-    // 3. HARDWARE COOLDOWN (Essential for multi-lens)
-    await new Promise((r) => setTimeout(r, 400));
-
-    // 4. START FRESH WITH ID
+    // 3. RE-CREATE INSTANCE
+    // Note: We are NOT clearing innerHTML here to prevent the Interrupted error
     html5QrCode = new Html5Qrcode('reader');
 
     try {
+      this.debug(`LINKING TO: ${cameraId}`);
+
       await html5QrCode.start(
-        cameraId, // Using exact ID instead of facingMode
+        cameraId,
         {
-          fps: 20,
+          fps: 24, // Smoother for mobile
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         },
         (text) => this.processResult(text, 'SCAN'),
       );
-      this.debug('LINK_ESTABLISHED');
+
+      this.debug('SYSTEM_ONLINE: Feed established.');
+
+      // CRITICAL FIX: Manually check if the video is actually playing
+      // Sometimes the library says "Success" but the hardware is black
+      setTimeout(() => {
+        const video = readerDiv.querySelector('video');
+        if (video && video.paused) {
+          this.debug('FEED_STUCK: Attempting manual jumpstart...');
+          video.play().catch((e) => this.debug('JUMPSTART_FAILED'));
+        }
+      }, 1000);
     } catch (err) {
-      this.debug(`LINK_FAULT: ${err.message}`);
-      // If it crashes, it might be a locked lens. Try auto-cycling.
-      if (this.availableCameras.length > 1) {
-        this.debug('RE-ROUTING TO NEXT LENS...');
-        setTimeout(() => this.cycleCamera(), 500);
+      this.debug(`LINK_FAILED: ${err}`);
+
+      // If it fails with "Media removed", it means the DOM shifted.
+      // We wait and try one more time automatically.
+      if (
+        err.toString().includes('removed') ||
+        err.toString().includes('interrupted')
+      ) {
+        this.debug('RETRIEVING LOST SIGNAL...');
+        setTimeout(() => this.launchCamera(cameraId), 1000);
+      } else {
+        this.showInactiveUI('HARDWARE_FAULT');
       }
     }
   },
