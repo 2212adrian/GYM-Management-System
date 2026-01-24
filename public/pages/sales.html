@@ -1,36 +1,4 @@
 <style>
-  /* --- TOP-DOWN SLIDING ALERT --- */
-  /* --- SYSTEM ALERT MODAL (TOP-MIDDLE) --- */
-  #wolf-system-alert {
-    position: fixed;
-    top: -100px; /* Hidden */
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 320px;
-    padding: 18px 30px;
-    border-radius: 0 0 20px 20px;
-    z-index: 300000;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    transition: top 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-    font-family: 'Inter', sans-serif;
-  }
-
-  #wolf-system-alert.show {
-    top: 0;
-  }
-
-  #wolf-system-alert.success {
-    background: #4ade80;
-    color: #000;
-  }
-  #wolf-system-alert.error {
-    background: var(--wolf-red);
-    color: #fff;
-  }
-
   .alert-icon {
     font-size: 24px;
   }
@@ -39,6 +7,23 @@
     font-weight: 900;
     letter-spacing: 1px;
     text-transform: uppercase;
+  }
+  /* DISBALE ZOOM AND PULL-TO-REFRESH */
+  html,
+  body {
+    overscroll-behavior-y: none; /* Prevents pull-to-refresh */
+    touch-action: pan-x pan-y; /* Disables pinch-zoom while allowing scrolling */
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS from zooming in on focus */
+  }
+
+  /* Page transitions / layout tweaks */
+  .page-wrapper {
+    -webkit-tap-highlight-color: transparent;
   }
 </style>
 <script src="/assets/js/utils/gatekeeper.js"></script>
@@ -92,6 +77,32 @@
       </div>
     </div>
   </div>
+  <nav class="week-nav-container">
+    <!-- PREVIOUS BUTTON -->
+    <button class="chrono-nav-btn" id="prev-week-btn">
+      <i class="bx bx-left-arrow-alt"></i>
+      <span class="btn-label">PREVIOUS</span>
+    </button>
+
+    <!-- CENTER DISPLAY -->
+    <div class="date-status-pill" id="chrono-picker-trigger">
+      <span class="protocol-label">SYSTEM_CHRONOLOCK << ACTIVE</span>
+      <span id="week-range-display">--- - ---</span>
+    </div>
+
+    <!-- NEXT BUTTON -->
+    <button class="chrono-nav-btn" id="next-week-btn">
+      <span class="btn-label">NEXT</span>
+      <i class="bx bx-right-arrow-alt"></i>
+    </button>
+  </nav>
+
+  <!-- Hidden Input -->
+  <input
+    type="date"
+    id="hidden-chrono-input"
+    style="position: absolute; opacity: 0; pointer-events: none"
+  />
 
   <!-- DAY SELECTOR -->
   <div class="day-selector" id="sales-day-picker">

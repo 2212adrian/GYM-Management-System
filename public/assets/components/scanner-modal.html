@@ -137,8 +137,8 @@
     transition: all 0.3s ease;
 
     /* Reset default browser appearance */
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
 
     /* Custom Wolf Red Arrow Icon */
     background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23a63429" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
@@ -162,6 +162,12 @@
     justify-content: center;
     align-items: center;
     animation: fadeIn 0.5s ease;
+  }
+
+  #camera-controls-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
   }
   /* Hide the guest button initially in the scanner component */
   .btn-guest-entry {
@@ -230,10 +236,7 @@
     <div class="scanner-header-bar">
       <div class="brand">SCAN <span>MODULE</span></div>
 
-      <div
-        id="camera-controls-group"
-        style="display: flex; gap: 10px; align-items: center"
-      >
+      <div id="camera-controls-group">
         <!-- 1. PC ONLY: Dropdown Selector -->
         <div id="pc-camera-selector" class="pc-only-controls">
           <select id="cameraSelect" class="scanner-dropdown"></select>

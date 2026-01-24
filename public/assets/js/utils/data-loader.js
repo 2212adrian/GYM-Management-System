@@ -15,28 +15,278 @@ async function moveToTrash(tableName, id, data) {
 
 const wolfData = {
   // Enables Realtime from supabase
-  initRealtime() {
-    console.log('Wolf OS: Realtime Telemetry Sync Active.');
+  selectedDate: null, // Will be set by server
+  serverDateStr: null,
+  weekStart: null, // The Sunday of the current week range
+  allSales: [],
+  currentSalesDay: new Date().toISOString().split('T')[0],
+  activeMode: 'sales',
+  isFetching: false,
 
-    // Listen for new Sales
+  async syncServerTime() {
+    console.log('Wolf OS: Synchronizing with Atomic Clock...');
+    try {
+      const { data, error } = await supabaseClient.rpc('get_server_time');
+      if (error) throw error;
+
+      // Supabase often returns RPC data as a string or an array of one object
+      // We ensure we get the raw string value
+      const timestamp = Array.isArray(data) ? data[0] : data;
+
+      if (timestamp) {
+        this.selectedDate = new Date(timestamp);
+        this.serverToday = new Date(timestamp); // The reference for "Today"
+      } else {
+        throw new Error('No timestamp returned');
+      }
+    } catch (err) {
+      console.error('Wolf OS: Sync Fault. Falling back to system clock.', err);
+      this.selectedDate = new Date();
+      this.serverToday = new Date();
+    }
+
+    // Safety check: if parsing failed, don't leave it as Invalid Date
+    if (isNaN(this.selectedDate.getTime())) {
+      this.selectedDate = new Date();
+      this.serverToday = new Date();
+    }
+  },
+
+  async syncTime() {
+    console.log('Wolf OS: Syncing with Atomic Server Clock...');
+    const { data, error } = await supabaseClient.rpc('get_server_time');
+
+    if (data && data[0]) {
+      // data[0].server_date is "2026-01-25" (The true today)
+      const parts = data[0].server_date.split('-');
+      this.selectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      this.serverDateStr = data[0].server_date;
+      console.log(
+        `Wolf OS: Server Sync Complete. Today is ${this.serverDateStr}`,
+      );
+    } else {
+      console.error(
+        'Time Sync Failed, falling back to local (not recommended)',
+      );
+      this.selectedDate = new Date();
+    }
+  },
+
+  // Refresh today's index (0-6)
+  get realTodayIndex() {
+    return new Date().getDay();
+  },
+  // Get today's ISO date (YYYY-MM-DD)
+  get realTodayISO() {
+    return new Date().toISOString().split('T')[0];
+  },
+
+  // Inside your wolfData object in data-loader.js
+  async initLedger(mode) {
+    this.activeMode = mode;
+    await this.syncTime();
+    this.selectedDate = this.serverToday
+      ? new Date(this.serverToday)
+      : new Date();
+
+    const title = document.getElementById('ledger-title');
+    const label = document.getElementById('ledger-summary-label');
+    const searchWrap = document.getElementById('ledger-search-wrapper');
+    const primBtn = document.getElementById('ledger-primary-btn');
+    const primIcon = document.getElementById('ledger-primary-icon');
+
+    if (!title) return; // Safety check: HTML not injected yet
+
+    if (mode === 'sales') {
+      title.innerText = 'SALES';
+      label.innerText = 'Daily Income Summary';
+      if (searchWrap) searchWrap.style.display = 'flex';
+      if (primBtn) primBtn.className = 'icon-btn red';
+      if (primIcon) primIcon.className = 'bx bx-plus';
+    } else {
+      title.innerText = 'LOGBOOK';
+      label.innerText = 'Total Floor Traffic';
+      if (searchWrap) searchWrap.style.display = 'none';
+      if (primBtn) primBtn.className = 'icon-btn';
+      if (primIcon) primIcon.className = 'bx bx-fullscreen';
+    }
+
+    this.initChrono(mode);
+  },
+
+  // ==========================================
+  // 0. CHRONO CORE (WEEK NAVIGATOR)
+  // ==========================================
+  initChrono(type) {
+    if (this.fp) {
+      this.fp.destroy();
+      this.fp = null;
+    }
+    const trigger = document.getElementById('chrono-picker-trigger');
+    const serverMax = this.serverToday || new Date();
+    this.fp = flatpickr('#hidden-chrono-input', {
+      disableMobile: true,
+      maxDate: serverMax,
+      animate: true,
+      positionElement: trigger,
+      position: 'below',
+
+      onReady: (selectedDates, dateStr, instance) => {
+        const cal = instance.calendarContainer;
+
+        // Apply Wolf OS v3 skin
+        cal.classList.remove('wolf-calendar-v2', 'wolf-calendar-v3');
+        cal.classList.add('wolf-calendar');
+
+        // Ensure correct base state
+        cal.classList.remove('open');
+      },
+
+      onOpen: (_, __, instance) => {
+        // Trigger CSS intro animation
+        requestAnimationFrame(() => {
+          instance.calendarContainer.classList.add('open');
+        });
+      },
+
+      onClose: (_, __, instance) => {
+        // Smooth exit (no snap close)
+        instance.calendarContainer.classList.remove('open');
+      },
+
+      onChange: (selectedDates) => {
+        if (selectedDates.length > 0) {
+          this.selectedDate = selectedDates[0];
+          this.calculateWeek(type);
+        }
+      },
+    });
+
+    // Manual trigger (safe)
+    if (trigger) {
+      trigger.onclick = null;
+      trigger.onclick = () => {
+        if (this.fp.isOpen) {
+          this.fp.close();
+        } else {
+          this.fp.open();
+        }
+      };
+    }
+
+    this.calculateWeek(type);
+  },
+
+  calculateWeek(type) {
+    const d = new Date(this.selectedDate);
+    const dayIndex = d.getDay();
+    const sun = new Date(d);
+    sun.setDate(d.getDate() - dayIndex);
+    const sat = new Date(sun);
+    sat.setDate(sun.getDate() + 6);
+    this.updateChronoUI(sun, sat, dayIndex, type);
+  },
+
+  shiftWeek(days, type) {
+    this.selectedDate.setDate(this.selectedDate.getDate() + days);
+    this.calculateWeek(type);
+  },
+
+  updateChronoUI(sun, sat, activeIndex) {
+    if (this.fp) this.fp.setDate(this.selectedDate, false);
+    const fmt = (date) =>
+      date
+        .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        .toUpperCase();
+
+    const display = document.getElementById('week-range-display');
+    if (display) display.innerText = `${fmt(sun)} - ${fmt(sat)}`;
+
+    // 1. Get Today context from Server-Synced date
+    const realToday = this.serverToday || new Date();
+    const realTodayISO = realToday.toLocaleDateString('en-CA');
+
+    // 2. Calculate Real Current Sunday (to decide if we show TODAY button)
+    const realSun = new Date(realToday);
+    realSun.setDate(realToday.getDate() - realToday.getDay());
+    const realSunISO = realSun.toLocaleDateString('en-CA');
+
+    // 3. Current View Sunday
+    const viewSunISO = sun.toLocaleDateString('en-CA');
+
+    // ANIMATION TRIGGER
+    const snapBtn = document.getElementById('snap-today-btn');
+    if (snapBtn) {
+      // If viewing ANY week older than the current one, show button
+      if (viewSunISO < realSunISO) {
+        snapBtn.classList.add('visible');
+      } else {
+        snapBtn.classList.remove('visible');
+      }
+    }
+
+    // 4. Update Day Buttons (Future Lock)
+    const buttons = document.querySelectorAll(`#ledger-day-picker .day-btn`);
+    buttons.forEach((btn, idx) => {
+      const btnDate = new Date(sun);
+      btnDate.setDate(sun.getDate() + idx);
+      const btnISO = btnDate.toLocaleDateString('en-CA');
+
+      btn.setAttribute('data-date', btnISO);
+      btn.classList.toggle('active', idx === activeIndex);
+      btn.disabled = btnISO > realTodayISO; // Server-time future lock
+    });
+
+    // 5. Lockdown UI
+    const selectedISO = this.selectedDate.toLocaleDateString('en-CA');
+    this.isReadOnly = selectedISO !== realTodayISO;
+    if (this.applyLockdownUI) this.applyLockdownUI();
+
+    // 6. Refresh Data
+    if (this.activeMode === 'sales') this.loadSales();
+    else if (this.activeMode === 'logbook') this.loadLogbook();
+  },
+
+  initRealtime() {
     supabaseClient
-      .channel('schema-db-changes')
+      .channel('wolf-realtime-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
         (payload) => {
-          console.log('Realtime Sale Detected:', payload);
-          this.loadSales(this.currentSalesDay); // Auto-refresh list & total
+          console.log(
+            `Wolf OS: Realtime [${payload.eventType}] detected on Sales`,
+          );
+
+          // 1. If it's a DELETE, refresh immediately to remove the row
+          if (payload.eventType === 'DELETE') {
+            this.loadSales();
+            return;
+          }
+
+          // 2. Get the date of the record (New for Inserts, Old for Deletes)
+          const record = payload.new || payload.old;
+          if (!record || !record.created_at) return;
+
+          const recordDate = new Date(record.created_at);
+          const recordISO = recordDate.toLocaleDateString('en-CA');
+          const viewedISO = this.selectedDate.toLocaleDateString('en-CA');
+
+          // 3. ONLY refresh if the changed record belongs to the day we are currently looking at
+          if (recordISO === viewedISO) {
+            console.log(
+              'Wolf OS: Incoming data matches viewed date. Refreshing...',
+            );
+            this.loadSales();
+          }
         },
       )
-      // Listen for Product changes (like qty updates)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'products' },
-        (payload) => {
-          console.log('Realtime Stock Update:', payload);
-          // If the sale terminal is open, we should fetch fresh product data
-          if (window.salesManager) window.salesManager.fetchProducts();
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          // If product stock/price changes, refresh the sales list to update names/availability
+          this.loadSales();
         },
       )
       .subscribe();
@@ -49,44 +299,62 @@ const wolfData = {
   salesDataCache: [], // Cache used for instant searching without re-fetching from DB
 
   // ==========================================
-  // 1. LOGBOOK ENGINE
+  // 1. LOGBOOK ENGINE (FIXED)
   // ==========================================
-  async loadLogbook(selectedDay = this.currentLogDay) {
-    const container = document.getElementById('logbook-list-container');
+  async loadLogbook() {
+    const container = document.getElementById('ledger-list-container');
+    const summaryVal = document.getElementById('ledger-summary-amount');
     if (!container) return;
 
-    this.currentLogDay = parseInt(selectedDay);
-    this.updateDayUI('logbook', this.currentLogDay);
+    // 1. Clear previous view immediately
+    this.allSales = [];
+    container.innerHTML = `
+      <div style="text-align:center; padding:50px; opacity:0.3;">
+        <i class='bx bx-loader-alt bx-spin' style='font-size:2rem;'></i>
+        <p style="font-size:10px; margin-top:10px; letter-spacing:1px;">SYNCING LOGBOOK...</p>
+      </div>`;
 
+    const localDay = this.selectedDate.toLocaleDateString('en-CA');
+
+    // 2. Fetch Data
     const { data, error } = await supabaseClient
       .from('check_in_logs')
       .select('*, profiles(full_name)')
+      .gte('time_in', `${localDay}T00:00:00`)
+      .lte('time_in', `${localDay}T23:59:59`)
       .order('time_in', { ascending: false });
 
-    if (error) return;
+    if (error) {
+      console.error('Logbook Fetch Error:', error);
+      return;
+    }
 
-    const filteredData = data.filter(
-      (log) => new Date(log.time_in).getDay() === this.currentLogDay,
-    );
+    // 3. Update Summary Count
+    if (summaryVal) summaryVal.innerText = data.length;
 
-    container.innerHTML = filteredData
+    if (data.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-user-x' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO CUSTOMER LOGGED</p></div>`;
+      return;
+    }
+
+    // 4. Render Logbook Cards
+    container.innerHTML = data
       .map((log) => {
         const isClosed = log.time_out !== null;
         return `
-            <div class="list-item-card">
-                <div class="card-header">
-                    <div class="status-icon ${!isClosed ? 'active' : ''}"><i class='bx ${isClosed ? 'bx-check' : 'bx-time-five'}'></i></div>
+            <div class="list-item-card" style="padding: 15px 20px; margin-bottom:10px;">
+                <div class="card-header" style="margin-bottom:0;">
+                    <div class="status-icon ${!isClosed ? 'active' : ''}" style="background:var(--bg-dark); color:var(--wolf-red);">
+                        <i class='bx ${isClosed ? 'bx-check' : 'bx-time-five'}'></i>
+                    </div>
                     <div class="item-info">
-                        <h4>${log.profiles?.full_name || 'Walk-in Guest'}</h4>
-                        <div class="time">IN: ${new Date(log.time_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <h4 style="font-size:13px; font-weight:800;">${log.profiles?.full_name || 'Walk-in Guest'}</h4>
+                        <div class="time" style="font-size:10px; color:#555;">IN: ${new Date(log.time_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
                     <div class="card-actions">
-                        <!-- TRASH ICON: Completely removed from HTML if ReadOnly -->
-                        ${!this.isReadOnly ? `<i class='bx bx-trash action-small' onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
+                        ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
                     </div>
                 </div>
-                <!-- RE-OPEN BUTTON: Only show if training ended AND not read-only -->
-                ${isClosed && !this.isReadOnly ? `<button class="re-open-btn" onclick="wolfData.reopenLog('${log.id}')"><i class='bx bx-undo'></i> Re-open Session</button>` : ''}
             </div>`;
       })
       .join('');
@@ -95,94 +363,49 @@ const wolfData = {
   // ==========================================
   // 2. SALES ENGINE
   // ==========================================
+  async loadSales() {
+    if (!this.selectedDate) await this.syncServerTime();
 
-  async loadSales(selectedDay = this.currentSalesDay) {
-    const container = document.getElementById('sales-list-container');
-    const revenueEl = document.getElementById('sales-total-amount'); // The total display element
-    const labelEl = document.getElementById('sales-summary-label');
+    if (this.isFetching) return;
+    this.isFetching = true;
 
-    if (!container) return;
+    const container = document.getElementById('ledger-list-container');
+    this.allSales = [];
 
-    this.currentSalesDay = parseInt(selectedDay);
-    this.updateDayUI('sales', this.currentSalesDay);
-
-    const { data, error } = await supabaseClient
-      .from('sales')
-      .select('*, products(name)')
-      .order('created_at', { ascending: false });
-
-    if (error) return console.error(error);
-
-    // 1. Filter by the selected day
-    const filtered = data.filter(
-      (sale) => new Date(sale.created_at).getDay() === this.currentSalesDay,
-    );
-
-    // --- THE CALCULATION LOGIC ---
-    let totalIncome = 0;
-    const dayNames = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-
-    if (labelEl)
-      labelEl.innerText = `${dayNames[this.currentSalesDay]} Total Income`;
-
-    if (filtered.length === 0) {
-      container.innerHTML = `<p style="text-align:center; color:#444; margin-top:40px;">No transactions recorded.</p>`;
-      if (revenueEl) revenueEl.innerText = `₱0.00`;
-      return;
+    if (container) {
+      container.innerHTML = `<div style="text-align:center; padding:50px; opacity:0.3;"><i class='bx bx-loader-alt bx-spin' style='font-size:2rem;'></i></div>`;
     }
 
-    // 2. Map and Sum
-    container.innerHTML = filtered
-      .map((sale) => {
-        // Accumulate the total (Force it to be a number to prevent bugs)
-        totalIncome += Number(sale.total_amount || 0);
+    const localDay = this.selectedDate.toLocaleDateString('en-CA');
 
-        return `
-        <div class="list-item-card" style="padding: 15px 20px;">
-            <div class="card-header" style="margin-bottom: 0;">
-                <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);">
-                    <i class='bx bx-shopping-bag'></i>
-                </div>
-                <div class="item-info">
-                    <h4>${sale.products?.name || 'Item'}</h4>
-                    <div class="time">${new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • x${sale.qty}</div>
-                </div>
-                <div class="card-actions">
-                    <div style="color: var(--wolf-red); font-weight: 900; font-family: 'Courier New';">₱${Number(sale.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
-                </div>
-            </div>
-        </div>`;
-      })
-      .join('');
+    try {
+      const { data, error } = await supabaseClient
+        .from('sales')
+        .select('*, products(name, sku)')
+        /* 
+           CRITICAL FIX: 
+           We tell Supabase to look for the day starting from 00:00 
+           in the Philippines (+08:00 offset).
+        */
+        .gte('created_at', `${localDay}T00:00:00+08:00`)
+        .lte('created_at', `${localDay}T23:59:59+08:00`)
+        .order('created_at', { ascending: false });
 
-    // 3. Update the Summary Card with formatting
-    if (revenueEl) {
-      revenueEl.innerText = `₱${totalIncome.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
+      if (error) throw error;
+      this.allSales = data || [];
+      this.renderSales(this.selectedDate.getDay());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      this.isFetching = false;
     }
   },
 
-  renderSales(day, searchTerm = '') {
-    const container = document.getElementById('sales-list-container');
-    const revenueEl = document.getElementById('sales-total-amount');
-    const labelEl = document.getElementById('sales-summary-label');
-
-    // --- THE FIX: Stop if elements are missing ---
-    if (!container) {
-      console.warn('Wolf OS: Sales container not found. Skipping render.');
-      return;
-    }
+  renderSales(dayIndex, searchTerm = '') {
+    const container = document.getElementById('ledger-list-container');
+    const revenueEl = document.getElementById('ledger-summary-amount');
+    const labelEl = document.getElementById('ledger-summary-label');
+    if (!container) return;
 
     const dayNames = [
       'Sunday',
@@ -193,50 +416,54 @@ const wolfData = {
       'Friday',
       'Saturday',
     ];
-    if (labelEl) labelEl.innerText = `${dayNames[day]} Total Income`;
+    if (labelEl) labelEl.innerText = `${dayNames[dayIndex]} Total Income`;
 
-    const filtered = this.salesDataCache.filter((sale) => {
-      const dateMatch = new Date(sale.created_at).getDay() == day;
-      const searchLower = searchTerm.toLowerCase();
-      const nameMatch = sale.products?.name
-        ?.toLowerCase()
-        .includes(searchLower);
-      const refMatch = sale.sale_reference?.toLowerCase().includes(searchLower);
-      return dateMatch && (nameMatch || refMatch);
-    });
+    const term = searchTerm.toLowerCase().trim();
+    let filtered = [...this.allSales];
 
-    let total = 0;
+    if (term !== '') {
+      filtered = filtered.filter((sale) => {
+        const name = String(sale.products?.name || '').toLowerCase();
+        const sku = String(sale.products?.sku || '').toLowerCase();
+        const ref = String(sale.sale_reference || '').toLowerCase();
+        return name.includes(term) || sku.includes(term) || ref.includes(term);
+      });
+    }
+
     if (filtered.length === 0) {
-      container.innerHTML = `<p style="text-align:center; color:#444; margin-top:40px;">No sales found.</p>`;
-      if (revenueEl) revenueEl.innerText = `₱0`;
+      container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-shopping-bag' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
+      if (revenueEl) revenueEl.innerText = '₱0.00';
       return;
     }
 
+    let totalIncome = 0;
     container.innerHTML = filtered
       .map((sale) => {
-        total += sale.total_amount;
-        const time = new Date(sale.created_at).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        const amount = Number(sale.total_amount || 0);
+        totalIncome += amount;
         return `
         <div class="list-item-card" style="padding: 15px 20px; margin-bottom:10px;">
             <div class="card-header" style="margin-bottom: 0;">
                 <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);"><i class='bx bx-shopping-bag'></i></div>
                 <div class="item-info">
-                    <h4 style="font-weight: 800;">${sale.products?.name || 'Item'}</h4>
-                    <div class="time" style="font-size: 11px; color: #555;">${time} • x${sale.qty} Units</div>
+                    <h4 style="font-size:13px; font-weight:800;">${sale.products?.name || 'Item'}</h4>
+                    <div class="time" style="font-size:10px; color:#555;">
+                        ${new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • x${sale.qty} • ${sale.products?.sku || 'N/A'}
+                    </div>
                 </div>
-                <div class="card-actions">
-                    <div style="color: var(--wolf-red); font-weight: 900; font-style: italic; font-size: 1.1rem;">₱${sale.total_amount.toLocaleString()}</div>
-                    <i class='bx bx-trash' style="color: #333; cursor: pointer; font-size: 18px;" onclick="wolfData.deleteSale('${sale.id}')"></i>
+                <div class="card-actions" style="text-align:right;">
+                    <div style="color: var(--wolf-red); font-weight: 900; font-family: 'JetBrains Mono'; font-size:14px;">
+                        ₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px; margin-top:5px;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
                 </div>
             </div>
         </div>`;
       })
       .join('');
 
-    if (revenueEl) revenueEl.innerText = `₱${total.toLocaleString()}`;
+    if (revenueEl)
+      revenueEl.innerText = `₱${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   },
 
   // ==========================================
@@ -345,10 +572,17 @@ const wolfData = {
   },
 
   async deleteSale(id) {
-    if (
-      !confirm('VOID TRANSACTION: Archive sale and restore product quantity?')
-    )
-      return;
+    const confirmed = await window.wolfModal.confirm({
+      title: 'DELETE ITEM',
+      message:
+        'Do you want to delete this product? This will be moved to Trash Bin.',
+      icon: 'bx-trash',
+      confirmText: 'CONFIRM',
+      cancelText: 'CANCEL',
+      type: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       // 1. Fetch the sale details
@@ -394,7 +628,7 @@ const wolfData = {
       await supabaseClient.from('sales').delete().eq('id', id);
 
       if (window.wolfAudio) window.wolfAudio.play('success');
-      this.loadSales(this.currentSalesDay);
+      this.loadSales(this.selectedDate);
     } catch (err) {
       console.error('Void Protocol Fault:', err);
       if (window.wolfAudio) window.wolfAudio.play('error');
@@ -412,20 +646,152 @@ const wolfData = {
 
 wolfData.initRealtime();
 
-// Global Event Listeners
-document.addEventListener('click', (e) => {
-  // Logbook Day Picker
-  const logDayBtn = e.target.closest('#logbook-day-picker .day-btn');
-  if (logDayBtn) wolfData.loadLogbook(logDayBtn.getAttribute('data-day'));
-
-  // Sales Day Picker
-  const salesDayBtn = e.target.closest('#sales-day-picker .day-btn');
-  if (salesDayBtn) wolfData.loadSales(salesDayBtn.getAttribute('data-day'));
-});
-
 document.addEventListener('input', (e) => {
   // Sales Live Search
   if (e.target.id === 'sales-search') {
-    wolfData.renderSales(wolfData.currentSalesDay, e.target.value);
+    const searchTerm = e.target.value.trim().toLowerCase();
+    // Use the current selected date's day index for rendering
+    wolfData.renderSales(wolfData.selectedDate.getDay(), searchTerm);
+  }
+});
+
+document.addEventListener('click', async (e) => {
+  const activeType = wolfData.activeMode;
+  // Use 'en-CA' for a reliable YYYY-MM-DD local string
+  const realTodayISO = (wolfData.serverToday || new Date()).toLocaleDateString(
+    'en-CA',
+  );
+
+  // 1. Week Navigation (Shift Week)
+  const navBtn = e.target.closest('#prev-week-btn, #next-week-btn');
+  if (navBtn) {
+    const direction = navBtn.id === 'prev-week-btn' ? -7 : 7;
+    const realToday = new Date();
+    const realTodayISO = realToday.toLocaleDateString('en-CA');
+
+    const targetDate = new Date(wolfData.selectedDate);
+    targetDate.setDate(targetDate.getDate() + direction);
+    const targetISO = targetDate.toLocaleDateString('en-CA');
+
+    if (direction > 0) {
+      // Moving Forward
+      // If the 7-day jump puts us in the future...
+      if (targetISO > realTodayISO) {
+        // CHECK: Are we already looking at "Today"?
+        const currentISO = wolfData.selectedDate.toLocaleDateString('en-CA');
+
+        if (currentISO === realTodayISO) {
+          // We are already at the latest possible date, so BLOCK.
+          if (window.salesManager)
+            window.salesManager.showSystemAlert(
+              'CHRONOLOCK_ACTIVE: FUTURE PROJECTION BLOCKED',
+              'error',
+            );
+          return;
+        } else {
+          // We are in the past, but the +7 jump goes too far.
+          // FIX: Instead of blocking, just "Snap" to today's date.
+          console.log(
+            'WolfChrono: Jump exceeds today. Snapping to current date.',
+          );
+          wolfData.selectedDate = realToday;
+        }
+      } else {
+        // Target is not in the future, move normally
+        wolfData.selectedDate = targetDate;
+      }
+    } else {
+      // Moving Backward (-7) is always allowed
+      wolfData.selectedDate = targetDate;
+    }
+
+    // Refresh the UI with the new selected date
+    wolfData.calculateWeek(activeType);
+    return;
+  }
+
+  // 2. HUD Node Click (The Fix)
+  if (e.target.closest('#chrono-picker-trigger')) {
+    if (wolfData.fp) {
+      wolfData.fp.open();
+    }
+    return;
+  }
+
+  // 3. Day Selector (Validation Added)
+  const dayBtn = e.target.closest('.day-btn');
+  if (dayBtn) {
+    const dateStr = dayBtn.getAttribute('data-date'); // This is already YYYY-MM-DD
+    if (dateStr) {
+      // Comparison: If dateStr is "2026-01-26" and today is "2026-01-25", block.
+      if (dateStr > realTodayISO) {
+        if (window.salesManager)
+          window.salesManager.showSystemAlert(
+            'INVALID_PROTOCOL: FUTURE_DATE_LOCKED',
+            'error',
+          );
+        return;
+      }
+
+      const parts = dateStr.split('-');
+      wolfData.selectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      wolfData.calculateWeek(activeType);
+    }
+  }
+
+  // 4. Header Action (Plus)
+  if (e.target.closest('#add-ledger-btn')) {
+    if (activeType === 'sales') window.salesManager.openSaleTerminal();
+  }
+
+  // 5. Archive Action (Trash)
+  if (e.target.closest('#clear-ledger-btn')) {
+    if (activeType === 'sales') window.salesManager.openTrashBin();
+  }
+
+  const snapBtn = e.target.closest('#snap-today-btn');
+  if (snapBtn) {
+    console.log('WolfChrono: Snap-to-Today triggered.');
+    await wolfData.syncServerTime();
+    if (wolfData.fp) {
+      wolfData.fp.setDate(wolfData.selectedDate, false);
+    }
+    wolfData.calculateWeek(wolfData.activeMode);
+    if (window.salesManager) {
+      window.salesManager.showSystemAlert('RETURNED TO LIVE LEDGER', 'success');
+    }
+    return;
+  }
+});
+
+document.addEventListener('click', () => {
+  setTimeout(() => {
+    const rangeDisplay = document.getElementById('week-range-display');
+
+    if (
+      rangeDisplay &&
+      (rangeDisplay.innerText === '--- - ---' || rangeDisplay.innerText === '')
+    ) {
+      const type = document.getElementById('sales-day-picker')
+        ? 'sales'
+        : 'logbook';
+      console.log(`WolfChrono: Auto-initializing ${type} view...`);
+      wolfData.initChrono(type);
+    }
+  }, 100);
+});
+
+// Also run on first load
+window.addEventListener('load', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const p = urlParams.get('p');
+  if (p === 'sales' || p === 'logbook') {
+    setTimeout(async () => {
+      if (document.getElementById('ledger-page')) {
+        // If you implemented the syncServerTime function, await it here
+        if (wolfData.syncServerTime) await wolfData.syncServerTime();
+        wolfData.initLedger(p);
+      }
+    }, 500);
   }
 });

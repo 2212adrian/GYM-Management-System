@@ -1,6 +1,7 @@
 :root {
   --bg-dark: #0f0f0f;
   --card-bg: #1a1a1a;
+  --wolf-green: #29a634;
   --wolf-red: #a63429;
   --wolf-blue: #2b3674;
   --text-main: #ffffff;
@@ -31,6 +32,45 @@ body {
 }
 
 /* --- DESKTOP CONTAINER --- */
+
+.flip-card-front::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(166, 52, 41, 0.2) 50%,
+    transparent 100%
+  );
+  z-index: 5;
+  pointer-events: none;
+  border: none;
+}
+
+/* Triggered when JS adds .auth-loading */
+.auth-split-container.auth-loading .flip-card-front::after {
+  animation: scanLine 1s ease-in-out forwards;
+}
+
+.auth-split-container.auth-loading .flip-card-front {
+  border-color: var(--wolf-red) !important;
+  box-shadow: 0 0 30px rgba(166, 52, 41, 0.4);
+  transition: all 0.5s ease;
+  overflow: hidden !important;
+}
+
+@keyframes scanLine {
+  0% {
+    top: -100%;
+  }
+  100% {
+    top: 100%;
+  }
+}
 
 .flip-card-inner {
   position: relative;
@@ -75,6 +115,7 @@ body {
   flex-direction: column;
   box-sizing: border-box;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
 
 .flip-card-back {
@@ -370,14 +411,6 @@ button:hover:not(:disabled) {
     animation: introSlideFlip 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   }
 
-  .flip-card-front,
-  .flip-card-back {
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 40px 25px;
-  }
-
   .brand {
     font-size: 1.8rem;
     margin-top: 20px;
@@ -463,20 +496,27 @@ button:hover:not(:disabled) {
   display: flex;
   width: 100vw;
   height: 100vh;
+  opacity: 0;
+  background-color: var(--bg-dark);
+  transition: opacity 1s ease;
 }
 
 /* Left Side & Star Effects */
 .auth-left {
   flex: 1;
   position: relative;
-  background: #0a0a0a;
+  background: var(--bg-dark);
   display: flex;
   justify-content: flex-end;
   align-items: center;
   padding-right: 80px;
   overflow: hidden;
+  border-right: none !important;
+  outline: none !important;
+  transform: translateX(-100px);
+  opacity: 0;
+  transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .flip-card {
   /* Initial state for intro animation */
   transform: translateX(-100vw) rotateY(90deg);
@@ -490,7 +530,40 @@ button:hover:not(:disabled) {
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
+  will-change: transform, opacity;
   animation: star-shine 3s ease-in-out infinite;
+}
+
+.auth-split-container.auth-verifying .flip-card-front {
+  border-color: var(--wolf-blue) !important;
+  box-shadow: 0 0 20px rgba(43, 54, 116, 0.4);
+  transition: all 0.5s ease;
+}
+
+/* Add a trail effect during the outro */
+.auth-split-container.outro .star {
+  box-shadow: -20px 0 20px 2px rgba(255, 255, 255, 0.3); /* Adds a "tail" to the flying star */
+  border-radius: 20px; /* Make it more of a capsule than a circle */
+}
+.auth-split-container.outro .auth-left {
+  overflow: visible !important;
+}
+.star.woosh {
+  animation: none !important;
+  will-change: transform, opacity; /* Essential for 60fps performance */
+  z-index: 9999;
+  background: #fff;
+  opacity: 1 !important;
+  /* Use a simpler shadow to prevent GPU lag */
+  box-shadow: -15px 0 10px rgba(255, 255, 255, 0.4);
+}
+
+/* The high-intensity trail */
+.auth-split-container.outro .star.woosh {
+  box-shadow:
+    0 0 20px 2px rgba(255, 255, 255, 0.8),
+    /* Core glow */ -30px 0 15px rgba(255, 255, 255, 0.5),
+    /* Internal trail */ -80px 0 40px rgba(166, 52, 41, 0.4); /* Wolf Red outer trail */
 }
 
 @keyframes star-shine {
@@ -513,8 +586,16 @@ button:hover:not(:disabled) {
 .auth-right {
   flex: 1.2;
   position: relative;
+  left: -20px;
   overflow: hidden;
   display: none;
+  border-right: none !important;
+  outline: none !important;
+  transform: translateX(100px);
+  opacity: 0;
+  transition:
+    flex 1.2s cubic-bezier(0.7, 0, 0.3, 1),
+    opacity 1s ease;
 }
 
 @media (min-width: 1024px) {
@@ -533,6 +614,7 @@ button:hover:not(:disabled) {
   inset: 0;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   opacity: 0;
   animation: slide-fade 15s infinite;
 }
@@ -612,14 +694,39 @@ button:hover:not(:disabled) {
 
 .carousel-overlay {
   position: absolute;
+  /* Keep the overlap fix to ensure the line is dead */
+  inset: 0;
+  left: -2px;
+  width: calc(100% + 2px);
+  z-index: 2;
+
+  /* --- DUAL GRADIENT SYSTEM --- */
+  background: linear-gradient(
+    to right,
+    #0a0a0a 0%,
+    /* 1. Left Edge: Solid color to plug the gap */ var(--bg-dark) 2px,
+    /* 2. Stay solid for 15px */ transparent 40%,
+    /* 3. Fade out to reveal the gym image */ transparent 45%,
+    /* 4. Keep center clear for visibility */ rgba(10, 10, 10, 0.5) 85%,
+    /* 5. Start fading back in on the right */ var(--bg-dark) 100%,
+    /* 6. Right Edge: Blend perfectly with screen edge */ #0a0a0a 100%
+  );
+}
+.carousel-overlay::before {
+  content: '';
+  position: absolute;
   inset: 0;
   background: linear-gradient(
     to right,
-    #0a0a0a,
-    transparent 40%,
-    rgba(0, 0, 0, 0.4)
+    var(--bg-dark) 0%,
+    var(--bg-dark) 2px,
+    transparent 2px,
+    transparent calc(100% - 2px),
+    var(--bg-dark) calc(100% - 2px),
+    var(--bg-dark) 100%
   );
-  z-index: 2;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .carousel-content {
@@ -682,19 +789,47 @@ button:hover:not(:disabled) {
 }
 
 /* --- OUTRO ANIMATIONS --- */
-.auth-split-container.outro .auth-left {
-  animation: outroExpand 1s ease-in-out forwards;
-}
-
-.auth-split-container.outro .auth-right {
-  animation: outroShrink 1s ease-in-out forwards;
-}
-
 .flip-card.outro {
-  animation: outroSlideFlip 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  transition: all 1.2s cubic-bezier(0.7, 0, 0.3, 1);
+  transform: translateX(120vw) rotateY(-90deg) !important;
+  animation: outroSlideFlip 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* --- COMPONENTS --- */
+/* 2. The Black Left Panel expands to take over the whole screen */
+.auth-split-container.outro .auth-left {
+  transition: all 1.2s cubic-bezier(0.7, 0, 0.3, 1);
+  flex: 10; /* Grow to fill space */
+  padding-right: 0;
+}
+
+/* 3. The Image Right Panel shrinks and fades out */
+.auth-split-container.outro .auth-right {
+  transition: all 1s ease-in;
+  flex: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.auth-split-container.is-ready {
+  opacity: 1;
+}
+
+.auth-split-container.is-ready .auth-left,
+.auth-split-container.is-ready .auth-right {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.auth-split-container.is-ready .flip-card {
+  opacity: 1;
+  filter: blur(0px);
+  transition:
+    opacity 1s ease 0.5s,
+    filter 1s ease 0.5s;
+}
 
 /* --- MOBILE RESPONSIVE OVERRIDE --- */
 @media (max-width: 1023px) {
@@ -714,6 +849,8 @@ button:hover:not(:disabled) {
   .flip-card {
     width: 100%;
     max-width: 400px;
+    opacity: 0;
+    filter: blur(10px);
   }
   .flip-card-front,
   .flip-card-back {

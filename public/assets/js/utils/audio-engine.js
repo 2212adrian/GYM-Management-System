@@ -5,6 +5,8 @@ window.wolfAudio = {
   denied: new Audio('/assets/sounds/rejected.wav'),
   notif: new Audio('/assets/sounds/notif.mp3'),
   bgm: new Audio('/assets/sounds/intro.mp3'),
+  woosh: new Audio('/assets/sounds/woosh-large-sub.mp3'),
+  logoff: new Audio('/assets/sounds/log-off.mp3'),
 
   isMuted: localStorage.getItem('wolf-bgm-muted') === 'true',
 

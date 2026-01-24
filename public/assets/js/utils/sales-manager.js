@@ -2,32 +2,65 @@
  * WOLF OS - SALES MANAGER (UNIFIED)
  */
 
+// --- PRE-LOADER: Injects HTML immediately when script runs ---
+(function preLoadAlert() {
+  if (!document.getElementById('wolf-system-alert')) {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `<div id="wolf-system-alert">
+         <i class='bx alert-icon'></i>
+         <span class="alert-text"></span>
+       </div>`,
+    );
+  }
+})();
+
 window.salesManager = {
   allProducts: [],
   selectedProductId: null,
-  placeholderImg:
-    'https://via.placeholder.com/300x300/111/a63429?text=NO+IMAGE',
+  placeholderImg: '/assets/images/placeholder.png',
   // ==========================================
   // SECTION 1: SALE TRANSACTION (POS) LOGIC
   // ==========================================
 
   // --- UI HELPER: TOP SYSTEM ALERT ---
+  _alertTimeout: null,
+
   showSystemAlert(message, type = 'success') {
-    let alertEl = document.getElementById('wolf-system-alert');
-    if (!alertEl) {
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<div id="wolf-system-alert"><i class='bx alert-icon'></i><span class="alert-text"></span></div>`,
-      );
-      alertEl = document.getElementById('wolf-system-alert');
-    }
-    alertEl.className = `show ${type}`;
-    alertEl.querySelector('.alert-icon').className =
-      `bx alert-icon ${type === 'success' ? 'bx-check-shield' : 'bx-error-alt'}`;
-    alertEl.querySelector('.alert-text').innerText = message;
-    if (window.wolfAudio)
-      window.wolfAudio.play(type === 'success' ? 'success' : 'error');
-    setTimeout(() => alertEl.classList.remove('show'), 4000);
+    // 1. Get the pre-loaded element
+    const alertEl = document.getElementById('wolf-system-alert');
+    if (!alertEl) return; // Should not happen with pre-injection
+
+    // 2. Clear previous hide-timers
+    if (this._alertTimeout) clearTimeout(this._alertTimeout);
+
+    // 3. Reset Classes & Update Content
+    alertEl.className = ''; // Wipe all themes
+
+    // Add the theme and the "show" class
+    // Using a tiny timeout ensures the browser sees the "removal" before the "addition"
+    setTimeout(() => {
+      const iconMap = {
+        success: 'bx-check-shield',
+        error: 'bx-error-alt',
+        warning: 'bx-shield-quarter',
+      };
+
+      alertEl.querySelector('.alert-icon').className =
+        `bx alert-icon ${iconMap[type] || 'bx-notification'}`;
+      alertEl.querySelector('.alert-text').innerText = message.toUpperCase();
+
+      alertEl.classList.add('show', type);
+
+      // Play Audio
+      if (window.wolfAudio)
+        window.wolfAudio.play(type === 'success' ? 'success' : 'error');
+    }, 10);
+
+    // 4. Schedule Hide after 4 seconds
+    this._alertTimeout = setTimeout(() => {
+      alertEl.classList.remove('show');
+    }, 4000);
   },
 
   showTopInstruction(show = true) {
@@ -492,6 +525,8 @@ window.salesManager = {
         throw new Error('INSUFFICIENT_STOCK');
 
       const saleRef = `SALE-${Date.now().toString().slice(-4)}`;
+
+      // FIX: Ensure created_at is NOT sent so Supabase uses Server Time (now())
       const { error: saleErr } = await supabaseClient.from('sales').insert([
         {
           sale_reference: saleRef,
@@ -512,13 +547,20 @@ window.salesManager = {
       }
 
       this.showSystemAlert(`AUTHORIZED: ${dbProd.name} x${sellQty}`);
+
+      // Reset Modal UI
       document.getElementById('sale-terminal-overlay').style.display = 'none';
       if (form) form.reset();
       this.selectedProductId = null;
-      if (window.wolfData && window.wolfData.loadSales)
+
+      // --- CRITICAL FIX: FORCE UI REFRESH ---
+      if (window.wolfData && window.wolfData.loadSales) {
         window.wolfData.loadSales();
+      }
+      if (window.wolfAudio) window.wolfAudio.play('success');
     } catch (err) {
       this.showSystemAlert(err.message, 'error');
+      if (window.wolfAudio) window.wolfAudio.play('error');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'AUTHORIZE TRANSACTION';
@@ -819,7 +861,6 @@ window.salesManager = {
     if (!confirmed) return;
 
     try {
-      // 1. Fetch the data from the trash bin
       const { data: trashRecord, error: trashError } = await supabaseClient
         .from('trash_bin')
         .select('*')
@@ -831,7 +872,6 @@ window.salesManager = {
 
       const saleData = trashRecord.deleted_data;
 
-      // 2. Fetch FRESH stock from the products table (Using your 'productid' primary key)
       const { data: product, error: prodError } = await supabaseClient
         .from('products')
         .select('qty, name')
@@ -841,46 +881,36 @@ window.salesManager = {
       if (prodError || !product)
         throw new Error('Original product no longer exists in registry.');
 
-      // 3. Check if we have enough stock to actually restore this sale
       if (product.qty < saleData.qty && product.qty < 999999) {
         if (window.wolfAudio) window.wolfAudio.play('error');
         alert(`RESTORE_DENIED: Only ${product.qty} units left in stock.`);
         return;
       }
 
-      // --- THE CRITICAL FIX: CLEAN THE DATA ---
-      // We must delete 'total_amount' because it's a generated/calculated column in your DB
-      delete saleData.total_amount;
-      // Optional: delete created_at if you want the restored sale to show up as "Today"
-      // delete saleData.created_at;
+      // --- THE CRITICAL FIX: DATA SANITIZATION ---
+      delete saleData.id; // Remove old ID to prevent Primary Key conflicts
+      delete saleData.total_amount; // Remove calculated column
+      delete saleData.created_at; // Remove old date so it restores to CURRENT SERVER TIME
 
-      // 4. STEP 1: Re-insert into the Sales table
       const { error: insertError } = await supabaseClient
         .from('sales')
         .insert([saleData]);
 
-      if (insertError) {
-        console.error('Insert Error:', insertError);
+      if (insertError)
         throw new Error('Database rejected the sale restoration.');
-      }
 
-      // 5. STEP 2: Re-decrement product stock (Only if not unlimited)
       if (product.qty < 999999) {
-        const { error: updateError } = await supabaseClient
+        await supabaseClient
           .from('products')
           .update({ qty: product.qty - saleData.qty })
           .eq('productid', saleData.product_id);
-
-        if (updateError) console.warn('Stock sync failed during restoration.');
       }
 
-      // 6. STEP 3: ONLY NOW delete from Trash Bin (Successful restoration)
       await supabaseClient.from('trash_bin').delete().eq('id', trashId);
 
-      // SUCCESS UI PROTOCOL
       if (window.wolfAudio) window.wolfAudio.play('success');
 
-      // Refresh both the Trash List and the Background Sales View
+      // Refresh UI immediately
       this.loadTrashItems();
       if (window.wolfData && window.wolfData.loadSales) {
         window.wolfData.loadSales();

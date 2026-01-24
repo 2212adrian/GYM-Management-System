@@ -140,67 +140,76 @@ async function navigateTo(pageName) {
   const mainContent = document.getElementById('main-content');
   if (!mainContent) return;
 
-  // 1. Transition Out
-  mainContent.style.transition = 'opacity 0.2s ease';
+  // 1. Start Transition
   mainContent.style.opacity = '0';
 
   try {
-    const path = `/pages/${pageName}.html`;
-    const res = await fetch(path);
+    let path;
+    let isLedger = false;
 
-    let html;
-    if (!res.ok) {
-      // --- THE 404 PROTOCOL: Fetch your actual 404.html design ---
-      console.warn(`Wolf OS: Protocol ${pageName} fault. Loading 404 UI.`);
-      const errRes = await fetch('/404.html');
-      const fullHtml = await errRes.text();
-
-      // Extract just the body content and include styles inline for proper rendering
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(fullHtml, 'text/html');
-      const bodyContent = doc.body.innerHTML;
-      const styleContent = doc.head.querySelector('style')?.innerHTML || '';
-
-      // Wrap content with inline styles
-      html = `<style>${styleContent}</style>${bodyContent}`;
-
-      // Clear highlights since we are in a fault state
-      pageName = null;
+    // AJAX Redirect
+    if (pageName === 'sales' || pageName === 'logbook') {
+      path = '/assets/views/daily-ledger.html';
+      isLedger = true;
     } else {
-      html = await res.text();
+      path = `/pages/${pageName}.html`;
     }
 
-    // 2. Slap HTML and Transition In
-    setTimeout(() => {
-      mainContent.innerHTML = html;
-      mainContent.style.opacity = '1';
-      updateNavHighlights(pageName);
-    }, 200);
+    const res = await fetch(path);
+    if (!res.ok) throw new Error('Page not found');
+    const html = await res.text();
 
-    setTimeout(() => {
-      mainContent.innerHTML = html;
-      mainContent.style.opacity = '1';
+    // 2. Inject HTML Immediately
+    mainContent.innerHTML = html;
+    // 3. Initialize based on type
+    if (isLedger) {
+      wolfData.activeMode = pageName;
+      wolfData.initLedger(pageName);
+    }
 
-      // --- DATA TRIGGER ---
-      if (pageName === 'logbook') {
-        wolfData.loadLogbook();
-        setTimeout(() => wolfData.loadLogbook(), 100);
-      } else if (pageName === 'sales') {
-        wolfData.loadSales();
-        setTimeout(() => wolfData.loadSales(), 100);
-      }
+    // 4. Finalize UI
+    mainContent.style.opacity = '1';
+    updateNavHighlights(pageName);
 
-      window.applyVersioning();
-    }, 200);
-
-    // 3. Update URL if valid page
     if (pageName) {
       window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
     }
+
+    if (window.applyVersioning) window.applyVersioning();
   } catch (err) {
-    console.error('Critical link fault:', err);
-    mainContent.innerHTML = `<div style="color:var(--accent-red); padding:50px; text-align:center;"><h1>[ERR_500]</h1><p>SYSTEM LINK OFFLINE</p></div>`;
-    mainContent.style.opacity = '1';
+    console.warn(`Wolf OS: Protocol fault. Loading 404.`);
+
+    try {
+      const errRes = await fetch('/404.html');
+      const fullHtml = await errRes.text();
+
+      // --- THE FIX: Extract Styles & Body ---
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(fullHtml, 'text/html');
+
+      // Get the CSS from the 404 page
+      const styleTag = doc.querySelector('style');
+      const styleHtml = styleTag ? styleTag.outerHTML : '';
+
+      // Get the content from the 404 page
+      const bodyContent = doc.body.innerHTML;
+
+      setTimeout(() => {
+        // Slap the styles AND the body into the main container
+        mainContent.innerHTML = styleHtml + bodyContent;
+        mainContent.style.opacity = '1';
+
+        // Re-run the path detection for the 404 screen
+        const pathEl = document.getElementById('display-path');
+        if (pathEl) pathEl.textContent = window.location.pathname;
+
+        document
+          .querySelectorAll('[data-page]')
+          .forEach((el) => el.classList.remove('active'));
+      }, 200);
+    } catch (fatal) {
+      mainContent.innerHTML = `<h1 style="color:var(--wolf-red); text-align:center;">[FATAL_ERROR]</h1>`;
+    }
   }
 }
 
@@ -216,14 +225,28 @@ async function initUI() {
   themeManager.init();
 
   // Start loading sequence
-  createLoadingStars();
+  // createLoadingStars();
 
   // Show stars for 2 seconds, then transition to loading screen
   setTimeout(() => {
     // Hide stars and show loading screen immediately
-    document.getElementById('stars-container').style.display = 'none';
-    document.getElementById('loading-screen').style.display = 'flex';
-    document.getElementById('loading-screen').classList.add('show');
+    const starsContainer = document.getElementById('stars-container');
+    if (starsContainer) starsContainer.style.display = 'none';
+
+    // Example: Fade out after 3 seconds
+    setTimeout(() => {
+      document.getElementById('loading-screen').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('loading-screen').style.display = 'none';
+      }, 800);
+    }, 3000);
+
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+      loadingScreen.style.display = 'flex';
+      loadingScreen.classList.add('show');
+    }
+
     const overlay = document.getElementById('loading-overlay');
     const layout = document.getElementById('wolf-layout');
 
@@ -231,11 +254,10 @@ async function initUI() {
     if (layout) layout.style.display = 'block';
 
     // PLAY INTRO HERE
-    // This triggers as the system "Boots" and becomes visible
     if (window.wolfAudio) {
       window.wolfAudio.play('intro');
     } else {
-      alert('nope');
+      console.warn('Wolf OS Audio Engine not detected.');
     }
 
     setTimeout(() => {
@@ -256,10 +278,8 @@ async function initUI() {
     document.getElementById('nav-container').innerHTML = nav;
 
     // 2. GLOBAL CLICK DELEGATION
-    // This is the "Magic Fix" - it handles clicks even for items not loaded yet.
     document.addEventListener('click', async (e) => {
       if (e.target.closest('#qrScannerBtn')) {
-        // Calling with false (or empty) ensures the Guest button IS visible here
         window.wolfScanner.start(null, false);
       }
 
@@ -267,8 +287,6 @@ async function initUI() {
       if (muteBtn) {
         e.preventDefault();
         const isMuted = wolfAudio.toggleMute();
-
-        // Update Icon visually
         const icon = muteBtn.querySelector('i');
         if (isMuted) {
           icon.className = 'bx bx-volume-mute';
@@ -291,16 +309,43 @@ async function initUI() {
       const logoutBtn = e.target.closest('.logout-btn');
       if (logoutBtn) {
         e.preventDefault();
-        logoutBtn.style.opacity = '0.5';
-        logoutBtn.innerText = 'ENDING...';
 
-        const supabase = window.supabase.createClient(
-          'https://xhahdzyjhwutgqfcrzfc.supabase.co',
-          'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT',
-        );
-        await supabase.auth.signOut();
-        localStorage.clear();
-        window.location.replace('/index.html');
+        logoutBtn.style.opacity = '0.5';
+        logoutBtn.innerHTML =
+          "<i class='bx bx-loader-alt bx-spin'></i> <span>ENDING...</span>";
+        if (window.wolfAudio) window.wolfAudio.play('logoff');
+
+        // --- NEW: TRIGGER OUTRO ANIMATION ---
+        // We target the containers so the body background color stays visible
+        const uiContainers = [
+          '#topbar-container',
+          '#sidebar-container',
+          '#wolf-layout',
+          '#nav-container',
+          '#sidebar-backdrop',
+        ];
+
+        uiContainers.forEach((selector) => {
+          const el = document.querySelector(selector);
+          if (el) el.classList.add('logoff-anim');
+        });
+
+        try {
+          const db = window.supabaseClient;
+
+          setTimeout(async () => {
+            if (db) {
+              await db.auth.signOut();
+            }
+            // Clear both storages for full system reset
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.replace('/index.html');
+          }, 2000); // 2 second delay to let user see the "Shutdown"
+        } catch (err) {
+          console.error('Logout Protocol Fault:', err);
+          window.location.replace('/index.html');
+        }
         return;
       }
 
@@ -313,7 +358,7 @@ async function initUI() {
       }
 
       // D. Sidebar Toggle Logic
-      const sidebar = document.getElementById('wolfSidebar');
+      const sidebarElement = document.getElementById('wolfSidebar');
       const backdrop = document.getElementById('sidebar-backdrop');
 
       if (
@@ -321,15 +366,15 @@ async function initUI() {
         e.target.closest('#sidebarClose') ||
         e.target === backdrop
       ) {
-        if (!sidebar) return;
-        const isActive = sidebar.classList.toggle('active');
+        if (!sidebarElement) return;
+        const isActive = sidebarElement.classList.toggle('active');
         const isMobile = window.innerWidth < 768;
 
         document.body.classList.toggle('sidebar-open', isActive);
-        if (document.getElementById('moreNavBtn'))
-          document
-            .getElementById('moreNavBtn')
-            .classList.toggle('sidebar-active', isActive);
+
+        const moreBtn = document.getElementById('moreNavBtn');
+        if (moreBtn) moreBtn.classList.toggle('sidebar-active', isActive);
+
         if (isMobile && backdrop) backdrop.classList.toggle('active', isActive);
 
         const closeIcon = document.getElementById('closeIcon');
@@ -342,6 +387,7 @@ async function initUI() {
         if (isMobile && mobileMoreIcon)
           mobileMoreIcon.className = isActive ? 'bx bx-x' : 'bx bx-menu';
       }
+
       // E. Re-apply Versioning after component loads
       if (typeof window.applyVersioning === 'function') {
         window.applyVersioning();
@@ -352,20 +398,25 @@ async function initUI() {
     const urlParams = new URLSearchParams(window.location.search);
     await navigateTo(urlParams.get('p') || 'dashboard');
 
-    // 4. Fade out loading overlay after everything is loaded (minimum 2s total)
+    // 4. Fade out loading overlay after everything is loaded
     setTimeout(() => {
-      document.getElementById('loading-overlay').classList.add('fade-out');
-      setTimeout(() => {
-        document.getElementById('loading-overlay').style.display = 'none';
-      }, 500);
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('fade-out');
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 500);
+      }
     }, 2000);
   } catch (err) {
     console.error('Wolf OS Boot Error:', err);
-    // Hide loading overlay on error
-    document.getElementById('loading-overlay').classList.add('fade-out');
-    setTimeout(() => {
-      document.getElementById('loading-overlay').style.display = 'none';
-    }, 500);
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('fade-out');
+      setTimeout(() => {
+        loadingOverlay.style.display = 'none';
+      }, 500);
+    }
   }
 }
 

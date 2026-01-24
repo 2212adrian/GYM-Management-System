@@ -26,35 +26,6 @@
   .brand-name span {
     color: #a63429;
   }
-  #themeToggleBtn {
-    /* Position */
-    position: absolute;
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-
-    /* Layout */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 6px 12px;
-
-    /* Aesthetic */
-    background: var(--input-bg); /* Darker than the header */
-    border: 1px solid var(--border-color);
-    border-radius: 8px; /* Matches your cards */
-
-    /* Typography */
-    color: var(--text-muted);
-    font-weight: 800;
-    font-size: 0.7rem; /* Smaller, more technical look */
-    letter-spacing: 1px;
-    text-transform: uppercase;
-
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
 
   #themeToggleBtn {
     /* Base Settings */
@@ -110,6 +81,64 @@
 
   /* Hover effect for both */
   #themeToggleBtn:hover {
+    border-color: var(--accent-red);
+    color: var(--text-main);
+    background: var(--card-bg);
+  }
+
+  #muteToggleBtn {
+    /* Base Settings */
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1060;
+  }
+
+  /* 📱 MOBILE: Right side, Icon only */
+  @media (max-width: 767px) {
+    #muteToggleBtn {
+      right: 15px; /* Snap to Right */
+      left: auto; /* Reset PC left positioning */
+      padding: 10px; /* Square box for icon only */
+    }
+
+    #muteToggleBtn .nav-text {
+      display: none; /* Hide text */
+    }
+
+    #muteToggleBtn i {
+      font-size: 1.3rem; /* Slightly larger icon for mobile touch */
+    }
+  }
+
+  /* 💻 PC: Left side, Pill shape with text */
+  @media (min-width: 768px) {
+    #muteToggleBtn {
+      right: 200px;
+      padding: 6px 12px;
+      gap: 8px;
+    }
+
+    #muteToggleBtn .nav-text {
+      display: inline;
+      font-weight: 800;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  }
+
+  /* Hover effect for muteToggleBtn */
+  #muteToggleBtn:hover {
     border-color: var(--accent-red);
     color: var(--text-main);
     background: var(--card-bg);

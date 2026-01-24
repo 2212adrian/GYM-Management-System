@@ -1,16 +1,3 @@
-<style>
-  /* Disabled Future Days */
-  .day-btn:disabled {
-    opacity: 0.2;
-    cursor: not-allowed;
-    filter: grayscale(1);
-  }
-
-  /* UI Hidden State for Read-Only mode */
-  .crud-hidden {
-    display: none !important;
-  }
-</style>
 <script src="/assets/js/utils/gatekeeper.js"></script>
 <!-- INTERNAL VIEW GUARD -->
 <div class="page-wrapper" id="page-wrapper">
@@ -34,6 +21,82 @@
     </div>
   </div>
 
+  <nav
+    class="week-nav"
+    style="
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      user-select: none;
+    "
+  >
+    <div
+      class="nav-link"
+      id="prev-week-btn"
+      style="
+        cursor: pointer;
+        font-weight: 900;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      "
+    >
+      <i class="bx bx-left-arrow-alt" style="font-size: 1.5rem"></i> PREVIOUS
+    </div>
+
+    <div
+      class="date-status-pill"
+      id="chrono-picker-trigger"
+      style="text-align: center; cursor: pointer"
+    >
+      <span
+        style="
+          display: block;
+          font-weight: 900;
+          font-size: 0.7rem;
+          letter-spacing: 1px;
+          color: #fff;
+        "
+        >DATE CURRENTLY << EDITABLE</span
+      >
+      <span
+        id="week-range-display"
+        style="
+          font-size: 10px;
+          color: #666;
+          font-family: 'JetBrains Mono', monospace;
+          margin-top: 4px;
+          display: block;
+        "
+        >--- - ---</span
+      >
+    </div>
+
+    <div
+      class="nav-link"
+      id="next-week-btn"
+      style="
+        cursor: pointer;
+        font-weight: 900;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      "
+    >
+      NEXT <i class="bx bx-right-arrow-alt" style="font-size: 1.5rem"></i>
+    </div>
+  </nav>
+
+  <!-- Hidden Native Date Input (Add anywhere inside page-wrapper) -->
+  <input
+    type="date"
+    id="hidden-chrono-input"
+    style="position: absolute; opacity: 0; pointer-events: none"
+  />
+
   <div class="day-selector" id="logbook-day-picker">
     <button class="day-btn" data-day="0">SUN</button>
     <button class="day-btn" data-day="1">MON</button>
@@ -47,3 +110,6 @@
   <!-- Container for Dynamic Cards -->
   <div id="logbook-list-container"></div>
 </div>
+<script>
+  wolfData.initChrono('logbook');
+</script>

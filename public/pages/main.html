@@ -4,8 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wolf OS - Terminal</title>
-
+    <link rel="icon" href="/assets/images/favicon.ico" />
     <!-- CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"
+    />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -16,9 +24,9 @@
     />
     <link rel="stylesheet" href="/assets/css/main.css" />
 
-    <!-- Frameworks -->
+    <!-- Frameworks & Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <!-- Shell Security & Config -->
     <script>
       window.WOLF_INTERNAL_SHELL = true;
@@ -42,10 +50,21 @@
       <div id="stars-container"></div>
 
       <!-- 2. The actual loading info screen -->
-      <div id="loading-screen" style="display: none">
-        <div class="boot-logo">WOLF <span>OS</span></div>
-        <div class="boot-spinner"></div>
-        <div class="boot-status">INITIALIZING CORE SYSTEMS...</div>
+      <div id="loading-screen" class="show">
+        <div class="scanline"></div>
+        <div class="terminal-container">
+          <div class="boot-logo">WOLF <span class="os-brand">OS</span></div>
+
+          <div class="loading-wrapper">
+            <div class="boot-spinner"></div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="boot-status">INITIALIZING CORE SYSTEMS...</div>
+          <div class="boot-metadata sys-os-version">ssssss</div>
+        </div>
       </div>
     </div>
 

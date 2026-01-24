@@ -7,6 +7,7 @@
   --text-muted: #888888;
   --border-color: rgba(255, 255, 255, 0.05);
   --input-bg: #111111;
+  --font-main: 'Inter', sans-serif;
 }
 /* Light Mode Overrides */
 body.light-theme {
@@ -125,15 +126,17 @@ body {
 }
 
 #loading-screen {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg-color);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transform: scale(0.8) translateY(20px);
-  transition:
-    opacity 0.5s ease,
-    transform 0.5s ease;
+  z-index: 9999;
+  font-family: var(--font-main);
+  color: white;
+  overflow: hidden;
+  transition: opacity 0.8s ease;
 }
 
 #loading-screen.show {
@@ -154,6 +157,139 @@ body {
   100% {
     opacity: 1;
     transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+.scanline {
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background: linear-gradient(
+    to bottom,
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+  position: absolute;
+  pointer-events: none;
+}
+
+.terminal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* Logo Styling */
+.boot-logo {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+  animation: logoPulse 2s infinite ease-in-out;
+}
+
+.os-brand {
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  padding: 0 10px;
+  margin-left: 5px;
+}
+
+/* Loading Bar instead of a Spinner */
+.loading-wrapper {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  height: 100%;
+  width: 30%;
+  background: var(--primary-color);
+  box-shadow: 0 0 15px var(--primary-color);
+  animation: progressSlide 2s infinite ease-in-out;
+}
+
+/* Status Text */
+.boot-status {
+  font-size: 0.8rem;
+  letter-spacing: 3px;
+  color: var(--primary-color);
+  text-transform: uppercase;
+  animation: blink 1s infinite;
+}
+
+.boot-metadata {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+/* Animations */
+@keyframes progressSlide {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+@keyframes logoPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Entrance Animation for the whole screen */
+#loading-screen.show .terminal-container {
+  animation: techEntrance 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes techEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scaleY(0);
+    filter: brightness(2);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    filter: brightness(1);
   }
 }
 
@@ -233,8 +369,8 @@ body.sidebar-open #wolf-layout {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.5); /* Essential for blur to show up */
-  backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
   z-index: 9999; /* Set this LOWER than your sidebar */
 
   /* Use these for smooth transitions */
@@ -409,7 +545,6 @@ body.sidebar-open #wolf-layout {
   background: #111;
   padding: 5px;
   border-radius: 12px;
-  margin-bottom: 25px;
   gap: 5px;
 }
 .day-btn {
@@ -1164,3 +1299,256 @@ body.sidebar-open #wolf-layout {
     transform: scale(0.8);
   }
 }
+
+/* ==========================================
+   WOLF OS - TOP SYSTEM ALERT (GLOBAL)
+   ========================================== */
+#wolf-system-alert {
+  position: fixed;
+  top: -120px; /* Start hidden above the screen */
+  left: 50%;
+  transform: translateX(-50%);
+
+  /* CRITICAL: Must be higher than scanner (150k) and modals (110k) */
+  z-index: 3000000;
+  min-width: 340px;
+  max-width: 90vw;
+  padding: 15px 30px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+
+  /* Aesthetic: Terminal Hardware */
+  border-radius: 0 0 20px 20px; /* Only bottom corners rounded */
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+
+  /* Animation */
+  transition: top 0.6s cubic-bezier(0.68, 0, 0.27, 1);
+  font-family: 'Inter', sans-serif;
+  pointer-events: none; /* Prevents blocking clicks when invisible */
+}
+
+/* Show State */
+#wolf-system-alert.show {
+  top: 0;
+  pointer-events: all;
+}
+
+/* SUCCESS THEME (Manila/Philippines Standard Green) */
+#wolf-system-alert.success {
+  background: #4ade80;
+  color: #000;
+  border-bottom: 3px solid #22c55e;
+}
+
+/* ERROR THEME (Wolf Red) */
+#wolf-system-alert.error {
+  background: var(--wolf-red);
+  color: #fff;
+  border-bottom: 3px solid #ff4d4d;
+}
+
+/* INTERNAL ELEMENTS */
+.alert-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.alert-text {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* Subtle pulse animation for the error icon */
+#wolf-system-alert.error .alert-icon {
+  animation: alertShake 0.4s ease infinite;
+}
+
+@keyframes alertShake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* MOBILE ADAPTATION */
+@media (max-width: 600px) {
+  #wolf-system-alert {
+    min-width: 95%;
+    padding: 12px 20px;
+  }
+  .alert-text {
+    font-size: 10px;
+  }
+}
+
+.logoff-anim {
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.8s ease !important;
+  opacity: 0 !important;
+  transform: translateY(30px) scale(0.98) !important;
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+/* ===============================
+   WOLF OS – CHRONO CALENDAR (FIXED)
+   =============================== */
+
+.flatpickr-calendar.wolf-calendar {
+  position: absolute !important;
+  width: 360px !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.01)
+    ),
+    rgba(10, 10, 10, 0.75) !important;
+
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  border-radius: 26px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 40px 90px rgba(0, 0, 0, 0.85);
+  padding: 16px 18px 18px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+
+  /* Centering Logic */
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-10px) scale(0.97);
+
+  opacity: 0;
+  visibility: hidden;
+  filter: blur(12px);
+  transition:
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.35s ease,
+    filter 0.35s ease,
+    visibility 0.35s;
+}
+
+.flatpickr-calendar.wolf-calendar.open {
+  opacity: 1;
+  visibility: visible;
+  filter: blur(0);
+  transform: translateX(-50%) translateY(0) scale(1) !important;
+}
+
+/* -------------------------------
+   HEADER (MONTH & YEAR)
+-------------------------------- */
+.wolf-calendar .flatpickr-months {
+  background: transparent !important;
+  margin-bottom: 10px;
+  display: flex !important;
+  align-items: center;
+}
+
+.wolf-calendar .flatpickr-month {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 10px 14px;
+  height: 46px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.wolf-calendar .flatpickr-current-month {
+  position: relative;
+  left: 10px;
+  display: flex !important;
+  justify-content: center !important; /* THE FIX: Centers Month and Year together */
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 !important;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* THE FIX: Month Dropdown Visibility */
+.wolf-calendar .flatpickr-monthDropdown-months {
+  display: inline-block !important; /* Removed 'none' to show Month */
+  background: transparent !important;
+  color: #fff !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  border: none !important;
+  outline: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+}
+
+/* THE FIX: Centering and Styling Year */
+.wolf-calendar .numInputWrapper {
+  width: 65px !important;
+  display: inline-flex !important;
+}
+
+.wolf-calendar .cur-year {
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* -------------------------------
+   WEEKDAYS & DAYS
+-------------------------------- */
+.wolf-calendar span.flatpickr-weekday {
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.wolf-calendar .flatpickr-day {
+  border-radius: 14px !important;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.wolf-calendar .flatpickr-day.prevMonthDay,
+.wolf-calendar .flatpickr-day.nextMonthDay {
+  color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.wolf-calendar .flatpickr-day.selected {
+  background: var(--wolf-red) !important;
+  box-shadow: 0 12px 32px rgba(166, 52, 41, 0.6);
+  transform: scale(1.08);
+  border: none !important;
+}
+
+/* CLEANUP */
+.wolf-calendar:before,
+.wolf-calendar:after {
+  display: none !important;
+}
+.wolf-calendar .numInputWrapper span {
+  display: none !important;
+} /* Hides tiny year arrows */
