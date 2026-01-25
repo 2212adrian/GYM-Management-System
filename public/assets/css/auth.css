@@ -857,6 +857,8 @@ button:hover:not(:disabled) {
     border: none;
     box-shadow: none;
     background: transparent;
+    height: auto;
+    width: auto;
   }
 }
 

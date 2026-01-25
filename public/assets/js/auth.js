@@ -138,42 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let otpTimerInterval = null;
 
   // --- DYNAMIC STAR GENERATOR ---
-  const createStars = () => {
-    const container = document.getElementById('starContainer');
-    if (!container) return;
-
-    // Clear existing stars to prevent duplicates on refresh
-    container.querySelectorAll('.star').forEach((s) => s.remove());
-
-    const starCount = 40; // Number of stars
-
-    for (let i = 0; i < starCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
-
-      // Random Position
-      const x = Math.random() * 100;
-      const y = Math.random() * 100;
-
-      // Random Size (1px to 3px)
-      const size = Math.random() * 2 + 1;
-
-      // Random Animation Duration (3s to 7s)
-      const duration = Math.random() * 4 + 3;
-
-      // Random Delay (0s to 5s)
-      const delay = Math.random() * 5;
-
-      star.style.left = `${x}%`;
-      star.style.top = `${y}%`;
-      star.style.width = `${size}px`;
-      star.style.height = `${size}px`;
-      star.style.animationDuration = `${duration}s`;
-      star.style.animationDelay = `${delay}s`;
-
-      container.appendChild(star);
-    }
-  };
 
   setTimeout(() => {
     container.classList.add('is-ready');
@@ -181,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Play a "System Boot" sound if you have one
     if (window.wolfAudio) window.wolfAudio.play('notif');
   }, 100);
-  createStars();
+  //createStars();
   typeCarousel();
 
   // --- LOGIN HANDLER WITH OUTRO ANIMATION ---
@@ -242,22 +206,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.querySelector('.auth-split-container');
         const card = document.querySelector('.flip-card');
 
-        // ==========================================
+        // ------------------------------------------
         // PHASE 1: IDENTITY HANDSHAKE (Intro Anim)
-        // ==========================================
-        // Add a class to indicate verification is happening (triggers CSS glow/scan)
+        // ------------------------------------------
         container.classList.add('auth-verifying');
         loginOutput.style.color = 'var(--wolf-blue)';
         loginOutput.innerHTML =
-          "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCESSFUL. INATIATING SYSTEM...";
+          "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCESSFUL. INITIATING SYSTEM...";
 
-        if (window.wolfAudio) window.wolfAudio.play('notif'); // Play a "processing" blip
+        if (window.wolfAudio) window.wolfAudio.play('notif');
 
-        // Wait 1.2 seconds for the "handshake" before exiting
         setTimeout(async () => {
-          // ==========================================
-          // PHASE 2: TERMINAL EXIT (Outro Anim)
-          // ==========================================
+          // ------------------------------------------
+          // PHASE 2: TERMINAL EXIT (Outro Anim + Canvas Warp)
+          // ------------------------------------------
           window.WOLF_IS_ANIMATING_OUT = true;
 
           // Clear lockout record
@@ -272,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             wolfAudio.play('success');
           }
 
-          // Trigger the actual exit animations
+          // Add outro classes for flip-card and container
           if (container) container.classList.add('outro');
           if (card) card.classList.add('outro');
 
@@ -280,30 +242,16 @@ document.addEventListener('DOMContentLoaded', () => {
           loginOutput.innerHTML =
             "<i class='bx bx-check-shield'></i> ACCESS GRANTED. BOOTING SYSTEM...";
 
-          // Star Warp Animation
-          const allStars = document.querySelectorAll('.star');
-          allStars.forEach((star) => {
-            star.classList.add('woosh');
-            star.style.transition =
-              'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.4s ease';
-            star.style.filter = `brightness(2)`;
-
-            const individualDelay = Math.random() * 300;
-            const speed = 0.8 + Math.random();
-            const destY = Math.random() * 500 - 250;
-
-            setTimeout(() => {
-              star.style.transition = `transform ${speed}s cubic-bezier(0.4, 0, 1, 1), opacity ${speed}s ease-in`;
-              star.style.transform = `translate(150vw, ${destY}px) scaleX(10) scaleY(0.4)`;
-              star.style.opacity = '0';
-            }, 400 + individualDelay);
-          });
+          // --- TRIGGER CANVAS STAR WARP ---
+          if (window.triggerStarWarp) {
+            window.triggerStarWarp(); // this should be your canvas warp function
+          }
 
           // Final Redirect
           setTimeout(() => {
             window.location.replace('/pages/main.html');
-          }, 2500);
-        }, 1200); // End of Handshake duration
+          }, 5000);
+        }, 1200);
       } else {
         wolfAudio.play('error');
         loginOutput.textContent = '[ERR_102] Unauthorized role.';
