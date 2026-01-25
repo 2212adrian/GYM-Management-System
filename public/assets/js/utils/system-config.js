@@ -1,6 +1,6 @@
 const WOLF_CONFIG = {
   VERSION: 'v0.2.7',
-  FULL_VERSION: 'SECURE ACCESS V0.2.7',
+  FULL_VERSION: 'GYM V0.2.7',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',
@@ -9,7 +9,7 @@ const WOLF_CONFIG = {
 
 // Make this globally accessible
 window.applyVersioning = function () {
-  console.log('Wolf OS: Injecting versioning data...');
+  console.log('Wolf OS: Applying Versioning:', WOLF_CONFIG.FULL_VERSION);
 
   document
     .querySelectorAll('.sys-full-version')

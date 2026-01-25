@@ -1,5 +1,5 @@
 <style>
-  /* --- BASE NAV STYLES --- */
+  /* --- MASTER NAV CONTAINER (MOBILE DEFAULT) --- */
   .gcash-nav-container {
     position: fixed;
     bottom: 0;
@@ -7,10 +7,11 @@
     right: 0;
     width: 100%;
     height: 75px;
-    background: var(--card-bg) !important; /* Swaps #1a1a1a for variable */
+    background: var(--card-bg) !important;
     border-top: 1px solid var(--border-color);
-    transition: background 0.3s ease;
     z-index: 1050;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 0;
   }
 
   .gcash-nav-content {
@@ -18,15 +19,96 @@
     justify-content: space-around;
     align-items: center;
     height: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
   }
 
-  /* HIGHLIGHT STATE: When the sidebar is open */
-  .nav-item.sidebar-active {
-    color: #a63429 !important; /* Your Muted Red */
-    font-weight: bold;
+  /* --- PC REDESIGN (MORPH TO PILL) --- */
+  @media (min-width: 768px) {
+    .gcash-nav-container {
+      bottom: 25px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      width: 520px;
+      border-radius: 100px;
+      height: 85px;
+      border: 1px solid #333;
+      background: rgba(26, 26, 26, 0.95) !important;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
   }
 
-  /* --- ICON MAPPING (Mobile Default) --- */
+  /* Individual Item Styling */
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #888;
+    flex: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .nav-item i {
+    font-size: 24px;
+    margin-bottom: 2px;
+    transition: transform 0.3s ease;
+  }
+
+  .nav-item span {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+  }
+
+  /* Active States */
+  .nav-item.active {
+    color: var(--wolf-red) !important;
+    transform: translateY(-3px);
+  }
+  .nav-item.active i,
+  .nav-item.active span {
+    color: var(--wolf-red) !important;
+  }
+  .nav-item#moreNavBtn.sidebar-active {
+    color: var(--wolf-red) !important;
+  }
+
+  /* THE FLOATING QR BUTTON */
+  .qr-wrapper {
+    position: relative;
+    width: 80px;
+    display: flex;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .qr-btn {
+    position: absolute;
+    top: -45px;
+    width: 68px;
+    height: 68px;
+    background: var(--wolf-red);
+    border-radius: 50%;
+    border: 6px solid var(--bg-dark) !important;
+    color: white;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(166, 52, 41, 0.4);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  /* --- 🧭 NAVIGATION ORDERING LOGIC --- */
+
+  /* MOBILE DEFAULT ORDER: Home > Sales > QR > Logbook > More */
   .item-home {
     order: 1;
   }
@@ -43,24 +125,8 @@
     order: 5;
   }
 
-  /* --- PC REDESIGN (SNAP) --- */
   @media (min-width: 768px) {
-    .gcash-nav-container {
-      bottom: 25px;
-      left: 50%;
-      right: auto;
-      transform: translateX(-50%);
-      width: 520px;
-      border-radius: 100px;
-      height: 85px;
-      border: 1px solid #333;
-      background: rgba(26, 26, 26, 0.95);
-      backdrop-filter: blur(10px);
-    }
-    .nav-item:hover:not(.active) {
-      color: #bbb;
-    }
-    /* ORDER: More > Home > Scan > Sales > Logbook */
+    /* PC ORDER SHIFT: More > Home > QR > Sales > Logbook */
     .item-more {
       order: 1 !important;
     }
@@ -76,68 +142,10 @@
     .item-logbook {
       order: 5 !important;
     }
-  }
 
-  /* Individual Item Styling */
-  .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: #888;
-    flex: 1;
-    cursor: pointer;
-    transition: 0.2s;
-    transition: color 0.3s ease;
-  }
-  .nav-item i {
-    font-size: 26px;
-    margin-bottom: 2px;
-  }
-  .nav-item span {
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-  }
-
-  .nav-item.active span,
-  .nav-item.active i {
-    color: var(--accent-red) !important;
-  }
-
-  /* Active/Home Color */
-  /* Active state for Bottom Nav links */
-  .nav-item.active {
-    color: var(--accent-red) !important;
-    transform: translateY(-3px);
-  }
-
-  /* Specific state for the MORE button when sidebar is open */
-  .nav-item#moreNavBtn.sidebar-active {
-    color: var(--accent-red) !important;
-  }
-
-  /* The Floating QR Button */
-  .qr-wrapper {
-    position: relative;
-    width: 75px;
-    display: flex;
-    justify-content: center;
-  }
-  .qr-btn {
-    position: absolute;
-    top: -45px;
-    width: 65px;
-    height: 65px;
-    background: #a63429; /* Matched Red */
-    border-radius: 50%;
-    border: 6px solid var(--bg-dark) !important;
-    color: white;
-    font-size: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 5px 20px rgba(166, 52, 41, 0.4);
+    .nav-item i {
+      font-size: 26px;
+    }
   }
 </style>
 
@@ -145,29 +153,30 @@
   <div class="gcash-nav-content">
     <!-- More (Burger Icon) -->
     <div class="nav-item item-more" id="moreNavBtn">
-      <i class="bx bx-menu"></i>
+      <i class="bx bx-menu" id="navMoreIcon"></i>
       <span>MORE</span>
     </div>
 
-    <!-- Home (AJAX) -->
+    <!-- Home (Dashboard) -->
     <div class="nav-item item-home" data-page="dashboard">
       <i class="bx bx-home-circle"></i>
       <span>HOME</span>
     </div>
-    <!-- Scan -->
+
+    <!-- Scan Module (Master Button) -->
     <div class="qr-wrapper item-qr">
       <button class="qr-btn" id="qrScannerBtn">
         <i class="bx bx-scan"></i>
       </button>
     </div>
 
-    <!-- Sales (AJAX) -->
+    <!-- Sales -->
     <div class="nav-item item-sales" data-page="sales">
       <i class="bx bx-shopping-bag"></i>
       <span>SALES</span>
     </div>
 
-    <!-- Logbook (AJAX) -->
+    <!-- Logbook -->
     <div class="nav-item item-logbook" data-page="logbook">
       <i class="bx bx-detail"></i>
       <span>LOGBOOK</span>

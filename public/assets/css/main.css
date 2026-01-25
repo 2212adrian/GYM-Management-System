@@ -392,7 +392,11 @@ body.sidebar-open #wolf-layout {
   transform: translateZ(0);
   visibility: visible;
 }
-
+@media (min-width: 768px) {
+  .ledger-page-wrapper {
+    padding: 0px 0px 0px 80px !important;
+  }
+}
 /* --- MOBILE RESPONSIVENESS --- */
 @media (max-width: 767px) {
   /* 1. Kill the Grid Columns on Mobile so 'main' stays full width */
@@ -401,6 +405,10 @@ body.sidebar-open #wolf-layout {
     grid-template-columns: none !important;
     width: 100% !important;
     transition: none !important; /* Remove the 0.4s movement */
+  }
+
+  .ledger-page-wrapper {
+    padding: 0px;
   }
 
   /* 2. Prevent the body from reacting to the .sidebar-open class on Mobile */
@@ -565,6 +573,12 @@ body.sidebar-open #wolf-layout {
   color: var(--accent-red);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
+#ledger-list-container {
+  position: relative;
+  min-height: 200px;
+  transition: opacity 0.2s ease;
+}
+
 /* List Cards (Logbook & Sales) */
 .list-item-card {
   width: 100%;
@@ -576,6 +590,46 @@ body.sidebar-open #wolf-layout {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  opacity: 0;
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform: translateX(30px) scale(0.98);
+  filter: blur(10px);
+  animation: wolfRowEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes wolfRowEntry {
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* 2. OUTRO: The Void Effect */
+.list-item-card.removing {
+  pointer-events: none;
+  transition:
+    transform 0.4s cubic-bezier(1, 0, 0, 1),
+    opacity 0.3s ease,
+    filter 0.3s ease,
+    margin-bottom 0.4s cubic-bezier(1, 0, 0, 1),
+    max-height 0.4s cubic-bezier(1, 0, 0, 1) !important;
+
+  transform: translateX(-100px) scale(0.9);
+  opacity: 0;
+  filter: blur(20px);
+  max-height: 0;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+}
+
+/* 3. NEW ITEM GLOW (Optional: For rows added via POS) */
+.list-item-card.new-auth {
+  border-color: var(--wolf-red) !important;
+  box-shadow: 0 0 20px rgba(166, 52, 41, 0.2);
 }
 
 .card-header {
@@ -1552,3 +1606,137 @@ body.sidebar-open #wolf-layout {
 .wolf-calendar .numInputWrapper span {
   display: none !important;
 } /* Hides tiny year arrows */
+
+/* --- WOLF OS SWEETALERT THEME --- */
+
+/* Ensure SweetAlert modals appear above other UI elements */
+.swal2-container {
+  z-index: 300000 !important; /* Higher than your Archive modal (110000) */
+}
+
+/* Ensure the backdrop also covers your custom modals */
+.swal2-backdrop-show {
+  backdrop-filter: blur(15px) !important;
+}
+.wolf-swal-popup {
+  background: #111 !important;
+  border: 1.5px solid var(--wolf-red) !important;
+  border-radius: 32px !important;
+  padding: 40px !important;
+  width: 450px !important;
+  z-index: 99999 !important;
+}
+
+/* The Title */
+.wolf-swal-title {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: #fff !important;
+  font-size: 1.6rem !important;
+  margin-top: 10px !important;
+}
+
+/* The Body Text */
+.wolf-swal-text {
+  color: #888 !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
+/* Confirm Button (Delete Permanently) */
+.wolf-swal-confirm {
+  background: #fff !important;
+  color: #000 !important;
+  border: none !important;
+  padding: 15px 30px !important;
+  border-radius: 16px !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  margin: 10px !important;
+  cursor: pointer;
+}
+
+/* Cancel Button (Keep Record) */
+.wolf-swal-cancel {
+  background: #1a1a1a !important;
+  color: #555 !important;
+  border: 1px solid #222 !important;
+  padding: 15px 30px !important;
+  border-radius: 16px !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  margin: 10px !important;
+  cursor: pointer;
+}
+
+.wolf-swal-cancel:hover {
+  color: #fff !important;
+  border-color: #444 !important;
+}
+
+/* The Container with Orange Border */
+.wolf-swal-popup-orange {
+  background: #111 !important;
+  border: 1.5px solid #b47023 !important; /* Orange Border */
+  border-radius: 32px !important;
+  padding: 40px !important;
+  width: 450px !important;
+  box-shadow: 0 0 30px rgba(180, 112, 35, 0.2) !important;
+}
+
+/* Orange Confirm Button */
+.wolf-swal-confirm-orange {
+  background: #b47023 !important; /* Orange Background */
+  color: #fff !important;
+  border: none !important;
+  padding: 15px 30px !important;
+  border-radius: 16px !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  margin: 10px !important;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.wolf-swal-confirm-orange:hover {
+  background: #d48429 !important; /* Brighter on hover */
+  box-shadow: 0 0 15px rgba(180, 112, 35, 0.4);
+}
+
+.wolf-swal-popup-green {
+  background: #111 !important;
+  border: 1.5px solid #08ea1b !important; /* Industrial Green Border */
+  border-radius: 32px !important;
+  padding: 40px !important;
+  width: 450px !important;
+  box-shadow: 0 0 30px rgba(8, 234, 27, 0.2) !important;
+}
+
+/* Green Confirm Button */
+.wolf-swal-confirm-green {
+  background: #08ea1b !important; /* Industrial Green Background */
+  color: #000 !important; /* Black text for high contrast */
+  border: none !important;
+  padding: 15px 30px !important;
+  border-radius: 16px !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  margin: 10px !important;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.wolf-swal-confirm-green:hover {
+  background: #06c816 !important;
+  box-shadow: 0 0 15px rgba(8, 234, 27, 0.4);
+}

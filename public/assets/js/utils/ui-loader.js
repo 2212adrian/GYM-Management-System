@@ -3,6 +3,67 @@
  * Handles AJAX page swapping, component injection, and UI state synchronization.
  */
 
+// --- 0. DOM PURIFY SETUP ---
+// Create a global purifier function for consistent use
+const WOLF_PURIFIER = (dirty) => {
+  return DOMPurify.sanitize(dirty, {
+    // Allow styling
+    ALLOWED_TAGS: [
+      'div',
+      'span',
+      'p',
+      'a',
+      'button',
+      'input',
+      'label',
+      'ul',
+      'li',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'section',
+      'header',
+      'footer',
+      'main',
+      'nav',
+      'i',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'style', // ✅ THIS is the big one
+    ],
+
+    // Allow layout + UI attributes
+    ALLOWED_ATTR: [
+      'class',
+      'id',
+      'style', // ✅ inline styles
+      'data-page',
+      'data-date',
+      'data-day',
+      'data-id',
+      'href',
+      'type',
+      'value',
+      'placeholder',
+      'aria-label',
+      'role',
+    ],
+
+    // Keep CSS working
+    KEEP_CONTENT: true,
+
+    // Explicitly forbid scripts
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick'],
+  });
+};
+
 // --- 1. THEME MANAGER (Place this at the very top) ---
 const themeManager = {
   init() {
@@ -31,37 +92,6 @@ const themeManager = {
 // Initialize theme immediately to prevent "white flash"
 themeManager.init();
 
-// --- STAR GENERATOR FOR LOADING ---
-function createLoadingStars() {
-  const container = document.getElementById('stars-container');
-  if (!container) return;
-
-  for (let i = 0; i < 50; i++) {
-    const star = document.createElement('div');
-    star.className = 'star';
-
-    // Random Position
-    const x = Math.random() * 100;
-    const y = Math.random() * 100;
-
-    // Random Size
-    const size = Math.random() * 4 + 1;
-
-    // Random Delay & Duration
-    const delay = Math.random() * 3;
-    const duration = Math.random() * 2 + 2;
-
-    star.style.left = `${x}%`;
-    star.style.top = `${y}%`;
-    star.style.width = `${size}px`;
-    star.style.height = `${size}px`;
-    star.style.animationDelay = `${delay}s`;
-    star.style.animationDuration = `${duration}s`;
-
-    container.appendChild(star);
-  }
-}
-
 // --- 1. CORE UTILS ---
 async function loadComponent(id, path) {
   if (window.applySystemConfig) window.applySystemConfig(); // Apply system config if available
@@ -70,7 +100,7 @@ async function loadComponent(id, path) {
   try {
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load ${path}`);
-    el.innerHTML = await res.text();
+    el.innerHTML = WOLF_PURIFIER(await res.text());
   } catch (err) {
     console.error('Component Load Error:', err);
   }
@@ -136,18 +166,47 @@ if (themeBtn) {
   };
 }
 
+function wolfRefreshView() {
+  const title = document.getElementById('ledger-title')?.innerText || '';
+  const searchInp = document.getElementById('ledger-main-search');
+  const term = searchInp ? searchInp.value.trim() : '';
+  if (title.includes('LOGBOOK')) {
+    if (window.wolfData && typeof window.wolfData.loadLogbook === 'function') {
+      // Force a re-fetch/re-render with the empty term
+      window.wolfData.loadLogbook();
+    }
+  } else {
+    if (window.wolfData && typeof window.wolfData.loadSales === 'function') {
+      // Force loadSales which now grabs the empty term from the DOM
+      window.wolfData.loadSales();
+    }
+  }
+
+  // If we are in Logbook mode
+  if (title.includes('LOGBOOK')) {
+    if (window.wolfData && typeof window.wolfData.loadLogs === 'function') {
+      window.wolfData.loadLogs();
+    }
+  }
+  // Default to Sales/Ledger mode
+  else {
+    if (window.wolfData && typeof window.wolfData.loadSales === 'function') {
+      window.wolfData.loadSales();
+    }
+  }
+}
+
 async function navigateTo(pageName) {
   const mainContent = document.getElementById('main-content');
   if (!mainContent) return;
 
-  // 1. Start Transition
   mainContent.style.opacity = '0';
 
   try {
     let path;
     let isLedger = false;
 
-    // AJAX Redirect
+    // Ledger pages
     if (pageName === 'sales' || pageName === 'logbook') {
       path = '/assets/views/daily-ledger.html';
       isLedger = true;
@@ -156,18 +215,16 @@ async function navigateTo(pageName) {
     }
 
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Page not found');
-    const html = await res.text();
+    if (!res.ok) throw new Error(`Page "${pageName}" not found`);
 
-    // 2. Inject HTML Immediately
+    const html = await res.text();
     mainContent.innerHTML = html;
-    // 3. Initialize based on type
+
     if (isLedger) {
       wolfData.activeMode = pageName;
       wolfData.initLedger(pageName);
     }
 
-    // 4. Finalize UI
     mainContent.style.opacity = '1';
     updateNavHighlights(pageName);
 
@@ -177,38 +234,46 @@ async function navigateTo(pageName) {
 
     if (window.applyVersioning) window.applyVersioning();
   } catch (err) {
-    console.warn(`Wolf OS: Protocol fault. Loading 404.`);
+    console.warn(
+      `Wolf OS: Could not load page "${pageName}". Falling back to 404.`,
+    );
 
     try {
       const errRes = await fetch('/404.html');
-      const fullHtml = await errRes.text();
+      const fullHtml = errRes.ok
+        ? await errRes.text()
+        : '<h1>404 Not Found</h1>';
 
-      // --- THE FIX: Extract Styles & Body ---
       const parser = new DOMParser();
       const doc = parser.parseFromString(fullHtml, 'text/html');
 
-      // Get the CSS from the 404 page
       const styleTag = doc.querySelector('style');
       const styleHtml = styleTag ? styleTag.outerHTML : '';
-
-      // Get the content from the 404 page
       const bodyContent = doc.body.innerHTML;
 
-      setTimeout(() => {
-        // Slap the styles AND the body into the main container
-        mainContent.innerHTML = styleHtml + bodyContent;
-        mainContent.style.opacity = '1';
+      mainContent.innerHTML = styleHtml + bodyContent;
+      mainContent.style.opacity = '1';
 
-        // Re-run the path detection for the 404 screen
-        const pathEl = document.getElementById('display-path');
-        if (pathEl) pathEl.textContent = window.location.pathname;
+      // Safe path display
+      const pathEl = document.getElementById('display-path');
+      if (pathEl && typeof DOMPurify !== 'undefined') {
+        pathEl.innerHTML = DOMPurify.sanitize(window.location.pathname);
+      }
 
-        document
-          .querySelectorAll('[data-page]')
-          .forEach((el) => el.classList.remove('active'));
-      }, 200);
+      document
+        .querySelectorAll('[data-page]')
+        .forEach((el) => el.classList.remove('active'));
     } catch (fatal) {
-      mainContent.innerHTML = `<h1 style="color:var(--wolf-red); text-align:center;">[FATAL_ERROR]</h1>`;
+      mainContent.innerHTML =
+        typeof DOMPurify !== 'undefined'
+          ? DOMPurify.sanitize(
+              '<h1 style="color:red;text-align:center;">[FATAL_ERROR]</h1>',
+              {
+                ALLOWED_TAGS: ['h1'],
+                ALLOWED_ATTR: ['style'],
+              },
+            )
+          : '<h1 style="color:red;text-align:center;">[FATAL_ERROR]</h1>';
     }
   }
 }
@@ -220,12 +285,8 @@ async function loadHTML(path) {
   if (!res.ok) throw new Error(`[ERR_503] Failed to fetch: ${path}`);
   return await res.text();
 }
-
 async function initUI() {
   themeManager.init();
-
-  // Start loading sequence
-  // createLoadingStars();
 
   // Show stars for 2 seconds, then transition to loading screen
   setTimeout(() => {
@@ -279,6 +340,93 @@ async function initUI() {
 
     // 2. GLOBAL CLICK DELEGATION
     document.addEventListener('click', async (e) => {
+      // --- 1. GENERIC SIDEBAR DROPDOWN LOGIC ---
+      // Targets any link inside a .nav-dropdown that acts as a toggle
+      const dropdownToggle = e.target.closest('.nav-dropdown > .nav-item-side');
+      if (dropdownToggle) {
+        e.preventDefault();
+        const sidebar = document.getElementById('wolfSidebar');
+        const dropdownParent = dropdownToggle.parentElement;
+
+        // A. RAIL MODE PROTECTION: If sidebar is mini/collapsed, expand it first
+        if (!sidebar.classList.contains('active')) {
+          sidebar.classList.add('active');
+          document.body.classList.add('sidebar-open');
+
+          // Update the sidebar chevron icon to "Left" (Open state)
+          const closeIcon = document.getElementById('closeIcon');
+          if (closeIcon) closeIcon.className = 'bxf bx-caret-big-right';
+
+          // Highlight the "More" button in the floating nav
+          const moreBtn = document.getElementById('moreNavBtn');
+          if (moreBtn) moreBtn.classList.add('sidebar-active');
+        }
+
+        // B. ACCORDION EFFECT: Close other dropdowns when one is opened
+        document.querySelectorAll('.nav-dropdown').forEach((other) => {
+          if (other !== dropdownParent) other.classList.remove('open');
+        });
+
+        // C. TOGGLE the clicked dropdown
+        dropdownParent.classList.toggle('open');
+
+        if (window.wolfAudio) window.wolfAudio.play('notif');
+        return;
+      }
+
+      // --- 2. SEARCH ENGINE LOGIC ---
+      const searchToggle = e.target.closest('#toggle-search-btn');
+      if (searchToggle) {
+        const container = document.getElementById('ledger-search-container');
+        const input = document.getElementById('ledger-main-search');
+        const clearBtn = document.getElementById('search-clear-btn');
+        if (!container || !input) return;
+
+        const isOpening = container.classList.toggle('active');
+        searchToggle.classList.toggle('active');
+
+        if (isOpening) {
+          setTimeout(() => input.focus(), 300);
+          if (window.wolfAudio) window.wolfAudio.play('notif');
+        } else {
+          input.value = '';
+          if (clearBtn) clearBtn.style.display = 'none';
+          const dataCore = window.wolfData || wolfData;
+          if (dataCore) {
+            dataCore.isFetching = false;
+            const dayIndex =
+              dataCore.selectedDate?.getDay?.() ?? new Date().getDay();
+            dataCore.activeMode === 'sales'
+              ? dataCore.renderSales(dayIndex, '')
+              : dataCore.loadLogbook();
+          }
+          if (window.wolfAudio) window.wolfAudio.play('notif');
+        }
+        return;
+      }
+
+      const clearBtn = e.target.closest('#search-clear-btn');
+      if (clearBtn) {
+        const input = document.getElementById('ledger-main-search');
+        if (input) {
+          input.value = '';
+          clearBtn.style.display = 'none';
+          input.focus();
+          const dataCore = window.wolfData || wolfData;
+          if (dataCore) {
+            dataCore.isFetching = false;
+            const dayIndex =
+              dataCore.selectedDate?.getDay?.() ?? new Date().getDay();
+            dataCore.activeMode === 'sales'
+              ? dataCore.renderSales(dayIndex, '')
+              : dataCore.loadLogbook();
+          }
+          if (window.wolfAudio) window.wolfAudio.play('notif');
+        }
+        return;
+      }
+
+      // --- 3. UTILITY BUTTONS (QR & MUTE) ---
       if (e.target.closest('#qrScannerBtn')) {
         window.wolfScanner.start(null, false);
       }
@@ -288,16 +436,11 @@ async function initUI() {
         e.preventDefault();
         const isMuted = wolfAudio.toggleMute();
         const icon = muteBtn.querySelector('i');
-        if (isMuted) {
-          icon.className = 'bx bx-volume-mute';
-          muteBtn.style.opacity = '0.5';
-        } else {
-          icon.className = 'bx bx-volume-full';
-          muteBtn.style.opacity = '1';
-        }
+        icon.className = isMuted ? 'bx bx-volume-mute' : 'bx bx-volume-full';
+        muteBtn.style.opacity = isMuted ? '0.5' : '1';
       }
 
-      // A. Handle Navigation (data-page)
+      // --- 4. NAVIGATION ENGINE (AJAX Swap) ---
       const navBtn = e.target.closest('[data-page]');
       if (navBtn) {
         e.preventDefault();
@@ -305,51 +448,44 @@ async function initUI() {
         return;
       }
 
-      // B. Handle Logout (.logout-btn)
+      // --- 5. LOGOUT PROTOCOL ---
       const logoutBtn = e.target.closest('.logout-btn');
       if (logoutBtn) {
         e.preventDefault();
-
-        logoutBtn.style.opacity = '0.5';
-        logoutBtn.innerHTML =
-          "<i class='bx bx-loader-alt bx-spin'></i> <span>ENDING...</span>";
+        Toastify({
+          text: 'Logging out of Wolf OS...',
+          duration: 3000,
+          gravity: 'top', // top or bottom
+          position: 'right', // left, center or right
+          stopOnFocus: true,
+          style: {
+            background: '#a63429', // Your Wolf Red variable
+            borderRadius: '10px',
+            fontWeight: 'bold',
+          },
+        }).showToast();
         if (window.wolfAudio) window.wolfAudio.play('logoff');
 
-        // --- NEW: TRIGGER OUTRO ANIMATION ---
-        // We target the containers so the body background color stays visible
-        const uiContainers = [
+        [
           '#topbar-container',
           '#sidebar-container',
           '#wolf-layout',
           '#nav-container',
           '#sidebar-backdrop',
-        ];
-
-        uiContainers.forEach((selector) => {
-          const el = document.querySelector(selector);
-          if (el) el.classList.add('logoff-anim');
+        ].forEach((sel) => {
+          document.querySelector(sel)?.classList.add('logoff-anim');
         });
 
-        try {
-          const db = window.supabaseClient;
-
-          setTimeout(async () => {
-            if (db) {
-              await db.auth.signOut();
-            }
-            // Clear both storages for full system reset
-            localStorage.clear();
-            sessionStorage.clear();
-            window.location.replace('/index.html');
-          }, 2000); // 2 second delay to let user see the "Shutdown"
-        } catch (err) {
-          console.error('Logout Protocol Fault:', err);
+        setTimeout(async () => {
+          if (window.supabaseClient) await window.supabaseClient.auth.signOut();
+          localStorage.clear();
+          sessionStorage.clear();
           window.location.replace('/index.html');
-        }
+        }, 4000);
         return;
       }
 
-      // C. Handle Theme Toggle (#themeToggleBtn)
+      // --- 6. THEME SWITCHER ---
       const themeBtn = e.target.closest('#themeToggleBtn');
       if (themeBtn) {
         e.preventDefault();
@@ -357,7 +493,7 @@ async function initUI() {
         return;
       }
 
-      // D. Sidebar Toggle Logic
+      // --- 7. SIDEBAR TOGGLE & BACKDROP ---
       const sidebarElement = document.getElementById('wolfSidebar');
       const backdrop = document.getElementById('sidebar-backdrop');
 
@@ -371,27 +507,27 @@ async function initUI() {
         const isMobile = window.innerWidth < 768;
 
         document.body.classList.toggle('sidebar-open', isActive);
-
-        const moreBtn = document.getElementById('moreNavBtn');
-        if (moreBtn) moreBtn.classList.toggle('sidebar-active', isActive);
-
+        document
+          .getElementById('moreNavBtn')
+          ?.classList.toggle('sidebar-active', isActive);
         if (isMobile && backdrop) backdrop.classList.toggle('active', isActive);
 
         const closeIcon = document.getElementById('closeIcon');
         if (!isMobile && closeIcon)
           closeIcon.className = isActive
-            ? 'bx bx-chevron-left'
-            : 'bx bx-chevron-right';
+            ? 'bxf bx-caret-big-left'
+            : 'bxf bx-caret-big-right';
 
-        const mobileMoreIcon = document.getElementById('navMoreIcon');
-        if (isMobile && mobileMoreIcon)
-          mobileMoreIcon.className = isActive ? 'bx bx-x' : 'bx bx-menu';
+        // UX: Close all sub-menus when the sidebar itself is closed
+        if (!isActive) {
+          document
+            .querySelectorAll('.nav-dropdown')
+            .forEach((d) => d.classList.remove('open'));
+        }
       }
 
-      // E. Re-apply Versioning after component loads
-      if (typeof window.applyVersioning === 'function') {
+      if (typeof window.applyVersioning === 'function')
         window.applyVersioning();
-      }
     });
 
     // 3. LOAD INITIAL PAGE
@@ -418,6 +554,20 @@ async function initUI() {
       }, 500);
     }
   }
+
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'ledger-main-search') {
+      const clearBtn = document.getElementById('search-clear-btn');
+      if (clearBtn) {
+        clearBtn.style.display = e.target.value.length > 0 ? 'block' : 'none';
+      }
+      // Use a debounce to prevent lagging the database
+      clearTimeout(window.searchDebounce);
+      window.searchDebounce = setTimeout(() => {
+        wolfRefreshView();
+      }, 300);
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', initUI);

@@ -3,256 +3,371 @@
     --side-bg: #111111;
     --accent-red: #a63429;
     --text-primary: #ffffff;
+    --text-muted: #888888;
+    --rail-width: 80px;
+    --expanded-width: 280px;
+    --sub-menu-bg: #080808; /* Deeper dark for sub-menus */
   }
 
+  /* 1. MASTER PANEL */
   .sidebar-panel {
     position: fixed;
     top: 0;
     height: 100vh;
     z-index: 10000;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Vital to hide text when narrow */
-    background: var(--card-bg); /* Changed from #111 */
-    border-right: 1px solid var(--border-color);
+    background: var(--side-bg);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    padding-bottom: 15px;
   }
 
-  /* 📱 MOBILE: Snap to RIGHT side */
+  /* PC RAIL LOGIC */
+  @media (min-width: 768px) {
+    .sidebar-panel {
+      left: 0;
+      width: var(--rail-width);
+    }
+    .sidebar-panel.active {
+      width: var(--expanded-width);
+    }
+  }
+
+  /* MOBILE LOGIC */
   @media (max-width: 767px) {
     .sidebar-panel {
       right: 0;
-      width: 85%;
-      max-width: 320px;
+      width: var(--expanded-width);
       transform: translateX(100%);
     }
     .sidebar-panel.active {
       transform: translateX(0);
     }
-    .nav-text {
+    /* Mobile Header/Icon Fixes */
+    .sidebar-header {
+      justify-content: flex-start !important; /* Move button to the top-left corner of sidebar */
+      padding-left: 15px !important;
+    }
+
+    /* Change Chevron to Burger Icon via CSS Content Swap */
+    #closeIcon.bx-chevron-left::before {
+      content: '\eb9b'; /* Hex code for bx-menu */
+    }
+
+    .nav-text,
+    .sidebar-section-label,
+    .profile-area,
+    .target-box {
       opacity: 1 !important;
       visibility: visible !important;
+      display: block !important;
     }
-    .sidebar-header {
-      flex-direction: row; /* [Button] [Text] */
+
+    .topbar .nav-item-side .nav-text {
+      display: none !important;
     }
   }
 
-  /* 💻 PC: Snap to LEFT side */
+  /* 2. SCROLLABLE CONTENT */
+  .nav-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 3. ITEM STYLING */
+  .nav-item-side,
+  .btn-disconnect {
+    display: flex;
+    align-items: center;
+    height: 54px;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background 0.3s,
+      color 0.3s;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .nav-icon {
+    min-width: var(--rail-width);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    transition: font-size 0.4s ease;
+  }
+
   @media (min-width: 768px) {
-    /* Fixed: added the '.' before sidebar-panel */
-    .sidebar-panel {
-      left: 0;
-      /* THE "MINI" STATE (Icons only) */
-      width: 80px;
-      transform: translateX(0); /* Always visible */
-      border-right: 1px solid rgba(255, 255, 255, 0.05);
+    .sidebar-panel:not(.active) .nav-icon {
+      font-size: 28px;
     }
+  }
 
-    /* THE "EXPANDED" STATE */
-    .sidebar-panel.active {
-      width: 280px;
-    }
+  .nav-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: opacity 0.3s ease;
+  }
 
-    /* Hide text/boxes when NOT active (mini mode) */
+  /* 4. FIXING MINI-SIDEBAR SPACING */
+  @media (min-width: 768px) {
     .sidebar-panel:not(.active) .nav-text,
     .sidebar-panel:not(.active) .profile-area,
     .sidebar-panel:not(.active) .target-box,
-    .sidebar-panel:not(.active) .label-gray {
+    .sidebar-panel:not(.active) .chevron-icon {
       opacity: 0;
       visibility: hidden;
-      white-space: nowrap;
+      display: none;
     }
 
-    .nav-text {
-      transition: opacity 0.2s;
-    }
-
-    .sidebar-header {
-      flex-direction: row-reverse; /* [Text] [Button] */
-    }
-
-    .nav-item-side i,
-    .btn-disconnect i,
-    #sidebarClose i {
-      transition:
-        font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-        color 0.3s;
-      min-width: 30px;
-      width: 30px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    /* 2. RAIL MODE: Icons are LARGE (No text visible) */
-    .sidebar-panel:not(.active) .nav-item-side i,
-    .sidebar-panel:not(.active) .btn-disconnect i {
-      font-size: 38px !important;
-    }
-
-    /* 3. FULL MODE: Icons shrink SMALLER (To match the text) */
-    .sidebar-panel.active .nav-item-side i,
-    .sidebar-panel.active .btn-disconnect i {
-      font-size: 22px !important;
+    .sidebar-panel:not(.active) .sidebar-section-label,
+    .sidebar-panel:not(.active) .sidebar-divider {
+      height: 0;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      border: none;
     }
   }
 
-  /* 🔓 ACTIVE STATE: Shows the sidebar */
-  .sidebar-panel.active {
-    transform: translateX(0) !important;
-  }
-
-  /* Sidebar Header */
+  /* 5. HEADER TOGGLE (PC Default: Right) */
   .sidebar-header {
+    height: 60px;
+    padding: 0 15px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 20px;
-    margin-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    justify-content: flex-end;
   }
 
-  #sidebarClose {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 28px;
-    cursor: pointer;
-    transition: 0.2s;
-    display: flex;
-    align-items: center;
-  }
-  #sidebarClose:hover {
-    color: black;
+  #closeIcon {
+    transition: transform 0.4s;
   }
 
-  /* User Details */
-  .user-name {
+  /* PC Rail: Rotate icon to point right when collapsed */
+  @media (min-width: 768px) {
+    .sidebar-panel:not(.active) #closeIcon {
+      transform: rotate(360deg);
+    }
+  }
+
+  .sidebar-section-label {
+    font-size: 0.6rem;
     font-weight: 800;
-    font-size: 1.1rem;
-    color: var(--text-main);
-    white-space: nowrap;
-  }
-  .user-email {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.2);
+    padding: 10px 0 10px 25px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s;
   }
 
-  /* Target Box */
-  .target-box {
-    background: var(--bg-dark);
-    border-radius: 20px;
-    padding: 20px;
-    margin: 20px;
-    transition: opacity 0.3s;
-    border: 1px solid var(--border-color);
+  /* HIERARCHY LINES */
+  .sidebar-divider {
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent);
+    margin: 10px 25px;
+    transition: all 0.3s;
   }
-  .progress-container {
-    height: 6px;
-    background: var(--input-bg);
-    border-radius: 10px;
-    margin: 10px 0;
+
+  /* FOOTER / LOGOUT */
+  .btn-disconnect {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--accent-red);
+    font-weight: 800;
+  }
+
+  /* 6. DROPDOWN STYLING - DARKER BACKGROUND */
+  .nav-dropdown .sub-nav-list {
+    max-height: 0;
     overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: var(--accent-red);
-    width: 85%;
+    transition: max-height 0.4s ease;
+    background: var(--sub-menu-bg); /* Darker Background */
+    margin-left: 0; /* Changed from 40px to span the width more cleanly */
+    border-left: 3px solid transparent; /* Placeholder for active state */
   }
 
-  /* Nav Links */
-  .nav-list {
-    flex-grow: 1;
-    margin-top: 10px;
+  .nav-dropdown.open .sub-nav-list {
+    max-height: 300px;
+    border-left-color: var(
+      --accent-red
+    ); /* Visual indicator for open dropdown */
   }
-  .nav-item-side {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 15px 25px;
-    color: var(--text-muted);
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-    border-radius: 10px;
-    white-space: nowrap;
+
+  .sub-item {
+    position: relative;
+    overflow: hidden;
+    padding-left: 80px !important; /* Align text past the rail icon width */
+    height: 48px !important;
   }
+
+  .sub-bg-icon {
+    position: absolute !important;
+    right: -10px; /* Pushed slightly further right */
+    top: 50%;
+    transform: translateY(-50%) scale(2.5); /* Initial scale */
+
+    /* Size and Clarity Adjustments */
+    font-size: 1200px !important; /* Increased from 48px */
+    filter: blur(1.2px); /* Sharpened from 2px */
+    opacity: 0.07; /* Slightly more visible */
+
+    pointer-events: none;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+    color: #fff;
+  }
+
+  /* Ensure foreground text/icon doesn't get washed out */
+  .sub-item:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+  }
+
+  .sub-item:hover .nav-text {
+    color: #fff;
+    transform: translateX(5px);
+    transition: transform 0.3s ease;
+  }
+
+  /* Hover Effect: The watermark glows and moves slightly */
+  .sub-item:hover .sub-bg-icon {
+    opacity: 1; /* Glow effect */
+    /* Scales up significantly and shifts position slightly */
+    transform: translateY(-50%) scale(1.4) rotate(-8deg);
+    filter: blur(0.1px);
+    color: gold; /* Tints the watermark red */
+  }
+
+  /* Ensure foreground elements stay above the watermark */
+  .sub-item .nav-text,
+  .sub-item > i:first-child {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Foreground icon style (Thin/Small) */
+  .sub-item > i:first-child {
+    font-size: 16px !important;
+    margin-right: 12px;
+    opacity: 0.6;
+  }
+
+  /* --- SUB-ITEM ICON STYLE --- */
+  .sub-item i {
+    font-size: 14px !important; /* Smaller than main icons */
+    min-width: 20px !important; /* Narrower footprint */
+    margin-right: 10px;
+    opacity: 0.5; /* Dimmed so they don't fight with text */
+    transition: transform 0.3s;
+  }
+
+  .sub-item:hover i {
+    opacity: 1;
+    transform: translateX(3px); /* Subtle slide effect on hover */
+  }
+  .nav-item-side:hover {
+    background: rgba(255, 255, 255, 0.02);
+    color: #fff;
+  }
+
+  /* 2. Active State (Overrides hover) */
   .nav-item-side.active {
     color: var(--accent-red) !important;
-    background: rgba(166, 52, 41, 0.05); /* Very subtle red tint */
+    background: rgba(166, 52, 41, 0.08) !important;
   }
 
-  .nav-item-side.active {
-    color: var(--accent-red) !important;
-  }
-
-  .nav-item-side.active i,
+  /* 3. Force child elements (Icon & Text) to be red when active */
+  .nav-item-side.active .nav-icon,
   .nav-item-side.active .nav-text {
     color: var(--accent-red) !important;
   }
-  .nav-item-side:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #bbb;
-  }
 
-  /* Disconnect Button */
-  .btn-disconnect {
-    color: var(--accent-red);
-    font-weight: 900;
-    padding: 20px 25px;
-    position: relative;
-    bottom: 60px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    cursor: pointer;
-    text-transform: uppercase;
-    border-top: 1px solid #222;
-    white-space: nowrap;
+  /* 4. Active + Hover State (Keep it red when mouse is over it) */
+  .nav-item-side.active:hover {
+    background: rgba(166, 52, 41, 0.12) !important;
+    color: var(--accent-red) !important;
   }
 </style>
 
 <div class="sidebar-panel" id="wolfSidebar">
+  <!-- HEADER -->
   <div class="sidebar-header">
-    <button id="sidebarClose">
-      <i class="bx bx-chevron-left" id="closeIcon"></i>
+    <button
+      id="sidebarClose"
+      style="background: none; border: none; color: #666; cursor: pointer"
+    >
+      <i
+        class="bxf bx-caret-big-right"
+        id="closeIcon"
+        style="font-size: 28px"
+      ></i>
     </button>
-    <span class="label-gray sys-os-version"></span>
   </div>
 
-  <!-- Wrapped text in .profile-area for hiding -->
-  <div class="profile-area" style="padding: 0 20px; transition: opacity 0.3s">
-    <div class="user-name">PALOMAR ADMIN</div>
-    <div class="user-email">admin@palomargym.com</div>
+  <!-- PROFILE AREA -->
+  <div class="profile-area" style="padding: 0 25px 15px">
+    <div
+      class="user-name"
+      style="font-weight: 800; color: #fff; white-space: nowrap"
+    >
+      PALOMAR ADMIN
+    </div>
+    <div
+      class="user-email"
+      style="font-size: 0.75rem; color: #555; white-space: nowrap"
+    >
+      admin@palomargym.com
+    </div>
   </div>
 
-  <div class="target-box shadow">
+  <!-- TARGET BOX -->
+  <div
+    class="target-box"
+    style="
+      background: #161616;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 0 20px 20px;
+      border: 1px solid #222;
+    "
+  >
     <div
       style="
         display: flex;
         justify-content: space-between;
-        font-size: 0.7rem;
-        color: #888;
+        font-size: 0.65rem;
+        color: #555;
       "
     >
-      <span>TODAY TARGET</span> <b style="color: #fff">100%</b>
+      <span>TARGET</span> <b style="color: #fff">100%</b>
     </div>
-    <div class="progress-container"><div class="progress-fill"></div></div>
     <div
       style="
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.7rem;
-        color: #666;
+        height: 4px;
+        background: #222;
+        margin-top: 8px;
+        border-radius: 5px;
+        overflow: hidden;
       "
     >
-      <span>REACHED</span> <b style="color: #fff">₱5,980 / ₱5,000</b>
+      <div
+        style="height: 100%; background: var(--accent-red); width: 85%"
+      ></div>
     </div>
   </div>
 
+  <!-- NAVIGATION -->
   <div class="nav-list">
+    <div class="sidebar-section-label">Main</div>
     <a href="#" class="nav-item-side" data-page="dashboard">
       <div class="nav-icon"><i class="bx bx-home-circle"></i></div>
       <span class="nav-text">HOME</span>
@@ -262,24 +377,80 @@
       <span class="nav-text">SALES</span>
     </a>
     <a href="#" class="nav-item-side" data-page="logbook">
-      <i class="bx bx-detail"></i>
+      <div class="nav-icon"><i class="bx bx-detail"></i></div>
       <span class="nav-text">LOGBOOK</span>
     </a>
-    <a href="#" class="nav-item-side" data-page="management">
-      <i class="bx bx-cube"></i>
-      <span class="nav-text">MANAGEMENT</span>
-    </a>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Admin</div>
+
+    <div class="nav-dropdown" id="mgmtDropdown">
+      <a href="javascript:void(0)" class="nav-item-side">
+        <div class="nav-icon"><i class="bx bx-grid-alt"></i></div>
+        <span class="nav-text">MANAGEMENT</span>
+        <i class="bx bx-chevron-down chevron-icon"></i>
+      </a>
+      <div class="sub-nav-list">
+        <a href="#" class="nav-item-side sub-item" data-page="members">
+          <i class="bx bx-group"></i> <span class="nav-text">MEMBERS</span>
+          <i class="bx bxs-group sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="products">
+          <i class="bx bx-package"></i> <span class="nav-text">PRODUCTS</span>
+          <i class="bx bxs-package sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="equipments">
+          <i class="bx bx-dumbbell-alt"></i>
+          <span class="nav-text">EQUIPMENTS</span>
+          <i class="bxf bx-dumbbell-alt sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+      </div>
+    </div>
+
+    <div class="nav-dropdown" id="toolsDropdown">
+      <a href="javascript:void(0)" class="nav-item-side">
+        <div class="nav-icon"><i class="bx bx-wrench"></i></div>
+        <span class="nav-text">SYSTEM TOOLS</span>
+        <i class="bx bx-chevron-down chevron-icon"></i>
+      </a>
+      <div class="sub-nav-list">
+        <a href="#" class="nav-item-side sub-item" data-page="id-maker">
+          <i class="bx bx-id-card"></i> <span class="nav-text">ID MAKER</span>
+          <i class="bx bxs-id-card sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="goal-center">
+          <i class="bx bx-target"></i>
+          <span class="nav-text">GOAL CENTER</span>
+          <i class="bxf bx-target sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="feedback">
+          <i class="bx bx-chat"></i> <span class="nav-text">FEEDBACK</span>
+          <i class="bx bxs-chat sub-bg-icon"></i>
+          <!-- Watermark -->
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">System</div>
     <a href="#" class="nav-item-side" data-page="audit">
-      <i class="bx bx-pulse"></i>
-      <span class="nav-text">SYSTEM AUDIT</span>
+      <div class="nav-icon"><i class="bx bx-shield-quarter"></i></div>
+      <span class="nav-text">AUDIT LOG</span>
     </a>
     <a href="#" class="nav-item-side" data-page="settings">
-      <i class="bx bx-cog"></i>
-      <span class="nav-text">ACCOUNT SETTINGS</span>
+      <div class="nav-icon"><i class="bx bx-cog"></i></div>
+      <span class="nav-text">SETTINGS</span>
     </a>
   </div>
+
+  <!-- FOOTER -->
   <div class="btn-disconnect logout-btn">
-    <i class="bx bx-power-off"></i>
+    <div class="nav-icon"><i class="bx bx-power-off"></i></div>
     <span class="nav-text">LOGOUT</span>
   </div>
 </div>

@@ -4,6 +4,10 @@
 -->
 
 <style>
+  :root {
+    --font-main: 'Inter', sans-serif;
+  }
+
   /* --- 1. PC RESPONSIVENESS (25% | 50% | 25%) --- */
   .ledger-page-wrapper {
     width: 100%;
@@ -241,6 +245,7 @@
     outline: none;
     font-size: 14px;
     font-weight: 500;
+    font-family: 'Inter', sans-serif;
   }
 
   /* --- 7. MOBILE ADAPTATION --- */
@@ -654,6 +659,41 @@
   .chrono-snap-btn i {
     font-size: 14px;
   }
+
+  /* --- SEARCH COLLAPSIBLE LOGIC --- */
+  .search-collapsible {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    margin-bottom: 0;
+  }
+
+  .search-collapsible.active {
+    display: block !important;
+    max-height: 100px;
+    opacity: 1;
+    transform: translateY(0);
+    margin-bottom: 10px;
+  }
+
+  /* Make the search icon button highlight when search is active */
+  #toggle-search-btn.active {
+    border-color: var(--wolf-red);
+    color: var(--wolf-red);
+    background: rgba(166, 52, 41, 0.1);
+  }
+
+  #search-clear-btn:hover {
+    color: #fff !important;
+  }
+
+  #sales-search::placeholder {
+    color: #555;
+    font-weight: 600;
+    font-family: var(--font-main);
+  }
 </style>
 
 <div class="ledger-page-wrapper" id="ledger-page">
@@ -664,6 +704,9 @@
     </div>
 
     <div class="ledger-actions">
+      <button class="icon-btn" id="toggle-search-btn" title="Toggle Search">
+        <i class="bx bx-search"></i>
+      </button>
       <button class="icon-btn" id="clear-sales-btn" title="Open Archive">
         <i class="bx bx-trash"></i>
       </button>
@@ -741,15 +784,23 @@
     </div>
   </div>
 
-  <!-- SEARCH HUB -->
-  <div id="ledger-search-wrapper" class="ledger-search-box">
-    <i class="bx bx-search" style="color: #444"></i>
-    <input
-      type="text"
-      id="sales-search"
-      placeholder="Search records..."
-      autocomplete="off"
-    />
+  <!-- SEARCH HUB (Moved & Modified for Toggle/Clear) -->
+  <div id="ledger-search-container" class="search-collapsible">
+    <div id="ledger-search-wrapper" class="ledger-search-box">
+      <i class="bx bx-search" style="color: var(--wolf-red)"></i>
+      <input
+        type="text"
+        id="ledger-main-search"
+        placeholder="FILTER RECORDS..."
+        autocomplete="off"
+      />
+      <!-- CLEAR BUTTON -->
+      <i
+        class="bx bx-x"
+        id="search-clear-btn"
+        style="cursor: pointer; display: none; font-size: 1.2rem; color: #666"
+      ></i>
+    </div>
   </div>
 
   <!-- UNIFIED LIST DATA (CRITICAL FIX: ONE ID FOR BOTH) -->

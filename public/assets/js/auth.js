@@ -1,3 +1,16 @@
+// --- IMPORT DOMPURIFY FOR SANITIZATION ---
+DOMPurify.setConfig({
+  FORBID_TAGS: ['img', 'svg', 'script', 'style'],
+  FORBID_ATTR: ['onerror', 'onclick', 'onload'],
+});
+
+function safeHTML(html) {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['br', 'span', 'i'],
+    ALLOWED_ATTR: ['class'],
+  });
+}
+
 // --- 1. INITIALIZE SUPABASE ---
 const supabaseClient = window.supabaseClient;
 
@@ -28,7 +41,9 @@ function typeCarousel() {
   // Apply your specific design: Split by space and wrap second word in <span>
   if (displayText.includes(' ')) {
     const parts = displayText.split(' ');
-    typewriterEl.innerHTML = `${parts[0]} <br> <span>${parts[1]}</span>`;
+    typewriterEl.innerHTML = safeHTML(
+      `${parts[0]} <br> <span>${parts[1]}</span>`,
+    );
   } else {
     typewriterEl.innerHTML = displayText;
   }
@@ -211,8 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // ------------------------------------------
         container.classList.add('auth-verifying');
         loginOutput.style.color = 'var(--wolf-blue)';
-        loginOutput.innerHTML =
-          "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCESSFUL. INITIATING SYSTEM...";
+        loginOutput.innerHTML = safeHTML(
+          "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCCESSFUL. INITIATING SYSTEM...",
+        );
 
         if (window.wolfAudio) window.wolfAudio.play('notif');
 
@@ -239,8 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
           if (card) card.classList.add('outro');
 
           loginOutput.style.color = '#4ade80';
-          loginOutput.innerHTML =
-            "<i class='bx bx-check-shield'></i> ACCESS GRANTED. BOOTING SYSTEM...";
+          loginOutput.innerHTML = safeHTML(
+            "<i class='bx bx-check-shield'></i> ACCESS GRANTED. BOOTING SYSTEM...",
+          );
 
           // --- TRIGGER CANVAS STAR WARP ---
           if (window.triggerStarWarp) {
@@ -261,9 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       loginOutput.textContent = '[ERR_500] System Fault.';
-      console.error(err);
+
+      if (window.wolfAudio) window.wolfAudio.play('error');
+      window.Swal.fire({
+        title: '[ERR_500] TERMINAL_FAULT',
+        html: `<div style="color:#a63429; font-size:4rem; margin-bottom:15px;"><i class='bx bx-error-alt'></i></div>
+               <p style="color:#888; font-size:14px;">CRITICAL_ERROR: ${err.message}</p>`,
+        background: '#111',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'wolf-swal-popup wolf-border-red', // RED BORDER
+          title: 'wolf-swal-title',
+          confirmButton: 'btn-wolf-red',
+        },
+        confirmButtonText: 'RE-INITIALIZE',
+      });
+
       loginBtn.disabled = false;
-      loginBtn.textContent = 'AUTHORIZE ACCESS';
     }
   }
 
@@ -322,9 +353,33 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadVerifyFragment() {
     try {
       const res = await fetch('pages/verifyotp.html');
-      const html = await res.text();
+
+      // 1. Get raw HTML
+      const rawHTML = await res.text();
+
+      // 2. Sanitize HTML BEFORE parsing
+      const cleanHTML = DOMPurify.sanitize(rawHTML, {
+        ALLOWED_TAGS: ['div', 'p', 'form', 'input', 'button', 'a', 'span', 'i'],
+        ALLOWED_ATTR: [
+          'id',
+          'class',
+          'type',
+          'placeholder',
+          'required',
+          'maxlength',
+          'inputmode',
+          'pattern',
+          'title',
+          'href',
+          'style',
+        ],
+      });
+
+      // 3. Parse sanitized HTML
       const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
+      const doc = parser.parseFromString(cleanHTML, 'text/html');
+
+      // 4. Extract only what you need
       const step2Content = doc.getElementById('recoveryStep2');
 
       if (step2Content) {
@@ -336,7 +391,6 @@ document.addEventListener('DOMContentLoaded', () => {
           initOtpFields();
           initVerifyForm();
 
-          // Check if timer should be active on the new RESEND button
           const remaining = await checkExistingCooldown();
           if (remaining > 0) startOtpCountdown(remaining);
         }, 50);
@@ -474,7 +528,23 @@ document.addEventListener('DOMContentLoaded', () => {
           wolfAudio.play('success');
           localOutput.style.color = '#4ade80';
           localOutput.textContent = 'Protocol success. Password updated.';
-          document.getElementById('successModal').style.display = 'flex';
+          if (window.wolfAudio) window.wolfAudio.play('success');
+          window.Swal.fire({
+            title: 'SUCCESS',
+            html: `<div style="color:#08ea1b; font-size:4rem; margin-bottom:15px;"><i class='bx bx-check-shield'></i></div>
+               <p style="color:#888; font-size:14px;">Credentials re-mapped successfully. Terminal access granted.</p>`,
+            background: '#111',
+            timer: 3000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            customClass: {
+              popup: 'wolf-swal-popup wolf-border-green', // GREEN BORDER
+              title: 'wolf-swal-title',
+            },
+            didClose: () => {
+              location.reload();
+            },
+          });
         } else {
           const data = await res.json();
           wolfAudio.play('denied');
@@ -542,9 +612,29 @@ document.addEventListener('DOMContentLoaded', () => {
       e.target.id === 'backToLoginTriggerSecondary'
     ) {
       e.preventDefault();
+
+      // If we are in the middle of OTP (Step 2 loaded)
       if (document.getElementById('recoveryStep2')) {
-        wolfAudio.play('notif');
-        exitModal.style.display = 'flex';
+        if (window.wolfAudio) window.wolfAudio.play('notif');
+        window.Swal.fire({
+          title: 'ABANDON RECOVERY?',
+          html: `<div style="color:#b47023; font-size:4rem; margin-bottom:15px;"><i class='bx bx-shield-quarter'></i></div>
+               <p style="color:#888; font-size:14px;">Terminating handshake will void the current security key. Proceed?</p>`,
+          showCancelButton: true,
+          confirmButtonText: 'YES, EXIT',
+          cancelButtonText: 'STAY',
+          reverseButtons: true,
+          background: '#111',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'wolf-swal-popup wolf-border-orange', // ORANGE BORDER
+            title: 'wolf-swal-title',
+            confirmButton: 'btn-wolf-orange',
+            cancelButton: 'btn-wolf-secondary',
+          },
+        }).then((res) => {
+          if (res.isConfirmed) location.reload();
+        });
       } else {
         inner.classList.remove('flipped');
       }

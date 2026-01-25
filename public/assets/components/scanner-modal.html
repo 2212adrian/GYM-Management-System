@@ -331,3 +331,16 @@
     <div class="modal-footer-glitch">ENCRYPTION: AES-256 | ACCESS LOGGED</div>
   </div>
 </div>
+<script>
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const val = searchInput.value.trim().toLowerCase();
+      const exactMatch = this.allProducts.find(
+        (p) => p.name.toLowerCase() === val || p.sku.toLowerCase() === val,
+      );
+      if (exactMatch) {
+        this.lockProduct(exactMatch);
+      }
+    }
+  });
+</script>

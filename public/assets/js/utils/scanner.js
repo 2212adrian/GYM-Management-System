@@ -1,148 +1,112 @@
+/**
+ * WOLF OS - SCANNER MODULE
+ * Handles Hardware Optics & Manual System ID Entry
+ */
+
 let html5QrCode = null;
 
 window.wolfScanner = {
-  currentCameraId: null,
-  activeCallback: null, // Stores the function to run after a successful scan
+  availableCameras: [],
+  currentCamIndex: 0,
+  activeCallback: null,
   onCloseCallback: null,
   isProcessingResult: false,
+  isSwitchingCamera: false,
   lastScanTime: 0,
+
+  /**
+   * Initialize the Scanner Component
+   */
   async init() {
     if (document.getElementById('wolf-scanner-overlay')) return true;
     try {
       const res = await fetch('/assets/components/scanner-modal.html');
-      if (!res.ok) throw new Error('Component not found');
+      if (!res.ok) throw new Error('Scanner component missing');
       const html = await res.text();
       document.body.insertAdjacentHTML('beforeend', html);
       this.attachListeners();
       return true;
     } catch (err) {
-      console.error('Wolf OS: Scanner Load Fault:', err);
+      console.error('Wolf OS: Scanner Init Fault:', err);
       return false;
     }
   },
 
-  // ADDED: hideGuest parameter to control button visibility
+  /**
+   * Start Scanner Sequence
+   */
   async start(callback = null, hideGuest = false, onClose = null) {
     const ready = await this.init();
     if (!ready) return;
 
     this.activeCallback = callback;
     this.onCloseCallback = onClose;
-    document.getElementById('wolf-scanner-overlay').style.display = 'flex';
 
+    const overlay = document.getElementById('wolf-scanner-overlay');
+    overlay.style.display = 'flex';
+
+    // --- 1. UX: AUTO-FOCUS MANUAL INPUT ---
+    const manualInput = document.getElementById('manualCodeInput');
+    if (manualInput) {
+      manualInput.value = ''; // Clear old data
+      // Delay focus slightly to ensure the keyboard pops up on mobile after CSS transitions
+      setTimeout(() => manualInput.focus(), 300);
+    }
+
+    // --- 2. HARDWARE: INITIALIZE CAMERAS ---
     try {
       const cameras = await Html5Qrcode.getCameras();
       this.availableCameras = cameras;
 
       if (cameras && cameras.length > 0) {
-        // 1. SETUP PC DROPDOWN
         const selector = document.getElementById('cameraSelect');
+
+        // Populate PC Dropdown
         selector.innerHTML = cameras
           .map(
-            (cam, index) =>
-              `<option value="${cam.id}">${cam.label || 'Camera ' + (index + 1)}</option>`,
+            (cam, i) =>
+              `<option value="${cam.id}">${cam.label || 'Optic ' + (i + 1)}</option>`,
           )
           .join('');
 
-        selector.onchange = (e) => {
-          this.launchCamera(e.target.value);
-          // Sync index for mobile just in case window is resized
-          this.currentCamIndex = cameras.findIndex(
-            (c) => c.id === e.target.value,
-          );
-        };
+        selector.onchange = (e) => this.launchCamera(e.target.value);
 
-        // 2. SETUP MOBILE SWITCH
-        const flipBtn = document.getElementById('flipCameraBtn');
-        flipBtn.onclick = () => this.cycleCamera();
+        // Mobile Flip Logic
+        document.getElementById('flipCameraBtn').onclick = () =>
+          this.cycleCamera();
 
-        // 3. AUTO-SELECT BACK CAMERA
-        let backCamIndex = cameras.findIndex(
-          (cam) =>
-            cam.label.toLowerCase().includes('back') ||
-            cam.label.toLowerCase().includes('environment') ||
-            cam.label.toLowerCase().includes('rear'),
+        // Auto-select REAR camera by default
+        let backCamIndex = cameras.findIndex((cam) =>
+          /back|rear|environment|main/i.test(cam.label),
         );
 
         this.currentCamIndex = backCamIndex !== -1 ? backCamIndex : 0;
-
-        // Update dropdown to match auto-selected index
         selector.value = cameras[this.currentCamIndex].id;
 
-        this.launchCamera(cameras[this.currentCamIndex].id);
+        await this.launchCamera(cameras[this.currentCamIndex].id);
       }
     } catch (err) {
-      this.showInactiveUI('PERMISSION DENIED');
+      this.showInactiveUI('PERMISSION_DENIED');
     }
   },
 
-  // salesManager.js or scanner.js
-  async cycleCamera() {
-    if (this.availableCameras.length < 2) return;
-
-    // Play click sound
-    if (window.wolfAudio) window.wolfAudio.play('notif');
-
-    // Cycle index
-    this.currentCamIndex =
-      (this.currentCamIndex + 1) % this.availableCameras.length;
-    const nextCamId = this.availableCameras[this.currentCamIndex].id;
-
-    // Re-launch
-    await this.launchCamera(nextCamId);
-  },
-
-  setupCameraSelector(cameras) {
-    const selectorWrap = document.getElementById('camera-selector-wrap');
-    const selector = document.getElementById('cameraSelect');
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    // PC only selector (shown if more than 1 camera)
-    if (cameras.length > 1 && !isMobile) {
-      selectorWrap.style.display = 'flex';
-      selector.innerHTML = cameras
-        .map(
-          (cam) =>
-            `<option value="${cam.id}" ${cam.id === this.currentCameraId ? 'selected' : ''}>${cam.label || 'Camera ' + cam.id}</option>`,
-        )
-        .join('');
-
-      selector.onchange = (e) => {
-        this.currentCameraId = e.target.value;
-        this.launchCamera(this.currentCameraId);
-      };
-    } else {
-      selectorWrap.style.display = 'none';
-    }
-  },
-
+  /**
+   * Launch Specific Camera Instance
+   */
   async launchCamera(cameraId) {
-    // Prevent multiple launches at the same time
     if (this.isSwitchingCamera) return;
     this.isSwitchingCamera = true;
 
-    // STOP EXISTING CAMERA CLEANLY
+    // Clean up existing instance
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
-      } catch (e) {
-        console.warn('Failed to stop previous camera:', e);
-      }
-
-      try {
-        html5QrCode.clear();
-      } catch (e) {
-        console.warn('Failed to clear previous camera:', e);
-      }
-
+      } catch (e) {}
       html5QrCode = null;
     }
 
-    // CLEAR VIEWFINDER (safe now)
     const reader = document.getElementById('reader');
-    reader.innerHTML = '';
-
-    // START NEW CAMERA
+    reader.innerHTML = ''; // Clear viewfinder UI
     html5QrCode = new Html5Qrcode('reader');
 
     try {
@@ -157,122 +121,142 @@ window.wolfScanner = {
       this.isSwitchingCamera = false;
     }
   },
-  processResult(text, type) {
+
+  /**
+   * Cycle through available cameras (Mobile Flip)
+   */
+  async cycleCamera() {
+    if (this.availableCameras.length < 2) return;
+    if (window.wolfAudio) window.wolfAudio.play('notif');
+
+    this.currentCamIndex =
+      (this.currentCamIndex + 1) % this.availableCameras.length;
+    const nextCamId = this.availableCameras[this.currentCamIndex].id;
+
+    // Sync PC selector UI
+    const selector = document.getElementById('cameraSelect');
+    if (selector) selector.value = nextCamId;
+
+    await this.launchCamera(nextCamId);
+  },
+
+  /**
+   * Handle Scanned or Manually Entered Data
+   */
+  async processResult(text, type) {
     const currentTime = Date.now();
-    // BLOCK if last scan was less than 2.5 seconds ago
-    if (currentTime - this.lastScanTime < 2500) return;
+    // Prevent double-processing
+    if (currentTime - this.lastScanTime < 2000) return;
     this.lastScanTime = currentTime;
+
     if (this.isProcessingResult) return;
     this.isProcessingResult = true;
-    if (navigator.vibrate) navigator.vibrate(100);
+
+    // Haptic/Audio Feedback
+    if (navigator.vibrate) navigator.vibrate(80);
+    if (window.wolfAudio) window.wolfAudio.play('success');
+
     const quickAuth = document.getElementById('quickAuthToggle')?.checked;
-    this.stop();
 
+    // Stop camera and hide scanner
+    await this.stop();
+
+    // ROUTING LOGIC
     if (this.activeCallback) {
+      // Use case: Scanner opened by a specific function to get a string
       this.activeCallback(text);
-      this.activeCallback = null;
-      this.isProcessingResult = false;
-      return;
-    }
-
-    if (window.salesManager) {
+    } else if (window.salesManager) {
+      // Use case: Global POS usage
       if (quickAuth) {
-        // Path A: Instant Addition
-        window.salesManager.processQuickSale(text);
+        // Instant process (SKIPS MODAL)
+        await window.salesManager.processQuickSale(text);
       } else {
-        // Path B: Open Modal with pre-filled data
-        window.salesManager.openSaleTerminal(text);
+        // Open Modal with Pre-filled SKU
+        await window.salesManager.openSaleTerminal(text);
       }
     }
 
     this.isProcessingResult = false;
   },
 
+  /**
+   * Shutdown Scanner & Reset UI
+   */
   async stop() {
-    if (this.isSwitchingCamera) return;
-
-    this.isSwitchingCamera = true;
-
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
-      } catch (e) {
-        console.warn('Stop failed:', e);
-      }
-
-      try {
         html5QrCode.clear();
-      } catch (e) {
-        console.warn('Clear failed:', e);
-      }
-
+      } catch (e) {}
       html5QrCode = null;
     }
 
     document.getElementById('wolf-scanner-overlay').style.display = 'none';
-    this.isSwitchingCamera = false;
-  },
-  showInactiveUI(message) {
-    const reader = document.getElementById('reader');
-    if (window.wolfAudio) window.wolfAudio.play('error');
 
-    reader.innerHTML = `<div class="camera-inactive-state"><i class='bx bx-camera-off' style="color:var(--wolf-red); opacity: 1;"></i><span style="color:var(--wolf-red)">${message}</span></div>`;
+    // Reset Manual Input UI
+    const input = document.getElementById('manualCodeInput');
+    const group = document.getElementById('manualInputGroup');
+    if (input) input.value = '';
+    if (group) group.classList.remove('has-content');
+
+    if (this.onCloseCallback) {
+      this.onCloseCallback();
+      this.onCloseCallback = null;
+    }
   },
 
+  /**
+   * Event Listener Delegation
+   */
   attachListeners() {
     const input = document.getElementById('manualCodeInput');
     const group = document.getElementById('manualInputGroup');
-    if (input) {
-      input.addEventListener('input', (e) => {
-        // NEW LOGIC: Force input to ALL CAPS
-        e.target.value = e.target.value.toUpperCase();
+    const confirmBtn = document.getElementById('manualConfirmBtn');
 
-        if (e.target.value.trim().length > 0) {
-          group.classList.add('has-content');
-        } else {
-          group.classList.remove('has-content');
+    if (input) {
+      // 1. Force Uppercase & UI Animation
+      input.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+        group.classList.toggle('has-content', e.target.value.trim().length > 0);
+      });
+
+      // 2. ENTER KEY LOGIC (Submits the form)
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = input.value.trim();
+          if (val) this.processResult(val, 'MANUAL_ENTRY');
         }
       });
     }
-    document.getElementById('exitScannerBtn').onclick = () => {
-      this.stop();
-    };
-    document.getElementById('manualConfirmBtn').onclick = () => {
-      const val = document.getElementById('manualCodeInput').value;
-      if (val.trim()) this.processResult(val, 'MANUAL_ENTRY');
-    };
+
+    // 3. Manual Button Click
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        const val = input.value.trim();
+        if (val) this.processResult(val, 'MANUAL_ENTRY');
+      };
+    }
+
+    // 4. Close UI
+    const exitBtn = document.getElementById('exitScannerBtn');
+    if (exitBtn) exitBtn.onclick = () => this.stop();
   },
 
-  setupCameraSelector(cameras) {
-    const selectorWrap = document.getElementById('camera-selector-wrap');
-    const selector = document.getElementById('cameraSelect');
-
-    // Simple check for PC vs Mobile
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (cameras.length > 1 && !isMobile) {
-      selectorWrap.style.display = 'flex';
-
-      // Clear and fill dropdown
-      selector.innerHTML = cameras
-        .map(
-          (cam) =>
-            `<option value="${cam.id}" ${cam.id === this.currentCameraId ? 'selected' : ''}>${cam.label || 'Camera ' + cam.id}</option>`,
-        )
-        .join('');
-
-      // ATTACH THE CHANGE EVENT
-      selector.onchange = (e) => {
-        console.log('Wolf OS: Switching camera source...');
-        this.launchCamera(e.target.value);
-      };
-    } else {
-      selectorWrap.style.display = 'none';
-    }
+  showInactiveUI(message) {
+    const reader = document.getElementById('reader');
+    if (window.wolfAudio) window.wolfAudio.play('error');
+    reader.innerHTML = `
+      <div class="camera-inactive-state">
+        <i class='bx bx-camera-off' style="color:var(--wolf-red); opacity: 1;"></i>
+        <span style="color:var(--wolf-red)">${message}</span>
+      </div>`;
   },
 };
 
-// Start logic
+// Global Listener for QR Trigger
 document.addEventListener('click', (e) => {
-  if (e.target.closest('#qrScannerBtn')) wolfScanner.start();
+  if (e.target.closest('#qrScannerBtn')) {
+    window.wolfScanner.start();
+  }
 });

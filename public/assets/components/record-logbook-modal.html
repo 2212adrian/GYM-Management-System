@@ -1,0 +1,286 @@
+<style>
+  .wolf-close-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #666;
+    padding: 8px 12px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 900;
+    transition: 0.3s;
+  }
+  .wolf-close-btn:hover {
+    background: var(--wolf-red);
+    color: #fff;
+    border-color: var(--wolf-red);
+  }
+</style>
+<!-- WOLF OS - LOGBOOK ENTRY TERMINAL -->
+<div id="logbook-modal-overlay" class="wolf-modal-overlay">
+  <div class="wolf-modal-card logbook-card">
+    <!-- HEADER -->
+    <header class="modal-header">
+      <div class="protocol-header">
+        <div class="protocol-dot pulse"></div>
+        <span class="protocol-title">LOGBOOK_CHECKIN_PROTOCOL</span>
+      </div>
+      <button type="button" class="wolf-close-btn" id="closeLogModal">
+        <i class="bx bx-x"></i>
+        <span>CLOSE</span>
+      </button>
+    </header>
+
+    <!-- MAIN BODY -->
+    <form id="record-logbook-form" class="modal-form">
+      <!-- GUEST INPUT SECTION -->
+      <div class="input-section">
+        <label class="wolf-label">IDENTIFY CUSTOMER</label>
+        <div class="search-wrapper" id="logbookSearchWrapper">
+          <i class="bx bx-user-pin search-icon"></i>
+          <input
+            type="text"
+            id="log-guest-search"
+            placeholder="ENTER MEMBER NAME OR WALK-IN GUEST..."
+            autocomplete="off"
+            required
+          />
+        </div>
+      </div>
+
+      <!-- TECHNICAL INFO (GLASS BOX) -->
+      <div class="tech-info-grid">
+        <div class="tech-node">
+          <span class="node-label">ENTRY_TIMESTAMP</span>
+          <div class="node-value" id="log-current-time">00:00:00</div>
+        </div>
+        <div class="tech-node">
+          <span class="node-label">PROTOCOL_STATUS</span>
+          <div class="node-value status-ready">AWAITING_AUTH</div>
+        </div>
+      </div>
+
+      <!-- ACTION FOOTER -->
+      <footer class="modal-footer">
+        <div class="entry-summary">
+          <span class="summary-label">LOGBOOK_RECORD</span>
+          <div class="summary-val">CHECK-IN</div>
+        </div>
+        <button type="submit" class="btn-authorize" id="log-submit-btn">
+          <span>AUTHORIZE ENTRY</span>
+          <i class="bx bx-log-in-circle"></i>
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* --- LOGBOOK TERMINAL SPECIFIC STYLES --- */
+  .wolf-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  .wolf-modal-card {
+    background: rgba(15, 15, 15, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 28px;
+    width: 100%;
+    max-width: 450px;
+    padding: 30px;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+    animation: wolfModalEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes wolfModalEntry {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+      filter: blur(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  .protocol-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 25px;
+  }
+
+  .protocol-dot.pulse {
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #4ade80;
+    animation: hubPulse 2s infinite;
+  }
+
+  .protocol-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 900;
+    color: #555;
+    letter-spacing: 2px;
+  }
+
+  .wolf-label {
+    display: block;
+    font-size: 9px;
+    font-weight: 900;
+    color: #444;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+
+  .search-wrapper {
+    position: relative;
+    background: #111;
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: 0.3s;
+  }
+
+  .search-wrapper:focus-within {
+    border-color: var(--wolf-red);
+    background: #141414;
+  }
+
+  .search-icon {
+    font-size: 1.4rem;
+    color: #333;
+  }
+
+  #log-guest-search {
+    background: none;
+    border: none;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* TECH INFO BOX */
+  .tech-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 25px 0;
+  }
+
+  .tech-node {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 16px;
+  }
+
+  .node-label {
+    display: block;
+    font-size: 8px;
+    font-weight: 900;
+    color: #444;
+    margin-bottom: 5px;
+    letter-spacing: 1px;
+  }
+
+  .node-value {
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .status-ready {
+    color: #4ade80;
+  }
+
+  /* FOOTER & BUTTON */
+  .modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #1a1a1a;
+    padding-top: 25px;
+    margin-top: 10px;
+  }
+
+  .entry-summary .summary-val {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    font-style: italic;
+  }
+
+  .summary-label {
+    font-size: 8px;
+    font-weight: 900;
+    color: #444;
+    letter-spacing: 1px;
+  }
+
+  .btn-authorize {
+    background: var(--wolf-red);
+    color: #fff;
+    border: none;
+    padding: 15px 25px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .btn-authorize span {
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .btn-authorize i {
+    font-size: 1.2rem;
+  }
+
+  .btn-authorize:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(166, 52, 41, 0.4);
+  }
+
+  .close-modal-btn {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    background: none;
+    border: none;
+    color: #333;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .close-modal-btn:hover {
+    color: #fff;
+    transform: rotate(90deg);
+  }
+</style>

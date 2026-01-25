@@ -1032,3 +1032,78 @@ button:hover:not(:disabled) {
   border: 1px solid #333 !important;
   color: #555 !important;
 }
+
+/* --- SHARED WOLF OS MODAL LAYOUT --- */
+.wolf-swal-popup {
+  background: #111 !important;
+  border-radius: 32px !important;
+  padding: 40px !important;
+  width: 450px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* --- THEME 1: RED (CRITICAL FAULT) --- */
+.wolf-border-red {
+  border: 1.5px solid #a63429 !important;
+  box-shadow: 0 0 20px rgba(166, 52, 41, 0.2) !important;
+}
+.btn-wolf-red {
+  background: #a63429 !important;
+  color: #fff !important;
+  font-weight: 900;
+  padding: 15px 30px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+/* --- THEME 2: ORANGE (SYSTEM WARNING) --- */
+.wolf-border-orange {
+  border: 1.5px solid #b47023 !important;
+  box-shadow: 0 0 20px rgba(180, 112, 35, 0.2) !important;
+}
+.btn-wolf-orange {
+  background: #b47023 !important;
+  color: #fff !important;
+  font-weight: 900;
+  padding: 15px 30px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+/* --- THEME 3: GREEN (PROTOCOL SUCCESS) --- */
+.wolf-border-green {
+  border: 1.5px solid #08ea1b !important;
+  box-shadow: 0 0 20px rgba(8, 234, 27, 0.2) !important;
+}
+.btn-wolf-green {
+  background: #08ea1b !important;
+  color: #000 !important;
+  font-weight: 900;
+  padding: 15px 30px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+/* --- SHARED BUTTONS --- */
+.btn-wolf-secondary {
+  background: #1a1a1a !important;
+  color: #666 !important;
+  border: 1px solid #333 !important;
+  font-weight: 900;
+  padding: 15px 30px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.wolf-swal-title {
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 2px !important;
+  color: #fff !important;
+}

@@ -547,14 +547,16 @@ window.salesManager = {
       }
 
       this.showSystemAlert(`AUTHORIZED: ${dbProd.name} x${sellQty}`);
+      if (window.wolfData) window.wolfData.loadSales();
+      const modal = document.getElementById('sale-terminal-overlay');
+      if (modal) modal.style.display = 'none';
 
       // Reset Modal UI
       document.getElementById('sale-terminal-overlay').style.display = 'none';
       if (form) form.reset();
       this.selectedProductId = null;
 
-      // --- CRITICAL FIX: FORCE UI REFRESH ---
-      if (window.wolfData && window.wolfData.loadSales) {
+      if (window.wolfData && typeof window.wolfData.loadSales === 'function') {
         window.wolfData.loadSales();
       }
       if (window.wolfAudio) window.wolfAudio.play('success');
@@ -737,47 +739,73 @@ window.salesManager = {
     }
   },
 
+  // ==========================================
+  // SECTION: CONTEXTUAL TRASH BIN (FIXED FILTER)
+  // ==========================================
+
   async openTrashBin() {
+    // Uses the mode set by loadSales or loadLogbook
+    const mode = this.currentTrashMode || 'sales';
+    const COMPONENT_PATH = '/assets/components/trash-modal.html';
+
     if (!document.getElementById('sales-trash-overlay')) {
-      const res = await fetch('/assets/components/sales-trash-modal.html');
+      const res = await fetch(COMPONENT_PATH);
       const html = await res.text();
       document.body.insertAdjacentHTML('beforeend', html);
-
-      // Listeners for the trash modal
-      document.getElementById('closeTrashModal').onclick = () =>
-        this.closeTrash();
-      document.getElementById('closeTrashBtn').onclick = () =>
-        this.closeTrash();
     }
 
-    document.getElementById('sales-trash-overlay').style.display = 'flex';
+    // Ensure DOM is ready
+    await new Promise((r) => setTimeout(r, 50));
+
+    const overlay = document.getElementById('sales-trash-overlay');
+    if (!overlay) return;
+
+    // FIX: Define titleHeader properly to avoid ReferenceError
+    const titleHeader = overlay.querySelector('.terminal-title');
+    if (titleHeader) {
+      const label = mode === 'sales' ? 'SALES' : 'LOGBOOK';
+      titleHeader.innerHTML = `${label} <span>TRASH BIN</span>`;
+    }
+
+    // Attach Listeners
+    document.getElementById('closeTrashModal').onclick = () =>
+      this.closeTrash();
+    document.getElementById('closeTrashBtn').onclick = () => this.closeTrash();
+
+    overlay.style.display = 'flex';
     if (window.wolfAudio) window.wolfAudio.play('notif');
-    this.loadTrashItems();
+
+    this.loadTrashItems(mode);
   },
 
   closeTrash() {
-    document.getElementById('sales-trash-overlay').style.display = 'none';
+    const overlay = document.getElementById('sales-trash-overlay');
+    if (overlay) overlay.style.display = 'none';
   },
 
-  // --- UPDATED LOAD TRASH ITEMS ---
-  async loadTrashItems() {
+  async loadTrashItems(mode) {
     const container = document.getElementById('trash-list-container');
+    if (!container) return;
 
-    // 1. Ensure products are loaded so we can find names
-    if (this.allProducts.length === 0) {
+    // 1. CRITICAL: If in sales mode, ensure the product registry is loaded in memory
+    // Otherwise, we cannot resolve SKUs for deleted items.
+    if (mode === 'sales' && this.allProducts.length === 0) {
+      console.log('Wolf OS: Fetching product registry for SKU resolution...');
       await this.fetchProducts();
     }
+
+    const targetTable = mode === 'sales' ? 'sales' : 'check_in_logs';
 
     const { data, error } = await supabaseClient
       .from('trash_bin')
       .select('*')
-      .eq('table_name', 'sales')
+      .eq('table_name', targetTable)
       .order('deleted_at', { ascending: false });
 
     if (error || !data || data.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:60px; opacity:0.3;">
         <i class='bx bx-folder-open' style='font-size:4rem;'></i>
-        <p style='font-size:14px; font-weight:700; margin-top:15px;'>ARCHIVE EMPTY</p>
+        <p style='font-size:12px; font-weight:900; margin-top:15px;'>ARCHIVE_EMPTY_FOR_${targetTable.toUpperCase()}</p>
       </div>`;
       return;
     }
@@ -785,31 +813,62 @@ window.salesManager = {
     container.innerHTML = data
       .map((item) => {
         const d = item.deleted_data;
+        let displayName = '';
+        let subDetail = '';
 
-        // --- THE NAME FIX ---
-        // We look up the name using the product_id from the deleted record
-        const productMatch = this.allProducts.find(
-          (p) => p.productid === d.product_id,
-        );
-        const prodName = productMatch ? productMatch.name : 'DELETED_PRODUCT';
+        if (mode === 'sales') {
+          // --- SALES RESOLUTION ---
+          // Match product_id from the deleted sale to productid in our memory
+          const productMatch = this.allProducts.find(
+            (p) => p.productid === d.product_id,
+          );
 
-        const price = Number(d.qty * d.unit_price).toFixed(2);
-        const ref = d.sale_reference || 'N/A';
+          displayName = productMatch ? productMatch.name : 'DELETED_PRODUCT';
+
+          const amount = Number(d.total_amount || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+          });
+
+          // Get the SKU from the match, or fallback to the ID if SKU is missing
+          const sku = productMatch
+            ? productMatch.sku
+            : d.product_id
+              ? d.product_id.slice(0, 8)
+              : 'N/A';
+
+          subDetail = `₱${amount} | SKU: ${sku}`;
+        } else {
+          // --- LOGBOOK RESOLUTION ---
+          displayName = d.notes?.replace('WALK-IN: ', '') || 'MEMBER_ENTRY';
+
+          const timeIn = new Date(d.time_in).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const timeOut = d.time_out
+            ? new Date(d.time_out).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'STILL_ACTIVE';
+
+          subDetail = `IN: ${timeIn} | OUT: ${timeOut}`;
+        }
 
         return `
         <div class="trash-item-card">
             <div class="trash-item-info">
-                <span class="trash-prod-name">${prodName}</span>
-                <div class="trash-tech-row">
-                    <span class="trash-price-tag">₱${price}</span>  |  REF: ${ref}
+                <span class="trash-prod-name">${displayName.toUpperCase()}</span>
+                <div class="trash-tech-row" style="text-transform: uppercase;">
+                    ${subDetail.toUpperCase()}
                 </div>
             </div>
             <div class="trash-actions">
-                <button class="btn-restore" onclick="salesManager.restoreSale('${item.id}')">
-                    <i class='bx bx-undo'></i> <span class="btn-text">RESTORE</span>
+                <button class="btn-restore" onclick="salesManager.restoreSale('${item.id}', '${mode}')">
+                    <i class='bx bx-undo'></i>
                 </button>
-                <button class="btn-purge" onclick="salesManager.purgeSale('${item.id}')">
-                    <i class='bx bx-trash'></i> <span class="btn-text">DELETE</span>
+                <button class="btn-purge" onclick="salesManager.purgeSale('${item.id}', '${mode}')">
+                    <i class='bx bx-trash'></i>
                 </button>
             </div>
         </div>`;
@@ -818,19 +877,37 @@ window.salesManager = {
   },
 
   // --- NEW: PERMANENT PURGE FUNCTION ---
-  async purgeSale(trashId) {
-    const confirmed = await window.wolfModal.confirm({
-      title: 'PURGE RECORD',
-      message:
-        'CRITICAL: This action cannot be undone. Permanent deletion will remove this record from the archive forever. Proceed?',
-      icon: 'bx-trash',
-      confirmText: 'DELETE PERMANENTLY',
-      cancelText: 'KEEP RECORD',
-      type: 'danger',
+  async purgeSale(trashId, mode) {
+    if (!window.Swal) return;
+
+    // 1. CONFIRMATION (Industrial Orange Style)
+    const result = await window.Swal.fire({
+      title: 'DELETE PERMANENTLY',
+      html: `
+        <div style="color: #b47023; font-size: 4.5rem; margin-bottom: 10px;">
+          <i class='bx bx-trash-alt'></i>
+        </div>
+        <p class="wolf-swal-text" style="text-transform: uppercase;">
+          CRITICAL: THIS ACTION CANNOT BE UNDONE. RECORD WILL BE REMOVED FOREVER. PROCEED?
+        </p>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'DELETE',
+      cancelButtonText: 'ABORT',
+      reverseButtons: true,
+      background: '#111',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'wolf-swal-popup-orange',
+        confirmButton: 'wolf-swal-confirm-orange',
+        cancelButton: 'wolf-swal-cancel',
+      },
     });
-    if (!confirmed) return;
+
+    if (!result.isConfirmed) return;
 
     try {
+      // 2. EXECUTE PERMANENT WIPE
       const { error } = await supabaseClient
         .from('trash_bin')
         .delete()
@@ -838,29 +915,46 @@ window.salesManager = {
 
       if (error) throw error;
 
-      this.showSystemAlert('RECORD PERMANENTLY PURGED', 'success');
+      // 3. SUCCESS FEEDBACK
+      this.showSystemAlert('RECORD_PERMANENTLY_PURGED', 'success');
       if (window.wolfAudio) window.wolfAudio.play('success');
-      this.loadTrashItems(); // Refresh the list
+
+      // 4. REFRESH THE CORRECT LIST (Stay in Sales or Logbook context)
+      this.loadTrashItems(mode);
     } catch (err) {
-      console.error(err);
+      console.error('Purge Fault:', err);
+      if (window.wolfAudio) window.wolfAudio.play('error');
       this.showSystemAlert('PURGE_PROTOCOL_FAILED', 'error');
     }
   },
 
-  async restoreSale(trashId) {
-    const confirmed = await window.wolfModal.confirm({
-      title: 'RESTORE ASSET',
-      message:
-        'PROCEED WITH RESTORATION: This will re-deduct quantity from stock. Continue?',
-      icon: 'bx-undo',
-      confirmText: 'AUTHORIZE RESTORE',
-      cancelText: 'ABORT',
-      type: 'warning',
-    });
-
-    if (!confirmed) return;
+  async restoreSale(trashId, mode) {
+    if (!window.Swal) return;
 
     try {
+      // 1. Confirm with the correct wording based on mode
+      const isSales = mode === 'sales';
+      const msg = isSales
+        ? 'PROCEED WITH RESTORATION: THIS WILL RE-DEDUCT QUANTITY FROM STOCK.'
+        : 'PROCEED WITH RESTORATION: THIS RECORD WILL RETURN TO THE LOGBOOK.';
+
+      const result = await Swal.fire({
+        title: 'RESTORE_RECORD',
+        html: `<p class="wolf-swal-text">${msg}</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'RESTORE',
+        background: '#111',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'wolf-swal-popup-green',
+          confirmButton: 'wolf-swal-confirm-green',
+          cancelButton: 'wolf-swal-cancel',
+        },
+      });
+
+      if (!result.isConfirmed) return;
+
+      // 2. Get the archived data
       const { data: trashRecord, error: trashError } = await supabaseClient
         .from('trash_bin')
         .select('*')
@@ -868,57 +962,70 @@ window.salesManager = {
         .single();
 
       if (trashError || !trashRecord)
-        throw new Error('Could not locate archive record.');
+        throw new Error('ARCHIVE_RECORD_NOT_FOUND');
 
-      const saleData = trashRecord.deleted_data;
+      const dataToRestore = { ...trashRecord.deleted_data };
+      const targetTable = isSales ? 'sales' : 'check_in_logs';
 
-      const { data: product, error: prodError } = await supabaseClient
-        .from('products')
-        .select('qty, name')
-        .eq('productid', saleData.product_id)
-        .single();
+      // 3. BRANCH LOGIC: SALES VS LOGBOOK
+      if (isSales) {
+        // --- SALES-ONLY: INVENTORY CHECK ---
+        const { data: product } = await supabaseClient
+          .from('products')
+          .select('qty, name')
+          .eq('productid', dataToRestore.product_id)
+          .single();
 
-      if (prodError || !product)
-        throw new Error('Original product no longer exists in registry.');
+        if (!product) throw new Error('ORIGINAL_PRODUCT_DELETED_FROM_REGISTRY');
 
-      if (product.qty < saleData.qty && product.qty < 999999) {
-        if (window.wolfAudio) window.wolfAudio.play('error');
-        alert(`RESTORE_DENIED: Only ${product.qty} units left in stock.`);
-        return;
+        if (product.qty < dataToRestore.qty && product.qty < 999999) {
+          throw new Error(`INSUFFICIENT_STOCK: ONLY ${product.qty} LEFT`);
+        }
+
+        // Clean data for re-insertion
+        delete dataToRestore.id;
+        delete dataToRestore.total_amount;
+        delete dataToRestore.created_at;
+
+        // Re-decrement stock
+        if (product.qty < 999999) {
+          await supabaseClient
+            .from('products')
+            .update({ qty: product.qty - dataToRestore.qty })
+            .eq('productid', dataToRestore.product_id);
+        }
+      } else {
+        // --- LOGBOOK-ONLY: CLEANUP ---
+        // We keep the original time_in so it goes back to where it belongs in history
+        delete dataToRestore.id;
+        // We don't delete created_at or time_in for logbook so history is preserved
       }
 
-      // --- THE CRITICAL FIX: DATA SANITIZATION ---
-      delete saleData.id; // Remove old ID to prevent Primary Key conflicts
-      delete saleData.total_amount; // Remove calculated column
-      delete saleData.created_at; // Remove old date so it restores to CURRENT SERVER TIME
-
+      // 4. INSERT BACK TO ORIGINAL TABLE
       const { error: insertError } = await supabaseClient
-        .from('sales')
-        .insert([saleData]);
+        .from(targetTable)
+        .insert([dataToRestore]);
 
       if (insertError)
-        throw new Error('Database rejected the sale restoration.');
+        throw new Error(`DATABASE_REJECTION: ${insertError.message}`);
 
-      if (product.qty < 999999) {
-        await supabaseClient
-          .from('products')
-          .update({ qty: product.qty - saleData.qty })
-          .eq('productid', saleData.product_id);
-      }
-
+      // 5. PURGE FROM TRASH
       await supabaseClient.from('trash_bin').delete().eq('id', trashId);
 
+      // 6. SUCCESS FEEDBACK
       if (window.wolfAudio) window.wolfAudio.play('success');
+      this.showSystemAlert('RESTORE_COMPLETE', 'success');
 
-      // Refresh UI immediately
-      this.loadTrashItems();
-      if (window.wolfData && window.wolfData.loadSales) {
-        window.wolfData.loadSales();
+      // 7. REFRESH EVERYTHING (The engine refresh)
+      this.loadTrashItems(mode);
+      if (window.wolfData) {
+        if (isSales) await window.wolfData.loadSales();
+        else await window.wolfData.loadLogbook();
       }
     } catch (err) {
-      console.error('Restoration Fault:', err);
+      console.error('Restore Error:', err);
       if (window.wolfAudio) window.wolfAudio.play('error');
-      alert(`PROTOCOL_FAULT: ${err.message}`);
+      this.showSystemAlert(err.message, 'error');
     }
   },
 };
@@ -927,15 +1034,5 @@ window.salesManager = {
 document.addEventListener('click', (e) => {
   if (e.target.closest('#clear-sales-btn')) {
     window.salesManager.openTrashBin();
-  }
-});
-
-document.addEventListener('click', (e) => {
-  const addBtn = e.target.closest('.icon-btn.red');
-  if (addBtn) {
-    // Logic: If on sales page, open sale terminal. If on inventory/management, open add terminal.
-    // For now, defaulting to openSaleTerminal as per your sales view context
-    if (window.wolfAudio) window.wolfAudio.play('notif');
-    window.salesManager.openSaleTerminal();
   }
 });
