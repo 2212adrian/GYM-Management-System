@@ -1,6 +1,7 @@
 (() => {
   const canvas = document.getElementById('starCanvas');
-  if (!canvas) return;
+  const container = document.getElementById('starContainer');
+  if (!canvas || !container) return;
 
   const ctx = canvas.getContext('2d', { alpha: true });
 
@@ -8,30 +9,28 @@
   const stars = [];
 
   // ===== PERFORMANCE TUNING =====
-  const INITIAL_STARS = 80; // fewer for mobile
-  const MAX_STARS = 120;
-  const SPAWN_INTERVAL = 16;
+  const INITIAL_STARS = 60; // fewer, bigger stars
+  const MAX_STARS = 100;
+  const SPAWN_INTERVAL = 20;
   const MAX_DPR = 1.5;
 
-  let spawningEnabled = true;
+  let spawningEnabled = true; // only disable after warp
   let lastSpawn = 0;
 
   let warpPhase = 0;
   let warpStart = 0;
   const WARP_DURATION = 1500;
 
-  // ===== EASING =====
   const easeOutBack = (t) => {
     const c1 = 1.70158;
     return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
   };
   const easeInExpo = (t) => (t === 0 ? 0 : Math.pow(2, 10 * (t - 1)));
 
-  // ===== RESIZE =====
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    width = window.innerWidth;
-    height = window.innerHeight;
+    width = container.clientWidth;
+    height = container.clientHeight;
 
     canvas.width = width * dpr;
     canvas.height = height * dpr;
@@ -39,17 +38,15 @@
     canvas.style.height = height + 'px';
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    document.body.style.overflow = 'hidden'; // prevent scrollbars
+    document.body.style.overflow = 'hidden';
   }
 
-  // ===== STAR CREATION =====
-  function createStar(randomX = false) {
+  function createStar(randomX = true) {
     return {
-      x: randomX ? Math.random() * width : -Math.random() * 80,
+      x: randomX ? Math.random() * width : -Math.random() * 50,
       y: Math.random() * height,
-      r: Math.random() * 2.2 + 1.8, // bigger stars for fewer quantity
-      baseSpeed: Math.random() * 0.35 + 0.2,
+      r: Math.random() * 2.5 + 1.5,
+      baseSpeed: Math.random() * 0.3 + 0.15,
       angle: Math.random() * 0.25 - 0.125,
       glow: 0,
     };
@@ -58,7 +55,7 @@
   function populateInitialStars() {
     stars.length = 0;
     for (let i = 0; i < INITIAL_STARS; i++) {
-      stars.push(createStar(true)); // random across canvas
+      stars.push(createStar(true)); // random across container
     }
   }
 
@@ -67,11 +64,10 @@
     if (stars.length >= MAX_STARS) return;
     if (time - lastSpawn < SPAWN_INTERVAL) return;
 
-    stars.push(createStar(false)); // spawn off-left
+    stars.push(createStar(false)); // spawn slightly off-left
     lastSpawn = time;
   }
 
-  // ===== UPDATE LOOP =====
   function update(time) {
     ctx.clearRect(0, 0, width, height);
 
@@ -91,20 +87,22 @@
 
     for (let i = stars.length - 1; i >= 0; i--) {
       const s = stars[i];
-
       const vx = warpPhase === 1 ? speedBoost : s.baseSpeed;
       const vy = vx * s.angle;
 
       s.x += vx;
       s.y += vy;
 
-      // remove stars beyond right edge during warp
-      if (warpPhase === 1 && s.x > width + 120) {
-        stars.splice(i, 1);
+      // recycle stars beyond right edge
+      if (s.x > width + 50 || s.y < -50 || s.y > height + 50) {
+        if (spawningEnabled) {
+          stars[i] = createStar(false); // respawn left
+        } else if (warpPhase === 1) {
+          stars.splice(i, 1);
+        }
         continue;
       }
 
-      // draw
       const trail = Math.min(60, Math.abs(vx) * 2.2);
       s.glow = glowBoost;
 
@@ -129,10 +127,9 @@
   requestAnimationFrame(update);
   window.addEventListener('resize', resize);
 
-  // ===== LOGIN SUCCESS TRIGGER =====
   window.triggerStarWarp = () => {
     if (warpPhase !== 0) return;
-    spawningEnabled = false;
+    spawningEnabled = false; // stop spawning new stars
     warpPhase = 1;
     warpStart = performance.now();
   };
