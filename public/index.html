@@ -19,6 +19,15 @@
     <script src="assets/js/utils/auth-guard.js"></script>
     <link rel="stylesheet" href="assets/css/auth.css" />
     <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* prevent scrollbars */
+        width: 100%;
+        height: 100%;
+        touch-action: none; /* optional: prevent swipe scroll on mobile */
+      }
       #starCanvas {
         position: fixed;
         inset: 0;
