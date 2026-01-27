@@ -26,19 +26,22 @@ window.salesManager = {
   // --- UI HELPER: TOP SYSTEM ALERT ---
   _alertTimeout: null,
 
-  showSystemAlert(message, type = 'success') {
+  showSystemAlert(message, type = 'success', color = '#28a745') {
+    // default green
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile) return; // Only show on mobile
+
     // 1. Get the pre-loaded element
     const alertEl = document.getElementById('wolf-system-alert');
-    if (!alertEl) return; // Should not happen with pre-injection
+    if (!alertEl) return; // Should exist
 
     // 2. Clear previous hide-timers
     if (this._alertTimeout) clearTimeout(this._alertTimeout);
 
     // 3. Reset Classes & Update Content
-    alertEl.className = ''; // Wipe all themes
+    alertEl.className = ''; // Remove all previous classes
+    alertEl.style.backgroundColor = color; // Apply custom color
 
-    // Add the theme and the "show" class
-    // Using a tiny timeout ensures the browser sees the "removal" before the "addition"
     setTimeout(() => {
       const iconMap = {
         success: 'bx-check-shield',
@@ -175,7 +178,7 @@ window.salesManager = {
 
       // A. Show Success Alert
       this.showSystemAlert(`QUICK AUTH: ${prod.name} x1`, 'success');
-
+      // write toastify here!
       // B. Play Sound
       if (window.wolfAudio) window.wolfAudio.play('success');
 
@@ -546,7 +549,23 @@ window.salesManager = {
           .eq('productid', this.selectedProductId);
       }
 
-      this.showSystemAlert(`AUTHORIZED: ${dbProd.name} x${sellQty}`);
+      this.showSystemAlert(
+        `PRODUCT ADDED: ${dbProd.name.toUpperCase()} x${sellQty}`,
+      );
+      Toastify({
+        text: `PRODUCT ADDED: ${dbProd.name.toUpperCase()} x${sellQty}`,
+        duration: 2500,
+        gravity: 'top', // top or bottom
+        position: 'right', // left, center, right
+        style: {
+          border: '1px solid #77ff00', // correct way to set border color
+          background: '#0a0a0a',
+          borderRadius: '12px',
+          fontWeight: '900',
+          fontFamily: 'JetBrains Mono, monospace',
+          color: '#fff',
+        },
+      }).showToast();
       if (window.wolfData) window.wolfData.loadSales();
       const modal = document.getElementById('sale-terminal-overlay');
       if (modal) modal.style.display = 'none';
@@ -617,7 +636,21 @@ window.salesManager = {
       }
 
       // Success Feedback
-      this.showSystemAlert(`QUICK AUTH: ${prod.name} x1`, 'success');
+      this.showSystemAlert(`PRODUCT ADDED: ${prod.name} x1`, 'success');
+      Toastify({
+        text: `PRODUCT ADDED: ${prod.name.toUpperCase()} x1`,
+        duration: 2500,
+        gravity: 'top', // top or bottom
+        position: 'right', // left, center, right
+        style: {
+          border: '1px solid #77ff00', // correct way to set border color
+          background: '#0a0a0a',
+          borderRadius: '12px',
+          fontWeight: '900',
+          fontFamily: 'JetBrains Mono, monospace',
+          color: '#fff',
+        },
+      }).showToast();
       if (window.wolfAudio) window.wolfAudio.play('success');
       if (window.wolfData && window.wolfData.loadSales)
         window.wolfData.loadSales();
@@ -780,36 +813,63 @@ window.salesManager = {
 
   closeTrash() {
     const overlay = document.getElementById('sales-trash-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (!overlay) return;
+
+    // 1. Trigger Outro Animation
+    overlay.classList.add('closing');
+
+    // 2. Wait for animation (300ms) then physically hide
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.classList.remove('closing');
+    }, 300);
   },
 
   async loadTrashItems(mode) {
     const container = document.getElementById('trash-list-container');
     if (!container) return;
 
-    // 1. CRITICAL: If in sales mode, ensure the product registry is loaded in memory
-    // Otherwise, we cannot resolve SKUs for deleted items.
+    // 1. Force Registry Sync for Sales mode
     if (mode === 'sales' && this.allProducts.length === 0) {
-      console.log('Wolf OS: Fetching product registry for SKU resolution...');
       await this.fetchProducts();
     }
 
     const targetTable = mode === 'sales' ? 'sales' : 'check_in_logs';
 
+    // 2. ATOMIC DATE BOUNDARIES (Using wolfData.serverToday)
+    // We get the YYYY-MM-DD from the synced server date
+    const baseDate =
+      window.wolfData && window.wolfData.serverToday
+        ? window.wolfData.serverToday
+        : new Date();
+
+    const localDay = baseDate.toLocaleDateString('en-CA'); // "YYYY-MM-DD"
+
+    // Philippines Offset (+08:00) to match Ledger logic
+    const startOfToday = `${localDay}T00:00:00+08:00`;
+    const endOfToday = `${localDay}T23:59:59+08:00`;
+
+    // 3. FETCH: Mode-Specific + Strictly Today Only
     const { data, error } = await supabaseClient
       .from('trash_bin')
       .select('*')
       .eq('table_name', targetTable)
+      .gte('deleted_at', startOfToday)
+      .lte('deleted_at', endOfToday)
       .order('deleted_at', { ascending: false });
 
     if (error || !data || data.length === 0) {
-      container.innerHTML = `<div style="text-align:center; padding:60px; opacity:0.3;">
-        <i class='bx bx-folder-open' style='font-size:4rem;'></i>
-        <p style='font-size:12px; font-weight:900; margin-top:15px;'>ARCHIVE_EMPTY_FOR_${targetTable.toUpperCase()}</p>
-      </div>`;
+      container.innerHTML = `
+        <div style="text-align:center; padding:60px; opacity:0.3;">
+          <i class='bx bx-folder-open' style='font-size:4rem;'></i>
+          <p style='font-size:12px; font-weight:900; margin-top:15px; text-transform: uppercase;'>
+            ARCHIVE_EMPTY_FOR_TODAY
+          </p>
+        </div>`;
       return;
     }
 
+    // 4. RENDER (FORCED UPPERCASE)
     container.innerHTML = data
       .map((item) => {
         const d = item.deleted_data;
@@ -818,18 +878,14 @@ window.salesManager = {
 
         if (mode === 'sales') {
           // --- SALES RESOLUTION ---
-          // Match product_id from the deleted sale to productid in our memory
           const productMatch = this.allProducts.find(
             (p) => p.productid === d.product_id,
           );
-
           displayName = productMatch ? productMatch.name : 'DELETED_PRODUCT';
 
           const amount = Number(d.total_amount || 0).toLocaleString(undefined, {
             minimumFractionDigits: 2,
           });
-
-          // Get the SKU from the match, or fallback to the ID if SKU is missing
           const sku = productMatch
             ? productMatch.sku
             : d.product_id
@@ -864,10 +920,10 @@ window.salesManager = {
                 </div>
             </div>
             <div class="trash-actions">
-                <button class="btn-restore" onclick="salesManager.restoreSale('${item.id}', '${mode}')">
+                <button class="btn-restore" title="RESTORE" onclick="salesManager.restoreSale('${item.id}', '${mode}')">
                     <i class='bx bx-undo'></i>
                 </button>
-                <button class="btn-purge" onclick="salesManager.purgeSale('${item.id}', '${mode}')">
+                <button class="btn-purge" title="DELETE_PERMANENT" onclick="salesManager.purgeSale('${item.id}', '${mode}')">
                     <i class='bx bx-trash'></i>
                 </button>
             </div>
@@ -882,7 +938,7 @@ window.salesManager = {
 
     // 1. CONFIRMATION (Industrial Orange Style)
     const result = await window.Swal.fire({
-      title: 'DELETE PERMANENTLY',
+      title: 'DELETE PERMANENTLY?',
       html: `
         <div style="color: #b47023; font-size: 4.5rem; margin-bottom: 10px;">
           <i class='bx bx-trash-alt'></i>
@@ -932,29 +988,28 @@ window.salesManager = {
     if (!window.Swal) return;
 
     try {
-      // 1. Confirm with the correct wording based on mode
       const isSales = mode === 'sales';
       const msg = isSales
         ? 'PROCEED WITH RESTORATION: THIS WILL RE-DEDUCT QUANTITY FROM STOCK.'
         : 'PROCEED WITH RESTORATION: THIS RECORD WILL RETURN TO THE LOGBOOK.';
 
       const result = await Swal.fire({
-        title: 'RESTORE_RECORD',
-        html: `<p class="wolf-swal-text">${msg}</p>`,
+        title: 'RESTORE PRODUCT?',
+        html: `<p class="wolf-swal-text" style="text-transform: uppercase;">${msg}</p>`,
         showCancelButton: true,
         confirmButtonText: 'RESTORE',
         background: '#111',
         buttonsStyling: false,
         customClass: {
           popup: 'wolf-swal-popup-green',
-          confirmButton: 'wolf-swal-confirm-green',
           cancelButton: 'wolf-swal-cancel',
+          confirmButton: 'wolf-swal-confirm-green',
         },
       });
 
       if (!result.isConfirmed) return;
 
-      // 2. Get the archived data
+      // 1. FETCH ARCHIVED DATA
       const { data: trashRecord, error: trashError } = await supabaseClient
         .from('trash_bin')
         .select('*')
@@ -964,68 +1019,101 @@ window.salesManager = {
       if (trashError || !trashRecord)
         throw new Error('ARCHIVE_RECORD_NOT_FOUND');
 
-      const dataToRestore = { ...trashRecord.deleted_data };
+      const rawData = { ...trashRecord.deleted_data };
       const targetTable = isSales ? 'sales' : 'check_in_logs';
+      let productInfo = null;
 
-      // 3. BRANCH LOGIC: SALES VS LOGBOOK
+      // 2. FETCH PRODUCT DETAILS (FOR UI CARD)
       if (isSales) {
-        // --- SALES-ONLY: INVENTORY CHECK ---
         const { data: product } = await supabaseClient
           .from('products')
-          .select('qty, name')
-          .eq('productid', dataToRestore.product_id)
+          .select('qty, name, sku')
+          .eq('productid', rawData.product_id)
           .single();
 
-        if (!product) throw new Error('ORIGINAL_PRODUCT_DELETED_FROM_REGISTRY');
+        if (product) {
+          if (product.qty < rawData.qty && product.qty < 999999)
+            throw new Error('INSUFFICIENT_STOCK');
 
-        if (product.qty < dataToRestore.qty && product.qty < 999999) {
-          throw new Error(`INSUFFICIENT_STOCK: ONLY ${product.qty} LEFT`);
+          if (product.qty < 999999) {
+            await supabaseClient
+              .from('products')
+              .update({ qty: product.qty - rawData.qty })
+              .eq('productid', rawData.product_id);
+          }
+          productInfo = { name: product.name, sku: product.sku };
         }
-
-        // Clean data for re-insertion
-        delete dataToRestore.id;
-        delete dataToRestore.total_amount;
-        delete dataToRestore.created_at;
-
-        // Re-decrement stock
-        if (product.qty < 999999) {
-          await supabaseClient
-            .from('products')
-            .update({ qty: product.qty - dataToRestore.qty })
-            .eq('productid', dataToRestore.product_id);
-        }
-      } else {
-        // --- LOGBOOK-ONLY: CLEANUP ---
-        // We keep the original time_in so it goes back to where it belongs in history
-        delete dataToRestore.id;
-        // We don't delete created_at or time_in for logbook so history is preserved
       }
 
-      // 4. INSERT BACK TO ORIGINAL TABLE
-      const { error: insertError } = await supabaseClient
+      // 3. DATABASE INSERT (CLEAN PAYLOAD)
+      const dbPayload = { ...rawData };
+      delete dbPayload.id;
+      delete dbPayload.total_amount;
+      delete dbPayload.created_at;
+      delete dbPayload.products; // Fix for earlier column error
+
+      const { data: restoredRow, error: insertError } = await supabaseClient
         .from(targetTable)
-        .insert([dataToRestore]);
+        .insert([dbPayload])
+        .select()
+        .single();
 
-      if (insertError)
-        throw new Error(`DATABASE_REJECTION: ${insertError.message}`);
+      if (insertError) throw insertError;
 
-      // 5. PURGE FROM TRASH
+      // 4. CLEANUP TRASH BIN
       await supabaseClient.from('trash_bin').delete().eq('id', trashId);
 
-      // 6. SUCCESS FEEDBACK
-      if (window.wolfAudio) window.wolfAudio.play('success');
-      this.showSystemAlert('RESTORE_COMPLETE', 'success');
-
-      // 7. REFRESH EVERYTHING (The engine refresh)
-      this.loadTrashItems(mode);
+      // --- 5. THE GLOBAL SYNC (THE FIX) ---
+      this.closeTrash(); // Close Archive Terminal
       if (window.wolfData) {
-        if (isSales) await window.wolfData.loadSales();
-        else await window.wolfData.loadLogbook();
+        if (isSales) {
+          // A. Update local allSales array immediately
+          const uiItem = { ...restoredRow, products: productInfo };
+          window.wolfData.allSales = [uiItem, ...window.wolfData.allSales];
+
+          // B. Force the HUD to recalculate from the new array
+          const newTotal = window.wolfData.allSales.reduce(
+            (sum, s) => sum + Number(s.total_amount || 0),
+            0,
+          );
+
+          // C. Trigger Rolling Animation via Global Reference
+          window.wolfData.refreshSummaryHUD(newTotal);
+
+          // D. Force UI to redraw the cards (Epic Intro will play for the new row)
+          window.wolfData.renderSales(window.wolfData.selectedDate.getDay());
+        } else {
+          // For Logbook, trigger the background refresh
+          await window.wolfData.loadLogbook();
+        }
       }
+      if (isSales && productInfo) {
+        const restoredQty = rawData.qty || 1; // fallback to 1 if somehow missing
+        this.showSystemAlert(
+          `${productInfo.name}, X${restoredQty} WAS RESTORED`,
+          'success',
+        );
+        Toastify({
+          text: `${productInfo.name}, ${rawData.qty} WAS RESTORED`,
+          duration: 4000,
+          gravity: 'top',
+          position: 'right',
+          stopOnFocus: true,
+          style: {
+            border: '1px solid #77ff00', // correct way to set border color
+            background: '#0a0a0a',
+            borderRadius: '12px',
+            fontWeight: '900',
+            fontFamily: 'JetBrains Mono, monospace',
+            color: '#fff',
+          },
+        }).showToast();
+      }
+      if (window.wolfAudio) window.wolfAudio.play('success');
     } catch (err) {
       console.error('Restore Error:', err);
       if (window.wolfAudio) window.wolfAudio.play('error');
-      this.showSystemAlert(err.message, 'error');
+      this.showSystemAlert(err.message.toUpperCase(), 'error');
     }
   },
 };

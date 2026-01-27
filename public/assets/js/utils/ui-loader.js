@@ -3,8 +3,45 @@
  * Handles AJAX page swapping, component injection, and UI state synchronization.
  */
 
+// 1. SMART RETRY LOGIC (Global so the button can see it)
+window.wolfRetry = async function () {
+  const btn = document.querySelector('.retry-btn');
+  const statusIcon = btn?.querySelector('i');
+  const statusText = btn?.querySelector('span');
+
+  if (btn) {
+    btn.disabled = true;
+    if (statusIcon) statusIcon.className = 'bx bx-loader-alt bx-spin';
+    if (statusText) statusText.innerText = 'RE-ESTABLISHING LINK...';
+  }
+
+  try {
+    // Attempt to fetch a tiny asset to verify real internet
+    const check = await fetch('/favicon.ico', {
+      mode: 'no-cors',
+      cache: 'no-store',
+    });
+
+    // If we reach here, connection is back!
+    // Now we can safely reload the page to restore the OS state
+    window.location.reload();
+  } catch (err) {
+    // Still no signal
+    console.warn('Wolf OS: Link attempt failed. Signal still dead.');
+
+    setTimeout(() => {
+      if (btn) {
+        btn.disabled = false;
+        if (statusIcon) statusIcon.className = 'bx bx-refresh';
+        if (statusText) statusText.innerText = 'RETRY CONNECTION';
+      }
+    }, 1500); // Give it a slight delay for better UX
+  }
+};
+
 // --- 0. DOM PURIFY SETUP ---
 // Create a global purifier function for consistent use
+
 const WOLF_PURIFIER = (dirty) => {
   return DOMPurify.sanitize(dirty, {
     // Allow styling
@@ -63,6 +100,16 @@ const WOLF_PURIFIER = (dirty) => {
     FORBID_ATTR: ['onerror', 'onload', 'onclick'],
   });
 };
+
+const getSkeletonUI = () => `
+  <div class="skeleton-wrapper">
+    <div class="skeleton skeleton-title"></div>
+    <div class="skeleton skeleton-text"></div>
+    <div class="skeleton skeleton-text" style="width: 80%"></div>
+    <div class="skeleton skeleton-box" style="margin-top: 20px;"></div>
+    <div class="skeleton skeleton-box"></div>
+  </div>
+`;
 
 // --- 1. THEME MANAGER (Place this at the very top) ---
 const themeManager = {
@@ -147,15 +194,12 @@ document.querySelectorAll('[data-page]').forEach((button) => {
   };
 });
 
-// --- 2. SETUP DARK MODE (THE THEME FIX) ---
+// --- 2. SETUP DARK MODE ---
 const themeBtn = document.getElementById('themeToggleBtn');
 if (themeBtn) {
   themeBtn.onclick = (e) => {
     e.preventDefault();
     e.stopPropagation(); // Stops it from interfering with page navigation
-
-    console.log('Wolf OS: Switching Theme...');
-    document.body.classList.toggle('dark-theme'); // Or your specific class
 
     // Bonus: Swap the icon between moon and sun
     const themeIcon = themeBtn.querySelector('i');
@@ -196,84 +240,151 @@ function wolfRefreshView() {
   }
 }
 
+/**
+ * WOLF OS - NAVIGATION ENGINE (NETLIFY & OFFLINE OPTIMIZED)
+ */
 async function navigateTo(pageName) {
   const mainContent = document.getElementById('main-content');
   if (!mainContent) return;
 
-  mainContent.style.opacity = '0';
+  // --- SKELETON UI ---
+  const skeletonUI = `
+    <div class="wolf-skeleton">
+      <style>
+        .wolf-skeleton { padding: 40px; max-width: 1200px; margin: 0 auto; opacity: 0; animation: fadeInSkel 0.3s forwards; }
+        .skel-shimmer {
+          background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
+          background-size: 200% 100%;
+          animation: skel-loading 1.5s infinite linear;
+          border-radius: 8px;
+        }
+        @keyframes skel-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes fadeInSkel { from { opacity: 0; } to { opacity: 1; } }
+        .skel-title { width: 150px; height: 35px; margin-bottom: 40px; }
+        .skel-income-card { width: 100%; height: 180px; border-radius: 20px; margin-bottom: 30px; }
+        .skel-nav-bar { width: 100%; height: 50px; margin-bottom: 20px; display: flex; gap: 10px; }
+        .skel-entry { width: 100%; height: 80px; margin-bottom: 15px; border-radius: 15px; }
+      </style>
+      <div class="skel-shimmer skel-title"></div>
+      <div class="skel-shimmer skel-income-card"></div>
+      <div class="skel-nav-bar"><div class="skel-shimmer" style="flex:1"></div><div class="skel-shimmer" style="flex:3"></div><div class="skel-shimmer" style="flex:1"></div></div>
+      <div class="skel-shimmer skel-entry"></div><div class="skel-shimmer skel-entry"></div><div class="skel-shimmer skel-entry"></div><div class="skel-shimmer skel-entry"></div>
+    </div>
+  `;
+
+  // --- OFFLINE UI ---
+  const offlineUI = `
+    <div class="wolf-page-intro" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:70vh; text-align:center; color:white;">
+      <i class='bx bx-wifi-off' style="font-size:80px; color:#a63429; margin-bottom:20px;"></i>
+      <h1 style="font-size:32px; font-weight:900; margin:0; letter-spacing:-1px;">SIGNAL LOST</h1>
+      <p style="color:#888; max-width:400px; margin:15px 0 30px 0; line-height:1.6;">The encrypted uplink to Wolf OS was severed.</p>
+      <button class="retry-btn" onclick="window.wolfRetry()" style="background:#a63429; color:white; border:none; padding:12px 30px; font-weight:bold; border-radius:8px; cursor:pointer; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+        <i class='bx bx-refresh' style="font-size:20px;"></i>
+        <span>RETRY CONNECTION</span>
+      </button>
+    </div>
+  `;
+
+  // 1. Immediate Network Guard
+  if (!navigator.onLine) {
+    mainContent.innerHTML = offlineUI;
+    mainContent.style.opacity = '1';
+    return;
+  }
+
+  // 2. Show Skeleton immediately
+  mainContent.innerHTML = skeletonUI;
+  mainContent.style.opacity = '1';
+
+  // 3. Forced Delay for smooth perception
+  const delay = new Promise((resolve) => setTimeout(resolve, 600));
 
   try {
     let path;
     let isLedger = false;
 
-    // Ledger pages
+    // 4. ROUTING LOGIC
     if (pageName === 'sales' || pageName === 'logbook') {
       path = '/assets/views/daily-ledger.html';
       isLedger = true;
+    } else if (pageName === 'members') {
+      path = '/pages/management/members.html';
+    } else if (pageName === 'management/products' || pageName === 'products') {
+      path = '/pages/management/products.html';
     } else {
       path = `/pages/${pageName}.html`;
     }
 
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`Page "${pageName}" not found`);
+    const fetchPromise = fetch(path);
+    const [res] = await Promise.all([fetchPromise, delay]);
+
+    if (!res.ok) throw new Error('404');
 
     const html = await res.text();
-    mainContent.innerHTML = html;
 
-    if (isLedger) {
-      wolfData.activeMode = pageName;
-      wolfData.initLedger(pageName);
-    }
+    // 5. Start swapping process: Fade out the skeleton
+    mainContent.style.opacity = '0';
 
-    mainContent.style.opacity = '1';
-    updateNavHighlights(pageName);
+    setTimeout(() => {
+      // 6. Wrap incoming HTML in the intro animation class
+      mainContent.innerHTML = `<div class="wolf-page-intro">${html}</div>`;
 
-    if (pageName) {
-      window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
-    }
+      // 7. INITIALIZE PAGE MANAGERS
+      if (isLedger && window.wolfData) {
+        wolfData.activeMode = pageName;
+        wolfData.initLedger(pageName);
+      } else if (
+        pageName === 'members' &&
+        typeof MemberManager !== 'undefined'
+      ) {
+        MemberManager.init();
+      } else if (
+        (pageName === 'management/products' || pageName === 'products') &&
+        typeof ProductManager !== 'undefined'
+      ) {
+        ProductManager.init();
+      }
 
-    if (window.applyVersioning) window.applyVersioning();
+      // 8. Reveal content
+      mainContent.style.opacity = '1';
+      updateNavHighlights(pageName);
+
+      if (pageName)
+        window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
+
+      if (window.applyVersioning) window.applyVersioning();
+    }, 200);
   } catch (err) {
-    console.warn(
-      `Wolf OS: Could not load page "${pageName}". Falling back to 404.`,
-    );
+    console.warn(`Wolf OS: Navigation Error ->`, err);
+
+    if (!navigator.onLine || err instanceof TypeError) {
+      mainContent.innerHTML = offlineUI;
+      mainContent.style.opacity = '1';
+      return;
+    }
 
     try {
       const errRes = await fetch('/404.html');
-      const fullHtml = errRes.ok
-        ? await errRes.text()
-        : '<h1>404 Not Found</h1>';
-
+      const fullHtml = await errRes.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(fullHtml, 'text/html');
 
-      const styleTag = doc.querySelector('style');
-      const styleHtml = styleTag ? styleTag.outerHTML : '';
-      const bodyContent = doc.body.innerHTML;
+      // Add intro animation to 404 page too
+      mainContent.innerHTML = `<div class="wolf-page-intro">
+        ${doc.querySelector('style')?.outerHTML || ''}
+        ${doc.body.innerHTML}
+      </div>`;
 
-      mainContent.innerHTML = styleHtml + bodyContent;
       mainContent.style.opacity = '1';
-
-      // Safe path display
       const pathEl = document.getElementById('display-path');
-      if (pathEl && typeof DOMPurify !== 'undefined') {
-        pathEl.innerHTML = DOMPurify.sanitize(window.location.pathname);
-      }
+      if (pathEl) pathEl.innerText = pageName;
 
       document
         .querySelectorAll('[data-page]')
         .forEach((el) => el.classList.remove('active'));
     } catch (fatal) {
-      mainContent.innerHTML =
-        typeof DOMPurify !== 'undefined'
-          ? DOMPurify.sanitize(
-              '<h1 style="color:red;text-align:center;">[FATAL_ERROR]</h1>',
-              {
-                ALLOWED_TAGS: ['h1'],
-                ALLOWED_ATTR: ['style'],
-              },
-            )
-          : '<h1 style="color:red;text-align:center;">[FATAL_ERROR]</h1>';
+      mainContent.innerHTML = offlineUI;
+      mainContent.style.opacity = '1';
     }
   }
 }
@@ -285,289 +396,273 @@ async function loadHTML(path) {
   if (!res.ok) throw new Error(`[ERR_503] Failed to fetch: ${path}`);
   return await res.text();
 }
+/**
+ * FIXED WOLF OS - UI INITIALIZATION
+ */
 async function initUI() {
+  // 1. Setup Theme and DOM References
   themeManager.init();
 
-  // Show stars for 2 seconds, then transition to loading screen
-  setTimeout(() => {
-    // Hide stars and show loading screen immediately
-    const starsContainer = document.getElementById('stars-container');
-    if (starsContainer) starsContainer.style.display = 'none';
+  const loadingScreen = document.getElementById('loading-screen');
+  const loadingOverlay = document.getElementById('loading-overlay');
+  const layout = document.getElementById('wolf-layout');
+  const starsContainer = document.getElementById('stars-container');
+  const statusText = document.querySelector('.boot-status');
+  const progressBar = document.querySelector('.progress-bar-fill');
 
-    // Example: Fade out after 3 seconds
+  /**
+   * Helper: Loads the Shell Components (Topbar, Sidebar, Nav)
+   */
+  const finalizeSystemBoot = async () => {
+    try {
+      const [topbar, sidebar, nav] = await Promise.all([
+        loadHTML('/assets/components/topbar.html'),
+        loadHTML('/assets/components/sidebar.html'),
+        loadHTML('/assets/components/floating-nav.html'),
+      ]);
+
+      document.getElementById('topbar-container').innerHTML = topbar;
+      document.getElementById('sidebar-container').innerHTML = sidebar;
+      document.getElementById('nav-container').innerHTML = nav;
+
+      // Auto-load initial page based on URL or default to dashboard
+      const urlParams = new URLSearchParams(window.location.search);
+      await navigateTo(urlParams.get('p') || 'dashboard');
+
+      if (window.applyVersioning) window.applyVersioning();
+    } catch (err) {
+      console.error('Wolf OS: Component Load Error:', err);
+    }
+  };
+
+  /**
+   * Helper: Terminal Message Simulation
+   */
+  function runBootSimulation(callback) {
+    const bootSteps = [
+      { progress: 15, msg: 'INITIALIZING CORE SYSTEMS...' },
+      { progress: 35, msg: 'ESTABLISHING SUPABASE UPLINK...' },
+      { progress: 60, msg: 'LOADING SECURE ENCRYPTION...' },
+      { progress: 85, msg: 'SYNCING DATABASE_MEMBERS...' },
+      { progress: 100, msg: 'SYSTEM READY.' },
+    ];
+    let currentStep = 0;
+    const bootInterval = setInterval(() => {
+      if (currentStep < bootSteps.length) {
+        const step = bootSteps[currentStep];
+        if (statusText) statusText.innerText = step.msg;
+        if (progressBar) progressBar.style.width = `${step.progress}%`;
+        currentStep++;
+      } else {
+        clearInterval(bootInterval);
+        if (callback) callback();
+      }
+    }, 550);
+  }
+
+  /**
+   * Helper: Final Transition out of Loading Screen
+   */
+  function finishBootSequence() {
     setTimeout(() => {
-      document.getElementById('loading-screen').style.opacity = '0';
+      if (loadingScreen) loadingScreen.style.opacity = '0';
+      if (window.wolfAudio) window.wolfAudio.play('intro');
       setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-      }, 800);
-    }, 3000);
+        if (loadingScreen) loadingScreen.style.display = 'none';
+        if (layout) {
+          layout.style.display = 'block';
+          void layout.offsetWidth; // Trigger reflow
+          layout.style.opacity = '1';
+        }
+        // Final fade for the simple overlay if it exists
+        if (loadingOverlay) {
+          loadingOverlay.classList.add('fade-out');
+          setTimeout(() => (loadingOverlay.style.display = 'none'), 100);
+        }
+      }, 300);
+    }, 1000);
+  }
 
-    const loadingScreen = document.getElementById('loading-screen');
+  // --- START BOOT LOGIC ---
+
+  // PATH A: FAST BOOT (No animations)
+  if (typeof WOLF_CONFIG !== 'undefined' && WOLF_CONFIG.noLoadingScreen) {
+    if (loadingScreen) loadingScreen.style.display = 'none';
+    if (starsContainer) starsContainer.style.display = 'none';
+    if (loadingOverlay) loadingOverlay.style.display = 'none';
+
+    await finalizeSystemBoot();
+
+    if (layout) {
+      layout.style.display = 'block';
+      layout.style.opacity = '1';
+    }
+    setupGlobalClickHandlers(); // Moved into a named function below
+    return;
+  }
+
+  // PATH B: CINEMATIC BOOT
+  console.log('Wolf OS: Cinematic Boot Initialized.');
+
+  setTimeout(async () => {
+    if (starsContainer) starsContainer.style.display = 'none';
     if (loadingScreen) {
       loadingScreen.style.display = 'flex';
       loadingScreen.classList.add('show');
     }
 
-    const overlay = document.getElementById('loading-overlay');
-    const layout = document.getElementById('wolf-layout');
+    setupGlobalClickHandlers();
 
-    if (overlay) overlay.classList.add('fade-out');
-    if (layout) layout.style.display = 'block';
-
-    // PLAY INTRO HERE
-    if (window.wolfAudio) {
-      window.wolfAudio.play('intro');
-    } else {
-      console.warn('Wolf OS Audio Engine not detected.');
-    }
-
-    setTimeout(() => {
-      if (overlay) overlay.style.display = 'none';
-    }, 800);
-  }, 2000);
-
-  try {
-    // 1. Load Components
-    const [topbar, sidebar, nav] = await Promise.all([
-      loadHTML('/assets/components/topbar.html'),
-      loadHTML('/assets/components/sidebar.html'),
-      loadHTML('/assets/components/floating-nav.html'),
-    ]);
-
-    document.getElementById('topbar-container').innerHTML = topbar;
-    document.getElementById('sidebar-container').innerHTML = sidebar;
-    document.getElementById('nav-container').innerHTML = nav;
-
-    // 2. GLOBAL CLICK DELEGATION
-    document.addEventListener('click', async (e) => {
-      // --- 1. GENERIC SIDEBAR DROPDOWN LOGIC ---
-      // Targets any link inside a .nav-dropdown that acts as a toggle
-      const dropdownToggle = e.target.closest('.nav-dropdown > .nav-item-side');
-      if (dropdownToggle) {
-        e.preventDefault();
-        const sidebar = document.getElementById('wolfSidebar');
-        const dropdownParent = dropdownToggle.parentElement;
-
-        // A. RAIL MODE PROTECTION: If sidebar is mini/collapsed, expand it first
-        if (!sidebar.classList.contains('active')) {
-          sidebar.classList.add('active');
-          document.body.classList.add('sidebar-open');
-
-          // Update the sidebar chevron icon to "Left" (Open state)
-          const closeIcon = document.getElementById('closeIcon');
-          if (closeIcon) closeIcon.className = 'bxf bx-caret-big-right';
-
-          // Highlight the "More" button in the floating nav
-          const moreBtn = document.getElementById('moreNavBtn');
-          if (moreBtn) moreBtn.classList.add('sidebar-active');
-        }
-
-        // B. ACCORDION EFFECT: Close other dropdowns when one is opened
-        document.querySelectorAll('.nav-dropdown').forEach((other) => {
-          if (other !== dropdownParent) other.classList.remove('open');
-        });
-
-        // C. TOGGLE the clicked dropdown
-        dropdownParent.classList.toggle('open');
-
-        if (window.wolfAudio) window.wolfAudio.play('notif');
-        return;
-      }
-
-      // --- 2. SEARCH ENGINE LOGIC ---
-      const searchToggle = e.target.closest('#toggle-search-btn');
-      if (searchToggle) {
-        const container = document.getElementById('ledger-search-container');
-        const input = document.getElementById('ledger-main-search');
-        const clearBtn = document.getElementById('search-clear-btn');
-        if (!container || !input) return;
-
-        const isOpening = container.classList.toggle('active');
-        searchToggle.classList.toggle('active');
-
-        if (isOpening) {
-          setTimeout(() => input.focus(), 300);
-          if (window.wolfAudio) window.wolfAudio.play('notif');
-        } else {
-          input.value = '';
-          if (clearBtn) clearBtn.style.display = 'none';
-          const dataCore = window.wolfData || wolfData;
-          if (dataCore) {
-            dataCore.isFetching = false;
-            const dayIndex =
-              dataCore.selectedDate?.getDay?.() ?? new Date().getDay();
-            dataCore.activeMode === 'sales'
-              ? dataCore.renderSales(dayIndex, '')
-              : dataCore.loadLogbook();
-          }
-          if (window.wolfAudio) window.wolfAudio.play('notif');
-        }
-        return;
-      }
-
-      const clearBtn = e.target.closest('#search-clear-btn');
-      if (clearBtn) {
-        const input = document.getElementById('ledger-main-search');
-        if (input) {
-          input.value = '';
-          clearBtn.style.display = 'none';
-          input.focus();
-          const dataCore = window.wolfData || wolfData;
-          if (dataCore) {
-            dataCore.isFetching = false;
-            const dayIndex =
-              dataCore.selectedDate?.getDay?.() ?? new Date().getDay();
-            dataCore.activeMode === 'sales'
-              ? dataCore.renderSales(dayIndex, '')
-              : dataCore.loadLogbook();
-          }
-          if (window.wolfAudio) window.wolfAudio.play('notif');
-        }
-        return;
-      }
-
-      // --- 3. UTILITY BUTTONS (QR & MUTE) ---
-      if (e.target.closest('#qrScannerBtn')) {
-        window.wolfScanner.start(null, false);
-      }
-
-      const muteBtn = e.target.closest('#muteToggleBtn');
-      if (muteBtn) {
-        e.preventDefault();
-        const isMuted = wolfAudio.toggleMute();
-        const icon = muteBtn.querySelector('i');
-        icon.className = isMuted ? 'bx bx-volume-mute' : 'bx bx-volume-full';
-        muteBtn.style.opacity = isMuted ? '0.5' : '1';
-      }
-
-      // --- 4. NAVIGATION ENGINE (AJAX Swap) ---
-      const navBtn = e.target.closest('[data-page]');
-      if (navBtn) {
-        e.preventDefault();
-        navigateTo(navBtn.getAttribute('data-page'));
-        return;
-      }
-
-      // --- 5. LOGOUT PROTOCOL ---
-      const logoutBtn = e.target.closest('.logout-btn');
-      if (logoutBtn) {
-        e.preventDefault();
-        Toastify({
-          text: 'Logging out of Wolf OS...',
-          duration: 3000,
-          gravity: 'top', // top or bottom
-          position: 'right', // left, center or right
-          stopOnFocus: true,
-          style: {
-            background: '#a63429', // Your Wolf Red variable
-            borderRadius: '10px',
-            fontWeight: 'bold',
-          },
-        }).showToast();
-        if (window.wolfAudio) window.wolfAudio.play('logoff');
-
-        [
-          '#topbar-container',
-          '#sidebar-container',
-          '#wolf-layout',
-          '#nav-container',
-          '#sidebar-backdrop',
-        ].forEach((sel) => {
-          document.querySelector(sel)?.classList.add('logoff-anim');
-        });
-
-        setTimeout(async () => {
-          if (window.supabaseClient) await window.supabaseClient.auth.signOut();
-          localStorage.clear();
-          sessionStorage.clear();
-          window.location.replace('/index.html');
-        }, 4000);
-        return;
-      }
-
-      // --- 6. THEME SWITCHER ---
-      const themeBtn = e.target.closest('#themeToggleBtn');
-      if (themeBtn) {
-        e.preventDefault();
-        themeManager.toggle();
-        return;
-      }
-
-      // --- 7. SIDEBAR TOGGLE & BACKDROP ---
-      const sidebarElement = document.getElementById('wolfSidebar');
-      const backdrop = document.getElementById('sidebar-backdrop');
-
-      if (
-        e.target.closest('#moreNavBtn') ||
-        e.target.closest('#sidebarClose') ||
-        e.target === backdrop
-      ) {
-        if (!sidebarElement) return;
-        const isActive = sidebarElement.classList.toggle('active');
-        const isMobile = window.innerWidth < 768;
-
-        document.body.classList.toggle('sidebar-open', isActive);
-        document
-          .getElementById('moreNavBtn')
-          ?.classList.toggle('sidebar-active', isActive);
-        if (isMobile && backdrop) backdrop.classList.toggle('active', isActive);
-
-        const closeIcon = document.getElementById('closeIcon');
-        if (!isMobile && closeIcon)
-          closeIcon.className = isActive
-            ? 'bxf bx-caret-big-left'
-            : 'bxf bx-caret-big-right';
-
-        // UX: Close all sub-menus when the sidebar itself is closed
-        if (!isActive) {
-          document
-            .querySelectorAll('.nav-dropdown')
-            .forEach((d) => d.classList.remove('open'));
-        }
-      }
-
-      if (typeof window.applyVersioning === 'function')
-        window.applyVersioning();
+    // Run simulation and load components in parallel
+    runBootSimulation(() => {
+      finishBootSequence();
     });
 
-    // 3. LOAD INITIAL PAGE
-    const urlParams = new URLSearchParams(window.location.search);
-    await navigateTo(urlParams.get('p') || 'dashboard');
+    await finalizeSystemBoot();
+  }, 2000);
+}
 
-    // 4. Fade out loading overlay after everything is loaded
-    setTimeout(() => {
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.classList.add('fade-out');
-        setTimeout(() => {
-          loadingOverlay.style.display = 'none';
-        }, 500);
+/**
+ * Consistently handle all clicks across the OS
+ */
+function setupGlobalClickHandlers() {
+  // Prevent double-attaching
+  if (window.wolfEventHandlersAttached) return;
+  window.wolfEventHandlersAttached = true;
+
+  document.addEventListener('click', async (e) => {
+    // 1. SIDEBAR DROPDOWNS
+    const dropdownToggle = e.target.closest('.nav-dropdown > .nav-item-side');
+    if (dropdownToggle) {
+      e.preventDefault();
+      const sidebar = document.getElementById('wolfSidebar');
+      const dropdownParent = dropdownToggle.parentElement;
+      const closeIcon = document.getElementById('closeIcon');
+      const versionLabel = sidebar ? sidebar.querySelector('.version') : null;
+
+      // 1. If sidebar is collapsed (mini), expand it first
+      if (sidebar && !sidebar.classList.contains('active')) {
+        sidebar.classList.add('active');
+        document.body.classList.add('sidebar-open');
       }
-    }, 2000);
-  } catch (err) {
-    console.error('Wolf OS Boot Error:', err);
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) {
-      loadingOverlay.classList.add('fade-out');
-      setTimeout(() => {
-        loadingOverlay.style.display = 'none';
-      }, 500);
-    }
-  }
 
+      // 2. SYNC UI: Sidebar is now expanded, flip icon to LEFT and hide .version
+      if (closeIcon) closeIcon.className = 'bxf bx-caret-big-left';
+      if (versionLabel) versionLabel.style.display = 'none';
+
+      // 3. Close all other dropdowns to keep UI clean
+      document.querySelectorAll('.nav-dropdown').forEach((other) => {
+        if (other !== dropdownParent) other.classList.remove('open');
+      });
+
+      // 4. Toggle the clicked dropdown
+      dropdownParent.classList.toggle('open');
+
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+      return;
+    }
+
+    // 2. SEARCH ENGINE
+    const searchToggle = e.target.closest('#toggle-search-btn');
+    if (searchToggle) {
+      const container = document.getElementById('ledger-search-container');
+      const input = document.getElementById('ledger-main-search');
+      if (!container || !input) return;
+
+      const isOpening = container.classList.toggle('active');
+      searchToggle.classList.toggle('active');
+
+      if (isOpening) {
+        setTimeout(() => input.focus(), 300);
+        if (window.wolfAudio) window.wolfAudio.play('notif');
+      }
+      return;
+    }
+
+    // 3. NAVIGATION
+    const navBtn = e.target.closest('[data-page]');
+    if (navBtn) {
+      e.preventDefault();
+      const targetPage = navBtn.getAttribute('data-page');
+
+      // Global Page Router
+      navigateTo(targetPage);
+
+      // LOCKDOWN: Sync UI immediately (Active turns Red + Unclickable)
+      if (window.wolfData && window.wolfData.syncNavigationUI) {
+        window.wolfData.syncNavigationUI(targetPage);
+      }
+      return;
+    }
+
+    // 4. THEME
+    if (e.target.closest('#themeToggleBtn')) {
+      e.preventDefault();
+      themeManager.toggle();
+      return;
+    }
+
+    // 5. SIDEBAR TOGGLES (More Button, Close Arrow, or Backdrop)
+    const sidebarElement = document.getElementById('wolfSidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+
+    if (
+      e.target.closest('#moreNavBtn') ||
+      e.target.closest('#sidebarToggle') || // Matches your button id
+      e.target.closest('#sidebarClose') ||
+      e.target === backdrop
+    ) {
+      if (!sidebarElement) return;
+
+      // Toggle state
+      const isActive = sidebarElement.classList.toggle('active');
+      document.body.classList.toggle('sidebar-open', isActive);
+      if (backdrop) backdrop.classList.toggle('active', isActive);
+
+      // --- CRITICAL UI SYNC FIX ---
+      const closeIcon = document.getElementById('closeIcon');
+      const versionLabel = sidebarElement.querySelector('.version');
+
+      if (isActive) {
+        // Expanded: Icon points LEFT, version HIDDEN
+        if (closeIcon) closeIcon.className = 'bxf bx-caret-big-left';
+        if (versionLabel) versionLabel.style.display = 'block';
+      } else {
+        // Collapsed: Icon points RIGHT, version VISIBLE
+        if (closeIcon) closeIcon.className = 'bxf bx-caret-big-right';
+        if (versionLabel) versionLabel.style.display = 'none';
+
+        // Bonus: Close all dropdowns for a clean collapse
+        document
+          .querySelectorAll('.nav-dropdown')
+          .forEach((d) => d.classList.remove('open'));
+      }
+
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+    }
+  });
+
+  // Global Input Handler for Search
   document.addEventListener('input', (e) => {
     if (e.target.id === 'ledger-main-search') {
       const clearBtn = document.getElementById('search-clear-btn');
-      if (clearBtn) {
+      if (clearBtn)
         clearBtn.style.display = e.target.value.length > 0 ? 'block' : 'none';
-      }
-      // Use a debounce to prevent lagging the database
+
       clearTimeout(window.searchDebounce);
       window.searchDebounce = setTimeout(() => {
-        wolfRefreshView();
+        // Call the loader of whichever mode we are in (Sales or Logbook)
+        if (window.wolfData) {
+          if (window.wolfData.activeMode === 'sales')
+            window.wolfData.loadSales();
+          else window.wolfData.loadLogbook();
+        }
       }, 300);
     }
   });
 }
 
-document.addEventListener('DOMContentLoaded', initUI);
+// --- INITIAL TRIGGER ---
+document.addEventListener('DOMContentLoaded', () => {
+  initUI().catch((err) => console.error('System Boot Failure:', err));
+});

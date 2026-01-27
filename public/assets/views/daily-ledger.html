@@ -19,8 +19,7 @@
 
   @media (min-width: 1024px) {
     .ledger-page-wrapper {
-      width: 50vw; /* Takes 50% middle, leaves 25% each side */
-      max-width: 950px;
+      max-width: 1200px;
       min-width: 650px;
     }
   }
@@ -409,9 +408,9 @@
 
     .day-btn {
       /* 
-       calc(100% / 4.5) is the magic number. 
-       It shows 4 full buttons and exactly half of the next one.
-    */
+        calc(100% / 4.5) is the magic number. 
+        It shows 4 full buttons and exactly half of the next one.
+      */
       flex: 0 0 calc(100% / 4.5);
       min-width: 80px; /* Ensures buttons never get squished */
       scroll-snap-align: center; /* Snaps the button to center when swiped */
@@ -694,8 +693,70 @@
     font-weight: 600;
     font-family: var(--font-main);
   }
-</style>
 
+  /* --- SUMMARY HUD ANIMATIONS --- */
+  #ledger-summary-amount {
+    transition:
+      color 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.3s ease;
+    display: inline-block;
+    will-change: transform, color;
+  }
+
+  /* Glow Green when increasing */
+  #ledger-summary-amount.increasing {
+    color: #4ade80 !important;
+    text-shadow: 0 0 20px rgba(74, 222, 128, 0.6);
+    transform: scale(1.1);
+  }
+
+  /* Glow Red when decreasing */
+  #ledger-summary-amount.decreasing {
+    color: #f87171 !important;
+    text-shadow: 0 0 20px rgba(248, 113, 113, 0.6);
+    transform: scale(0.95);
+  }
+
+  /* INTRO: Slide in from right + Fade in */
+  .list-item-card {
+    opacity: 0;
+    transform: translateX(40px);
+    filter: blur(5px);
+    background-image: url('/assets/images/textures/dark-mosaic.png');
+    background-blend-mode: overlay;
+    background-size: auto;
+    background-repeat: repeat;
+    animation: wolfRowSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes wolfRowSlideIn {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+      filter: blur(0);
+    }
+  }
+
+  /* OUTRO: Slide out to left + Fade out + Shrink */
+  .list-item-card.removing {
+    pointer-events: none;
+    transition:
+      transform 0.4s cubic-bezier(1, 0, 0, 1),
+      opacity 0.3s ease,
+      filter 0.3s ease,
+      max-height 0.4s ease,
+      margin-bottom 0.4s ease !important;
+
+    transform: translateX(-100px);
+    opacity: 0;
+    filter: blur(15px);
+    max-height: 0;
+    margin-bottom: 0 !important;
+    padding: 0 !important;
+  }
+</style>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
 <div class="ledger-page-wrapper" id="ledger-page">
   <!-- HEADER -->
   <header class="ledger-header">

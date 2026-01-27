@@ -7,7 +7,7 @@ window.wolfAudio = {
   bgm: new Audio('/assets/sounds/intro.mp3'),
   woosh: new Audio('/assets/sounds/woosh-large-sub.mp3'),
   logoff: new Audio('/assets/sounds/log-off.mp3'),
-
+  swipe: new Audio('/assets/sounds/swipe.mp3'),
   isMuted: localStorage.getItem('wolf-bgm-muted') === 'true',
 
   init() {

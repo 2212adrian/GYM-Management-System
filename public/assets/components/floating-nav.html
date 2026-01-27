@@ -45,40 +45,73 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    color: #888;
+    color: #666666; /* Gray if hasn't been clicked */
     flex: 1;
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
     z-index: 1;
+
+    /* DEFAULT STATE: Clickable */
+    pointer-events: auto;
+    opacity: 0.7;
   }
 
   .nav-item i {
+    color: #666666; /* Icon matches text when not clicked */
     font-size: 24px;
     margin-bottom: 2px;
-    transition: transform 0.3s ease;
+    transition: all 0.3s ease;
   }
 
   .nav-item span {
     font-size: 9px;
-    font-weight: 800;
+    font-weight: 900;
     letter-spacing: 1px;
-    color: var(--text-muted);
+    color: inherit; /* Inherits the #666666 */
   }
 
-  /* Active States */
+  /* HOVER: Only for items that are NOT active */
+  .nav-item:not(.active):hover {
+    opacity: 1;
+    color: #fff;
+  }
+  .nav-item:not(.active):hover i {
+    color: #fff;
+    transform: scale(1.1);
+  }
+
+  /* ACTIVE STATE: Physically Locked and Color Changed */
   .nav-item.active {
+    /* THE LOCK: Active button cannot be clicked */
+    pointer-events: none !important;
+    cursor: default;
+
+    /* VISUALS: Fully visible and Wolf Red */
+    opacity: 1 !important;
     color: var(--wolf-red) !important;
     transform: translateY(-3px);
   }
-  .nav-item.active i,
-  .nav-item.active span {
+
+  .nav-item.active i {
     color: var(--wolf-red) !important;
-  }
-  .nav-item#moreNavBtn.sidebar-active {
-    color: var(--wolf-red) !important;
+    text-shadow: 0 0 15px rgba(166, 52, 41, 0.6);
+    transform: scale(1.15);
   }
 
+  .nav-item.active span {
+    color: var(--wolf-red) !important;
+    font-weight: 900;
+  }
+
+  /* Sidebar/More Button Special Case */
+  .nav-item#moreNavBtn.sidebar-active {
+    color: var(--wolf-red) !important;
+    opacity: 1;
+  }
+  .nav-item#moreNavBtn.sidebar-active i {
+    color: var(--wolf-red) !important;
+  }
   /* THE FLOATING QR BUTTON */
   .qr-wrapper {
     position: relative;

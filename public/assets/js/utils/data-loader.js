@@ -13,6 +13,7 @@ async function moveToTrash(tableName, id, data) {
   if (error) throw error;
 }
 
+window.wolfData = null;
 const wolfData = {
   // Enables Realtime from supabase
   selectedDate: new Date(),
@@ -20,6 +21,197 @@ const wolfData = {
   activeMode: 'sales',
   isFetching: false,
   allSales: [],
+  lastTotal: 0,
+  activeAF: null, // store active auto-filter
+  lastTraffic: 0,
+
+  // --- NAVIGATION SYNC ENGINE ---
+  syncNavigationUI(currentMode) {
+    console.log(`Wolf OS: Navigation UI Lock engaged for [${currentMode}]`);
+
+    // 1. Target both Floating Nav and Sidebar items
+    const allNavLinks = document.querySelectorAll(
+      '.nav-item[data-page], .sidebar-link[data-page]',
+    );
+
+    allNavLinks.forEach((item) => {
+      const targetPage = item.getAttribute('data-page');
+
+      if (targetPage === currentMode) {
+        // THIS IS THE CURRENT PAGE -> LOCK IT
+        item.classList.add('active');
+      } else {
+        // THIS IS A DIFFERENT PAGE -> ENABLE IT
+        item.classList.remove('active');
+      }
+    });
+  },
+
+  // THE ROLLING ANIMATOR (Add this to wolfData)
+  // --- 1. THE ELITE ANIMATOR ---
+  animateValue(el, start, end, duration) {
+    // KILL any existing animation before starting a new one
+    if (this.activeAF) {
+      cancelAnimationFrame(this.activeAF);
+    }
+
+    let startTimestamp = null;
+    const isSales = this.activeMode === 'sales';
+
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const val = progress * (end - start) + start;
+
+      // Update Text
+      if (isSales) {
+        el.textContent = `₱${val.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      } else {
+        el.textContent = Math.floor(val);
+      }
+
+      if (progress < 1) {
+        this.activeAF = window.requestAnimationFrame(step);
+      } else {
+        // Animation finished naturally
+        this.activeAF = null;
+        // Faster reset of colors
+        setTimeout(() => {
+          if (!this.activeAF) el.classList.remove('increasing', 'decreasing');
+        }, 300);
+      }
+    };
+    this.activeAF = window.requestAnimationFrame(step);
+  },
+
+  // --- 2. THE UNIFIED REVENUE UPDATER ---
+  // Call this instead of updateLedgerRevenue
+  refreshSummaryHUD(newValue = null) {
+    const el = document.getElementById('ledger-summary-amount');
+    if (!el) return;
+
+    // A. Use provided value, or calculate from allSales
+    let targetValue =
+      newValue !== null
+        ? newValue
+        : (this.allSales || []).reduce(
+            (sum, s) => sum + Number(s.total_amount || 0),
+            0,
+          );
+
+    // B. First load check
+    if (this.lastTotal === 0 && targetValue !== 0) {
+      this.lastTotal = targetValue;
+      el.textContent =
+        this.activeMode === 'sales'
+          ? `₱${targetValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+          : targetValue;
+      return;
+    }
+
+    if (targetValue === this.lastTotal) return;
+
+    // C. Trigger Animation
+    el.classList.remove('increasing', 'decreasing');
+    void el.offsetWidth; // Force CSS Reflow
+
+    if (targetValue > this.lastTotal) el.classList.add('increasing');
+    else el.classList.add('decreasing');
+
+    this.animateValue(el, this.lastTotal, targetValue, 800);
+    this.lastTotal = targetValue;
+  },
+
+  // --- UI methods ---
+  async addSaleRow(sale) {
+    // Add sale to table and internal array
+    const container = document.getElementById('ledger-list-container');
+    if (!container) return;
+
+    // We only render the individual card here
+    // The refreshSummaryHUD handles the math
+    const newRowHTML = this.renderSingleSaleCard(sale, 0); // index 0 for instant pop
+    container.insertAdjacentHTML('afterbegin', newRowHTML);
+  },
+
+  updateSaleRow(sale) {
+    // Update sale in array
+    const index = this.salesData.findIndex((s) => s.id === sale.id);
+    if (index > -1) this.salesData[index] = sale;
+    this.updateLedgerRevenue();
+    Toastify({
+      text: `Sale updated: ${sale.id}`,
+      duration: 2000,
+      gravity: 'top',
+      position: 'right',
+    }).showToast();
+  },
+
+  removeSaleRow(id) {
+    // 1. Trigger the Epic Outro Animation
+    const rowEl = document.getElementById(`row-${id}`);
+    if (rowEl) {
+      rowEl.classList.add('removing');
+      // Physically remove from UI after animation
+      setTimeout(() => rowEl.remove(), 400);
+    }
+
+    // 2. Remove from Memory Array
+    this.allSales = (this.allSales || []).filter((s) => s.id !== id);
+
+    // 3. Trigger HUD Rolling Animation (Red Glow)
+    this.refreshSummaryHUD();
+    alert('test');
+  },
+
+  updateProductUI(product) {
+    // Example: update product table or stock info
+    Toastify({
+      text: `Product updated: ${product.name}`,
+      duration: 2000,
+      gravity: 'top',
+      position: 'right',
+      backgroundColor: '#ff9800',
+    }).showToast();
+  },
+
+  // Animate the ledger revenue number
+  updateLedgerRevenue() {
+    const revenueEl = document.getElementById('ledger-summary-amount');
+    if (!revenueEl) return;
+
+    // 1. Calculate the actual total from the data array
+    const newTotal = (this.allSales || []).reduce(
+      (sum, sale) => sum + Number(sale.total_amount || 0),
+      0,
+    );
+
+    // 2. Identify if it's the first load (to avoid 0 to Total animation on refresh)
+    if (this.currentTotal === 0 && newTotal !== 0) {
+      this.currentTotal = newTotal;
+      revenueEl.textContent = `₱${newTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      return;
+    }
+
+    // 3. Skip if no change
+    if (newTotal === this.currentTotal) return;
+
+    // 4. Trigger Color State
+    if (newTotal > this.currentTotal) {
+      revenueEl.className = 'summary-value increasing'; // Force clean class state
+    } else {
+      revenueEl.className = 'summary-value decreasing';
+    }
+
+    // 5. Run the "Rolling" Animation
+    this.animateNumber(revenueEl, this.currentTotal, newTotal);
+
+    // 6. Update the memory for the next change
+    this.currentTotal = newTotal;
+  },
 
   async syncServerTime() {
     console.log('Wolf OS: Synchronizing with Atomic Clock...');
@@ -103,21 +295,43 @@ const wolfData = {
       searchContainer.style.display = 'block';
       searchContainer.classList.remove('active');
     }
-
+    this.syncNavigationUI(mode);
     this.initChrono(mode);
+    await this.syncServerTime();
   },
 
   // ==========================================
   // 0. CHRONO CORE (WEEK NAVIGATOR)
   // ==========================================
   initChrono(type) {
-    if (this.fp) {
-      this.fp.destroy();
-      this.fp = null;
+    // 1. CLEANUP PREVIOUS INSTANCE
+    // Use defensive checks to see if this.fp exists and has a destroy method
+    if (this.fp && typeof this.fp.destroy === 'function') {
+      try {
+        this.fp.destroy();
+      } catch (e) {
+        console.warn(
+          'Wolf OS: Non-critical - could not destroy old flatpickr instance.',
+        );
+      }
     }
+    this.fp = null;
+
+    // 2. DOM ELEMENT CHECKS
     const trigger = document.getElementById('chrono-picker-trigger');
+    const targetInput = document.getElementById('hidden-chrono-input');
+
+    // If the AJAX swap hasn't finished or element is missing, stop to prevent crash
+    if (!targetInput) {
+      console.error('Wolf OS: Chrono Input not found in DOM.');
+      return;
+    }
+
     const serverMax = this.serverToday || new Date();
-    this.fp = flatpickr('#hidden-chrono-input', {
+
+    // 3. INITIALIZE FLATPICKR
+    // Flatpickr returns an ARRAY of instances. We must grab the first one [0].
+    const instances = flatpickr(targetInput, {
       disableMobile: true,
       maxDate: serverMax,
       animate: true,
@@ -126,11 +340,9 @@ const wolfData = {
 
       onReady: (selectedDates, dateStr, instance) => {
         const cal = instance.calendarContainer;
-
         // Apply Wolf OS v3 skin
         cal.classList.remove('wolf-calendar-v2', 'wolf-calendar-v3');
         cal.classList.add('wolf-calendar');
-
         // Ensure correct base state
         cal.classList.remove('open');
       },
@@ -155,10 +367,17 @@ const wolfData = {
       },
     });
 
-    // Manual trigger (safe)
-    if (trigger) {
-      trigger.onclick = null;
-      trigger.onclick = () => {
+    // 4. ASSIGN SINGLE INSTANCE TO THIS.FP
+    this.fp = Array.isArray(instances) ? instances[0] : instances;
+
+    // 5. MANUAL TRIGGER LOGIC (Toggle Open/Close)
+    if (trigger && this.fp) {
+      trigger.onclick = null; // Clear previous listeners
+      trigger.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Now that this.fp is the instance (not an array), .isOpen works
         if (this.fp.isOpen) {
           this.fp.close();
         } else {
@@ -167,6 +386,7 @@ const wolfData = {
       };
     }
 
+    // 6. UPDATE UI STATE
     this.calculateWeek(type);
   },
 
@@ -189,7 +409,9 @@ const wolfData = {
     // 2. DEFENSIVE CHECK: Ensure sun and sat are valid dates
     if (!sun || isNaN(sun.getTime()) || !sat || isNaN(sat.getTime())) return;
 
-    if (this.fp) this.fp.setDate(this.selectedDate, false);
+    if (this.fp && typeof this.fp.setDate === 'function') {
+      this.fp.setDate(this.selectedDate, false);
+    }
 
     const fmt = (date) =>
       date
@@ -243,17 +465,10 @@ const wolfData = {
   // 1. LOGBOOK ENGINE (FIXED)
   // ==========================================
   async loadLogbook() {
-    // 1. SET TRASH MODE
     if (window.salesManager) window.salesManager.currentTrashMode = 'logbook';
-
     const container = document.getElementById('ledger-list-container');
-    const summaryVal = document.getElementById('ledger-summary-amount');
-    const searchInp = document.getElementById('ledger-main-search');
-    const searchTerm = searchInp ? searchInp.value.toLowerCase().trim() : '';
-
     if (!container) return;
 
-    // --- SEAMLESS FIX: Only show loader if the list is currently empty ---
     if (container.children.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:50px; opacity:0.3;"><i class='bx bx-loader-alt bx-spin' style='font-size:2rem;'></i></div>`;
     }
@@ -261,7 +476,6 @@ const wolfData = {
     const localDay = this.selectedDate.toLocaleDateString('en-CA');
 
     try {
-      // 2. BACKGROUND FETCH (Philippines Offset +08:00)
       const { data, error } = await supabaseClient
         .from('check_in_logs')
         .select('*, profiles(full_name)')
@@ -271,7 +485,6 @@ const wolfData = {
 
       if (error) throw error;
 
-      // 3. DATA PROCESSING
       let filtered = (data || []).map((log) => {
         const rawName =
           log.profiles?.full_name ||
@@ -280,79 +493,65 @@ const wolfData = {
         return { ...log, resolvedName: rawName.toUpperCase() };
       });
 
-      if (searchTerm) {
+      const searchInp = document.getElementById('ledger-main-search');
+      if (searchInp && searchInp.value) {
+        const term = searchInp.value.toLowerCase();
         filtered = filtered.filter((log) =>
-          log.resolvedName.toLowerCase().includes(searchTerm),
+          log.resolvedName.toLowerCase().includes(term),
         );
       }
 
-      // Update Summary HUD
-      if (summaryVal) summaryVal.innerText = filtered.length;
+      // UPDATE THE TOP HUD (ANIMATED)
+      this.refreshSummaryHUD(filtered.length);
 
-      // 4. SEAMLESS RENDER
       if (filtered.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-user-x' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
         return;
       }
 
-      // Build HTML string for all rows
-      const htmlOutput = filtered
+      container.innerHTML = filtered
         .map((log, index) => {
           const isClosed = log.time_out !== null;
-          const safeName = DOMPurify.sanitize(log.resolvedName);
-          const safeTimeIn = DOMPurify.sanitize(
-            new Date(log.time_in).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-          );
+          const time = new Date(log.time_in).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
 
-          // EPIC INTRO: Added 'row-${log.id}' and dynamic 'animation-delay'
           return `
-            <div class="list-item-card" id="row-${log.id}" style="padding: 15px 20px; margin-bottom:10px; animation-delay: ${index * 0.04}s;"> 
-              <div class="card-header" style="margin-bottom:0;">
-                <div class="status-icon ${!isClosed ? 'active' : ''}" style="background:var(--bg-dark); color:var(--wolf-red);">
-                  <i class='bx ${isClosed ? 'bx-check' : 'bx-time-five'}'></i>
-                </div>
-                <div class="item-info">
-                  <h4 style="font-size:13px; font-weight:800;">${safeName}</h4>
-                  <div class="time" style="font-size:10px; color:#555;">IN: ${safeTimeIn}</div>
-                </div>
-                <div class="card-actions" style="text-align:right;">
-                  ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
-                </div>
+          <div class="list-item-card" id="row-${log.id}" style="animation-delay: ${index * 0.04}s;">
+            <div class="card-header" style="margin-bottom:0;">
+              <div class="status-icon ${!isClosed ? 'active' : ''}" style="background:var(--bg-dark); color:var(--wolf-red);">
+                <i class='bx ${isClosed ? 'bx-check' : 'bx-time-five'}'></i>
               </div>
-            </div>`;
+              <div class="item-info">
+                <h4 style="font-size:13px; font-weight:800;">${log.resolvedName}</h4>
+                <div class="time" style="font-size:10px; color:#555;">IN: ${time}</div>
+              </div>
+              <div class="card-actions">
+                ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
+              </div>
+            </div>
+          </div>`;
         })
         .join('');
-
-      // Replace innerHTML once (The CSS animations will handle the visual transition)
-      container.innerHTML = htmlOutput;
     } catch (err) {
-      console.error('Wolf OS Logbook Error:', err);
-      // Only wipe container if it was previously empty
-      if (container.children.length <= 1) {
-        container.innerHTML = `<p style="color:red; text-align:center; opacity:0.5; font-size:10px; font-weight:900;">PROTOCOL_SYNC_ERROR</p>`;
-      }
+      console.error('Wolf OS Logbook Fault:', err);
     }
   },
+
   // ==========================================
   // 2. SALES ENGINE
   // ==========================================
   async loadSales() {
-    // 1. Set context for Trash Bin
     if (window.salesManager) window.salesManager.currentTrashMode = 'sales';
-
-    // 2. Critical: Ensure date is ready
-    if (!this.selectedDate) await this.syncServerTime();
-
     if (this.isFetching) return;
     this.isFetching = true;
 
     const container = document.getElementById('ledger-list-container');
-    this.allSales = [];
+    if (!container) return;
 
-    if (container && container.children.length === 0) {
+    // Show loader ONLY if the screen is currently empty
+    if (container.children.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:50px; opacity:0.3;"><i class='bx bx-loader-alt bx-spin' style='font-size:2rem;'></i></div>`;
     }
 
@@ -367,14 +566,16 @@ const wolfData = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // SAVE TO MEMORY
       this.allSales = data || [];
 
+      // TRIGGER RENDER
       const searchInp = document.getElementById('ledger-main-search');
       const currentTerm = searchInp ? searchInp.value : '';
-
       this.renderSales(this.selectedDate.getDay(), currentTerm);
     } catch (err) {
-      console.error('Wolf OS Sales Error:', err);
+      console.error('Wolf OS Sales Fault:', err);
     } finally {
       this.isFetching = false;
     }
@@ -382,10 +583,9 @@ const wolfData = {
 
   renderSales(dayIndex, searchTerm = '') {
     const container = document.getElementById('ledger-list-container');
-    const revenueEl = document.getElementById('ledger-summary-amount');
-    const labelEl = document.getElementById('ledger-summary-label');
     if (!container) return;
 
+    const labelEl = document.getElementById('ledger-summary-label');
     const dayNames = [
       'Sunday',
       'Monday',
@@ -403,54 +603,51 @@ const wolfData = {
       filtered = filtered.filter((sale) => {
         const name = String(sale.products?.name || '').toLowerCase();
         const sku = String(sale.products?.sku || '').toLowerCase();
-        const ref = String(sale.sale_reference || '').toLowerCase();
-        return name.includes(term) || sku.includes(term) || ref.includes(term);
+        return name.includes(term) || sku.includes(term);
       });
     }
 
+    // UPDATE THE TOP HUD (ANIMATED)
+    const totalIncome = filtered.reduce(
+      (sum, s) => sum + Number(s.total_amount || 0),
+      0,
+    );
+    this.refreshSummaryHUD(totalIncome);
+
     if (filtered.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-shopping-bag' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
-      if (revenueEl) revenueEl.innerText = '₱0.00';
       return;
     }
 
-    let totalIncome = 0;
-    // FIX: Added 'index' here
+    // RENDER ROWS WITH EPIC INTRO
     container.innerHTML = filtered
       .map((sale, index) => {
         const amount = Number(sale.total_amount || 0);
-        totalIncome += amount;
-
         const safeName = DOMPurify.sanitize(sale.products?.name || 'Item');
         const safeSKU = DOMPurify.sanitize(sale.products?.sku || 'N/A');
-        const safeTime = DOMPurify.sanitize(
-          new Date(sale.created_at).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-        );
+        const time = new Date(sale.created_at).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
 
         return `
-        <div class="list-item-card" id="row-${sale.id}" style="padding: 15px 20px; margin-bottom:10px; animation-delay: ${index * 0.04}s;">
+        <div class="list-item-card" id="row-${sale.id}" style="animation-delay: ${index * 0.06}s;">
           <div class="card-header" style="margin-bottom: 0;">
             <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);"><i class='bx bx-shopping-bag'></i></div>
             <div class="item-info">
-              <h4 style="font-size:13px; font-weight:800;">${safeName}</h4>
-              <div class="time" style="font-size:10px; color:#555;">${safeTime} • x${sale.qty} • ${safeSKU}</div>
+              <h4 style="font-size:13px; font-weight:800;">${safeName.toUpperCase()}</h4>
+              <div class="time" style="font-size:10px; color:#555;">${time} • x${sale.qty} • ${safeSKU}</div>
             </div>
             <div class="card-actions" style="text-align:right;">
               <div style="color: var(--wolf-red); font-weight: 900; font-family: 'JetBrains Mono'; font-size:14px;">
                 ₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </div>
-              ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px; margin-top:5px;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
+              ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
             </div>
           </div>
         </div>`;
       })
       .join('');
-
-    if (revenueEl)
-      revenueEl.innerText = `₱${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   },
 
   // ==========================================
@@ -532,23 +729,14 @@ const wolfData = {
 
     const result = await window.Swal.fire({
       title: 'REMOVE ENTRY?',
-      html: `
-        <div style="color: #b47023; font-size: 4.5rem; margin-bottom: 10px;">
-          <i class='bx bx-error-alt'></i>
-        </div>
-        <p class="wolf-swal-text" style="text-transform: uppercase;">
-          WARNING: THIS RECORD WILL BE MOVED TO TRASH bin. PROCEED?
-        </p>
-      `,
+      html: `<p class="wolf-swal-text">WARNING: THIS RECORD WILL BE MOVED TO TRASH bin. PROCEED?</p>`,
       showCancelButton: true,
       confirmButtonText: 'REMOVE',
       cancelButtonText: 'CANCEL',
-      reverseButtons: true,
       background: '#111',
       buttonsStyling: false,
       customClass: {
         popup: 'wolf-swal-popup-orange',
-        title: 'wolf-swal-title',
         confirmButton: 'wolf-swal-confirm-orange',
         cancelButton: 'wolf-swal-cancel',
       },
@@ -557,14 +745,20 @@ const wolfData = {
     if (!result.isConfirmed) return;
 
     try {
-      // 1. Fetch data
+      // 1. EPIC OUTRO
+      const rowElement = document.getElementById(`row-${id}`);
+      if (rowElement) {
+        rowElement.classList.add('removing');
+        await new Promise((r) => setTimeout(r, 400));
+        rowElement.remove();
+      }
+
+      // 2. DB LOGIC
       const { data: logData } = await supabaseClient
         .from('check_in_logs')
         .select('*')
         .eq('id', id)
         .single();
-
-      // 2. Move to Trash
       await supabaseClient.from('trash_bin').insert([
         {
           original_id: id,
@@ -572,16 +766,14 @@ const wolfData = {
           deleted_data: logData,
         },
       ]);
-
-      // 3. Delete original
       await supabaseClient.from('check_in_logs').delete().eq('id', id);
 
       if (window.wolfAudio) window.wolfAudio.play('notif');
 
-      // FIX: Ensure only logbook refreshes
+      // 3. SILENT REFRESH (Triggers the Green/Red Glow and Rolling Numbers)
       await this.loadLogbook();
     } catch (err) {
-      console.error('Archival Fault:', err);
+      console.error(err);
     }
   },
 
@@ -591,13 +783,13 @@ const wolfData = {
     const result = await window.Swal.fire({
       title: 'REMOVE PRODUCT?',
       html: `
-        <div style="color: #b47023; font-size: 4.5rem; margin-bottom: 10px;">
-          <i class='bx bx-error-alt'></i>
-        </div>
-        <p class="wolf-swal-text" style="text-transform: uppercase;">
-          WARNING: THIS RECORD WILL BE MOVED TO TRASH BIN. PROCEED?
-        </p>
-      `,
+      <div style="color: #b47023; font-size: 4.5rem; margin-bottom: 10px;">
+        <i class='bx bx-error-alt'></i>
+      </div>
+      <p class="wolf-swal-text" style="text-transform: uppercase; letter-spacing: 1px;">
+        WARNING: THIS RECORD WILL BE MOVED TO TRASH BIN. PROCEED?
+      </p>
+    `,
       showCancelButton: true,
       confirmButtonText: 'REMOVE',
       cancelButtonText: 'CANCEL',
@@ -614,30 +806,27 @@ const wolfData = {
 
     if (!result.isConfirmed) return;
 
+    // --- 1. TARGET ELEMENT FOR EPIC OUTRO ---
+    const rowElement = document.getElementById(`row-${id}`);
+
     try {
-      // --- 1. SEAMLESS EPIC OUTRO ---
-      const rowElement = document.getElementById(`row-${id}`);
+      // --- 2. START SLIDE & FADE ANIMATION ---
       if (rowElement) {
         rowElement.classList.add('removing');
-        // Wait 400ms for the "Void" CSS animation to complete
         await new Promise((resolve) => setTimeout(resolve, 400));
-
-        // Remove from DOM immediately after animation so the UI feels responsive
-        // even before the Database finishes its work.
         rowElement.remove();
       }
 
-      // --- 2. BACKGROUND DATABASE PROTOCOL ---
-      // We fetch the data to move to trash
-      const { data: saleData } = await supabaseClient
+      // --- 3. DB PREPARATION (FETCH BEFORE DELETE) ---
+      const { data: saleData, error: saleErr } = await supabaseClient
         .from('sales')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (!saleData) return;
+      if (saleErr || !saleData) throw saleErr;
 
-      // Restore Product Stock logic
+      // --- 4. RESTORE PRODUCT STOCK ---
       const { data: product } = await supabaseClient
         .from('products')
         .select('qty, name')
@@ -651,7 +840,7 @@ const wolfData = {
           .eq('productid', saleData.product_id);
       }
 
-      // Record in Trash Bin
+      // --- 5. EXECUTE VOID PROTOCOL (TRASH + DELETE) ---
       await supabaseClient.from('trash_bin').insert([
         {
           original_id: id,
@@ -660,19 +849,40 @@ const wolfData = {
         },
       ]);
 
-      // Execute Deletion
       await supabaseClient.from('sales').delete().eq('id', id);
 
-      // --- 3. SILENT SYNC ---
-      if (window.wolfAudio) window.wolfAudio.play('success');
+      // --- 6. SYNC INTERNAL MEMORY & TRIGGER HUD ANIMATION ---
+      this.allSales = (this.allSales || []).filter((s) => s.id !== id);
+      const newTotal = this.allSales.reduce(
+        (sum, sale) => sum + Number(sale.total_amount || 0),
+        0,
+      );
+      this.refreshSummaryHUD(newTotal);
 
-      // Refresh data silently in the background to update "Total Income" HUD
-      // Since container is not empty, this won't show a loading spinner.
-      await this.loadSales();
+      // --- 7. SHOW NOTIFICATION ---
+      const message = `${product?.name || 'Product'}, X${saleData.qty} WAS REMOVED`;
+
+      window.salesManager.showSystemAlert(message, 'success');
+      Toastify({
+        text: message,
+        duration: 5000,
+        gravity: 'top',
+        position: 'right',
+        stopOnFocus: true,
+        style: {
+          border: '1px solid #ff9800', // correct way to set border color
+          background: '#0a0a0a',
+          borderRadius: '12px',
+          fontWeight: '900',
+          fontFamily: 'JetBrains Mono, monospace',
+          color: '#fff',
+        },
+      }).showToast();
+
+      if (window.wolfAudio) window.wolfAudio.play('success');
     } catch (err) {
       console.error('Void Protocol Fault:', err);
       if (window.wolfAudio) window.wolfAudio.play('error');
-      // If it fails, reload the whole view to restore the row
       this.loadSales();
     }
   },
@@ -686,52 +896,176 @@ const wolfData = {
   },
 };
 
+window.wolfData = wolfData;
+
+wolfData.addSaleRow = function (sale) {
+  // Ensure salesData array exists
+  if (!Array.isArray(this.salesData)) this.salesData = [];
+
+  // Add the new sale to the array
+  this.salesData.push(sale);
+
+  // Render row in the table
+  const tbody = document.querySelector('#sales-table-body');
+  if (tbody) {
+    const tr = document.createElement('tr');
+    tr.id = `sale-row-${sale.id}`;
+    tr.innerHTML = `
+      <td>${sale.id}</td>
+      <td>${sale.product_name}</td>
+      <td>${sale.quantity}</td>
+      <td>${sale.price}</td>
+      <td>${(sale.quantity * sale.price).toFixed(2)}</td>
+      <td><button onclick="wolfData.deleteSale('${sale.id}')">Delete</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Recalculate totals safely
+  this.updateLedgerRevenue();
+};
+
+wolfData.removeSaleRow = function (id) {
+  // Update the array source
+  this.allSales = (this.allSales || []).filter((row) => row.id !== id);
+
+  // Remove from UI
+  const rowEl = document.getElementById(`row-${id}`);
+  if (rowEl) rowEl.remove();
+
+  // Update Total
+  this.updateLedgerRevenue();
+};
+
 wolfData.initRealtime = async function () {
+  // Safety: update totals immediately
+  this.updateLedgerRevenue();
+
   if (this.realtimeChannel) return; // Prevent duplicate connections
 
   // Ensure atomic time is synced first
   if (!this.selectedDate) await this.syncServerTime();
 
-  console.log('Wolf OS: Activating Neural Realtime Link...');
-
   const channel = supabaseClient
     .channel('wolf-ledger-sync-stable')
-    // 1. Listen for SALES changes
+
+    /* =======================
+       SALES (ROW-LEVEL + totals)
+    ======================= */
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'sales' },
+      { event: 'INSERT', schema: 'public', table: 'sales' },
       (payload) => {
-        console.log(`Wolf OS: Sales [${payload.eventType}] Syncing...`);
-        if (this.activeMode === 'sales') this.loadSales();
+        if (this.activeMode !== 'sales') return;
+
+        const sale = payload.new;
+        // Add to memory and render
+        this.allSales.unshift(sale);
+        this.renderSales(this.selectedDate.getDay());
       },
     )
-    // 2. Listen for LOGBOOK changes (THE MISSING LINK)
+
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'check_in_logs' },
+      { event: 'UPDATE', schema: 'public', table: 'sales' },
       (payload) => {
-        console.log(`Wolf OS: Logbook [${payload.eventType}] Syncing...`);
-        if (this.activeMode === 'logbook') this.loadLogbook();
+        if (this.activeMode !== 'sales') return;
+        this.updateSaleRow(payload.new);
+        this.updateLedgerRevenue();
+        Toastify({
+          text: `Sale updated: ${payload.new.id}`,
+          duration: 5000,
+          gravity: 'top',
+          position: 'right',
+        }).showToast();
       },
     )
-    // 3. Listen for PRODUCT changes (Price/Stock updates)
+
+    /* =======================
+       LOGBOOK (ROW-LEVEL)
+    ======================= */
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'products' },
+      { event: 'INSERT', schema: 'public', table: 'check_in_logs' },
       (payload) => {
-        if (this.activeMode === 'sales') this.loadSales();
+        if (this.activeMode !== 'logbook') return;
+        this.addLogbookRow(payload.new);
+        Toastify({
+          text: `Log added: ${payload.new.id}`,
+          duration: 5000,
+          gravity: 'top',
+          position: 'right',
+          style: {
+            border: '1px solid #4dff00', // correct way to set border color
+            background: '#0a0a0a',
+            borderRadius: '12px',
+            fontWeight: '900',
+            fontFamily: 'JetBrains Mono, monospace',
+            color: '#fff',
+          },
+        }).showToast();
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'check_in_logs' },
+      (payload) => {
+        if (this.activeMode !== 'logbook') return;
+        this.updateLogbookRow(payload.new);
+        Toastify({
+          text: `Log updated: ${payload.new.id}`,
+          duration: 5000,
+          gravity: 'top',
+          position: 'right',
+          style: {
+            border: '1px solid #6fff00', // correct way to set border color
+            background: '#0a0a0a',
+            borderRadius: '12px',
+            fontWeight: '900',
+            fontFamily: 'JetBrains Mono, monospace',
+            color: '#fff',
+          },
+        }).showToast();
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'check_in_logs' },
+      (payload) => {
+        if (this.activeMode !== 'logbook') return;
+        this.removeLogbookRow(payload.old.id);
+        Toastify({
+          text: `Log removed: ${payload.old.id}`,
+          duration: 5000,
+          gravity: 'top',
+          position: 'right',
+          style: {
+            border: '1prgb(255, 0, 0) #ff9800', // correct way to set border color
+            background: '#0a0a0a',
+            borderRadius: '12px',
+            fontWeight: '900',
+            fontFamily: 'JetBrains Mono, monospace',
+            color: '#fff',
+          },
+        }).showToast();
       },
     );
 
-  // Subscribe properly
+  // Subscribe
   const { error } = await channel.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      console.log('Wolf OS: Realtime Sync Active ✅');
-      this.showRealtimeToast();
+      this.showRealtimeToast?.();
     }
   });
 
   if (error) {
+    Toastify({
+      text: 'Realtime subscription failed ❌',
+      duration: 5000,
+      gravity: 'top',
+      position: 'right',
+      backgroundColor: '#f44336',
+    }).showToast();
     console.error('Realtime subscription failed:', error);
     return;
   }
@@ -739,6 +1073,21 @@ wolfData.initRealtime = async function () {
   this.realtimeChannel = channel;
 };
 
+wolfData.updateLedgerRevenue = function () {
+  const revenueEl = document.getElementById('ledger-summary-amount');
+  if (!revenueEl) return;
+
+  // Uses allSales (the same array populated by loadSales)
+  const total = (this.allSales || []).reduce(
+    (sum, sale) => sum + Number(sale.total_amount || 0),
+    0,
+  );
+
+  revenueEl.textContent = `₱${total.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 // UI Feedback Helper
 wolfData.showRealtimeToast = function () {
   const toastContent = document.createElement('span');
@@ -749,12 +1098,12 @@ wolfData.showRealtimeToast = function () {
 
   Toastify({
     node: toastContent,
-    duration: 3000,
+    duration: 5000,
     gravity: 'top',
     position: 'right',
     style: {
       background: '#0a0a0a',
-      border: '1px solid #222',
+      border: '1px solid #ffffff',
       borderRadius: '12px',
       fontWeight: '900',
       fontFamily: 'JetBrains Mono, monospace',
@@ -782,6 +1131,21 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('click', async (e) => {
+  const muteBtn = e.target.closest('#muteToggleBtn');
+  if (muteBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Trigger the audio engine
+    const isMutedNow = window.wolfAudio.toggleMute();
+
+    // Optional: Play a tiny "notif" sound if we just unmuted
+    if (!isMutedNow) {
+      window.wolfAudio.play('notif');
+    }
+    return;
+  }
+
   const activeType = wolfData.activeMode;
   // Use 'en-CA' for a reliable YYYY-MM-DD local string
   const realTodayISO = (wolfData.serverToday || new Date()).toLocaleDateString(
@@ -796,9 +1160,6 @@ document.addEventListener('click', async (e) => {
     try {
       const input = document.getElementById('ledger-main-search');
       document.getElementById('search-collapse-btn').classList.toggle('active');
-
-      console.log('Wolf OS: Search Container Active State:', isActive); // DEBUG LINE
-
       if (isActive) {
         setTimeout(() => {
           if (input) input.focus();
@@ -912,7 +1273,7 @@ document.addEventListener('click', async (e) => {
     const currentMode = wolfData.activeMode;
     Toastify({
       text: `Opening ${currentMode.toUpperCase()} Trash Bin...`,
-      duration: 2000,
+      duration: 5000,
       gravity: 'top',
       position: 'right',
       style: {
@@ -963,60 +1324,12 @@ document.addEventListener('click', () => {
   }, 100);
 });
 
-async function setupRealtime() {
-  if (wolfData.realtimeChannel) return; // avoid duplicate
-
-  // Ensure date is synced first
-  if (!wolfData.selectedDate) await wolfData.syncServerTime();
-
-  const channel = supabaseClient
-    .channel('wolf-realtime-sync')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'sales' },
-      (payload) => {
-        console.log('Realtime [sales] triggered:', payload);
-        wolfData.loadSales();
-      },
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'products' },
-      (payload) => {
-        console.log('Realtime [products] triggered:', payload);
-        wolfData.loadSales();
-      },
-    )
-    .subscribe();
-
-  const toastContent = document.createElement('span');
-
-  // Put the Boxicon + text inside it
-  toastContent.innerHTML = DOMPurify.sanitize(`
-  <i class="bx bx-check-circle" style="margin-right: 8px; font-size:18px;"></i>
-  Realtime Sync Activated
-`);
-
-  wolfData.realtimeChannel = channel;
-  Toastify({
-    node: toastContent, // <-- DOM node goes here
-    duration: 3000,
-    gravity: 'top',
-    position: 'right',
-    style: {
-      background: '#343434',
-      borderRadius: '10px',
-      fontWeight: 'bold',
-      color: '#fff',
-    },
-  }).showToast();
-}
-
 // Also run on first load
 window.addEventListener('load', () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const p = urlParams.get('p');
+  const p = urlParams.get('p') || 'home';
 
+  wolfData.syncNavigationUI(p);
   if (p === 'sales' || p === 'logbook') {
     setTimeout(async () => {
       if (document.getElementById('ledger-page')) {
@@ -1025,7 +1338,6 @@ window.addEventListener('load', () => {
 
         // 2. Load UI
         await wolfData.initLedger(p);
-
         // 3. Start Unified Realtime (For both Sales and Logbook)
         wolfData.initRealtime();
       }

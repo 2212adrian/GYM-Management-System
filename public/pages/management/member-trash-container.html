@@ -1,0 +1,283 @@
+<style>
+  #trash-list {
+    display: block !important;
+    min-height: 50px;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  /* --- 1. TRANSITION WRAPPER --- */
+  .trash-page-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .trash-page-wrapper {
+      max-width: 1200px;
+    }
+  }
+
+  /* --- 2. HEADER DESIGN --- */
+  .trash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .trash-brand {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: var(--wolf-red); /* Using the system red */
+    text-transform: uppercase;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* --- 3. RECOVERY HUD --- */
+  /* WOLF OS - HUD MODULE DESIGN */
+  .hud-item {
+    /* High-end Glassmorphism */
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 20, 0.85),
+      rgba(10, 10, 10, 0.95)
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    /* Wolf Red Accent Border */
+    border: 1px solid rgba(166, 52, 41, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+
+    padding: 25px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Background Textures */
+    background-image:
+      url('/assets/images/textures/dark-mosaic.png'),
+      radial-gradient(circle at 50% 0%, rgba(166, 52, 41, 0.1), transparent);
+    background-blend-mode: overlay, normal;
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Hover Effect: Glow intensifies */
+  .hud-item:hover {
+    transform: translateY(-5px);
+    border-color: rgba(166, 52, 41, 0.6);
+    box-shadow:
+      0 15px 35px rgba(166, 52, 41, 0.15),
+      0 5px 15px rgba(0, 0, 0, 0.5);
+  }
+
+  .hud-item label {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    color: #777; /* Muted gray */
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .hud-item span {
+    display: block;
+    font-size: 2.8rem;
+    font-weight: 900;
+    font-style: italic; /* Aggressive fitness look */
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -1.5px;
+
+    /* Wolf Red Text Glow */
+    text-shadow:
+      0 0 15px rgba(166, 52, 41, 0.4),
+      2px 2px 0px rgba(0, 0, 0, 0.8);
+  }
+
+  .hud-item::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 3px;
+    height: 3px;
+    background: #a63429;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #a63429;
+    opacity: 0.6;
+  }
+
+  /* Red underline on hover */
+  .hud-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: #a63429;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+  }
+
+  .hud-item:hover::after {
+    width: 40%;
+  }
+
+  /* --- 4. THE CARD DESIGN (Matching Member List) --- */
+  .trash-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .trash-pill-card {
+    background: #0d0d0d;
+    background-image: url('/assets/images/textures/dark-mosaic.png');
+    background-blend-mode: overlay;
+    border: 1px solid #1a1a1a;
+    border-radius: 40px; /* High rounding for pill shape */
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+    animation: wolfRowSlideIn 0.4s forwards;
+    opacity: 0;
+    animation-fill-mode: both;
+  }
+
+  .animate__animated {
+    animation-duration: 0.6s;
+  }
+
+  .trash-pill-card:hover {
+    border-color: #333;
+    background-color: #121212;
+    transform: translateX(5px);
+  }
+
+  .trash-avatar-node {
+    width: 45px;
+    height: 45px;
+    background: #151515;
+    border: 1px solid #222;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 1.2rem;
+  }
+
+  .trash-details h6 {
+    margin: 0;
+    font-weight: 800;
+    color: #fff;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .trash-details p {
+    margin: 0;
+    font-size: 10px;
+    color: var(--wolf-red);
+    font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  /* --- 5. ACTION BUTTONS (Right Aligned) --- */
+  .trash-action-group {
+    margin-left: auto;
+    display: flex;
+    gap: 15px;
+  }
+
+  .btn-trash-action {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    color: #333;
+    padding: 5px;
+    transition: 0.2s;
+    cursor: pointer;
+  }
+
+  .btn-trash-action.restore:hover {
+    color: #4ade80;
+    transform: scale(1.2);
+  }
+  .btn-trash-action.purge:hover {
+    color: var(--wolf-red);
+    transform: scale(1.2);
+  }
+
+  /* --- ANIMATION CORE: DOES NOT TOUCH ALIGNMENT --- */
+  .ledger-page-wrapper,
+  .trash-page-wrapper {
+    /* This handles the movement of the whole container */
+    transition:
+      transform 0.6s cubic-bezier(0.7, 0, 0.3, 1),
+      opacity 0.5s ease !important;
+    will-change: transform, opacity;
+  }
+
+  /* EXIT/ENTRY POSITIONS */
+  .stage-right {
+    transform: translateX(100%) !important;
+    opacity: 0 !important;
+  }
+
+  .stage-left {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+  }
+
+  /* ACTIVE POSITION (Center) */
+  .stage-center {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+  }
+</style>
+
+<div class="trash-page-wrapper stage-center" id="member-trash-view">
+  <!-- Header -->
+  <div class="trash-header">
+    <div class="trash-brand">
+      <i class="bx bxs-trash-alt"></i> RECOVERY_PROTOCOL
+    </div>
+    <div class="trash-actions">
+      <button class="icon-btn" id="btn-trash-back" title="Back to Database">
+        <i class="bx bx-chevron-left"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary HUD -->
+  <div class="hud-item">
+    <label>Total Archived Items</label>
+    <span id="archived-members-count">0</span>
+    <!-- This ID must match the JS -->
+  </div>
+  <!-- Red Container Wrapper (List) -->
+  <div class="trash-list-container" id="trash-list">
+    <!-- Cards will be injected here -->
+    <div class="text-center py-5 opacity-25">
+      <div class="spinner-border text-danger"></div>
+    </div>
+  </div>
+</div>

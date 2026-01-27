@@ -1,3 +1,61 @@
+/* --- WOLF OS CUSTOM SCROLLBAR --- */
+html,
+body,
+#main-content,
+.row,
+.container-fluid,
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #222 #0a0a0a; /* Firefox Dark */
+}
+
+/* 1. For Chrome, Edge, and Safari */
+::-webkit-scrollbar {
+  width: 8px; /* Width of the vertical scrollbar */
+  height: 8px; /* Height of the horizontal scrollbar */
+}
+
+/* The background of the scrollbar track */
+::-webkit-scrollbar-track {
+  background: #0a0a0a; /* Matches your dark theme */
+  border-left: 1px solid #1a1a1a;
+}
+
+/* The draggable handle */
+::-webkit-scrollbar-thumb {
+  background: #222; /* Subtle dark handle */
+  border-radius: 10px; /* Rounded like your pill cards */
+  border: 2px solid #0a0a0a; /* Creates padding effect around handle */
+}
+
+/* 3. LIGHT MODE (Triggered by your ThemeManager) */
+body.light-theme ::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Light grey track */
+  border-left: 1px solid #e0e0e0;
+}
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: #ccc; /* Mid-grey handle */
+  border: 2px solid #f1f1f1; /* Matches light track */
+}
+
+::-webkit-scrollbar-thumb:hover,
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: #a63429; /* Wolf Red */
+  box-shadow: 0 0 8px rgba(166, 52, 41, 0.5);
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wolf-red); /* Glows Wolf Red when interacting */
+  box-shadow: 0 0 10px var(--wolf-red);
+}
+
+/* 2. For Firefox (Standard) */
+* {
+  scrollbar-width: thin; /* "auto" or "thin" */
+  scrollbar-color: #222 #0a0a0a; /* thumb color | track color */
+}
+
 :root {
   --bg-dark: #0f0f0f;
   --card-bg: #1a1a1a;
@@ -8,6 +66,71 @@
   --border-color: rgba(255, 255, 255, 0.05);
   --input-bg: #111111;
   --font-main: 'Inter', sans-serif;
+}
+
+@keyframes wolfPageIntro {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wolf-page-intro {
+  animation: wolfPageIntro 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#toast-container .toastify {
+  margin-top: 55px;
+
+  /* Always glassy */
+  backdrop-filter: blur(12px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  /* Text & layout */
+  color: #fff !important; /* Keep text readable */
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease,
+    background 0.3s ease; /* allow smooth background change */
+
+  /* Background is dynamic but semi-transparent for glass effect */
+  background: rgba(
+    10,
+    10,
+    10,
+    0.4
+  ) !important; /* default, can override via JS */
+}
+
+/* Hover effect */
+#toast-container .toastify:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* Toast icon styling inside container */
+.toastify .toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  #toast-container, /* Toastify's container */
+  .toastify {
+    display: none !important;
+  }
 }
 /* Light Mode Overrides */
 body.light-theme {
@@ -64,6 +187,10 @@ body {
   overflow-x: hidden;
   padding-left: var(--sidebar-width);
   background-color: var(--bg-dark) !important;
+  background-image: url('/assets/images/textures/grid-me.png');
+  background-blend-mode: overlay;
+  background-size: auto;
+  background-repeat: repeat;
   color: var(--text-main);
   transition:
     background-color 0.3s ease,
@@ -109,34 +236,19 @@ body {
   animation: starTwinkle 3s ease-in-out infinite;
 }
 
-@keyframes starTwinkle {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 0.8;
-    box-shadow: 0 0 10px white;
-  }
-  100% {
-    transform: scale(0);
-    opacity: 0;
-  }
-}
-
 #loading-screen {
   position: fixed;
   inset: 0;
-  background-color: var(--bg-color);
+  background: #050505;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  font-family: var(--font-main);
-  color: white;
+  flex-direction: column;
+  color: #fff;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   overflow: hidden;
-  transition: opacity 0.8s ease;
+  transition: opacity 0.8s cubic-bezier(0.7, 0, 0.3, 1);
 }
 
 #loading-screen.show {
@@ -160,18 +272,67 @@ body {
   }
 }
 
-.scanline {
-  width: 100%;
-  height: 100%;
-  z-index: 10;
-  background: linear-gradient(
-    to bottom,
-    rgba(18, 16, 16, 0) 50%,
-    rgba(0, 0, 0, 0.25) 50%
-  );
-  background-size: 100% 4px;
+#loading-screen::after {
+  content: ' ';
+  display: block;
   position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background:
+    radial-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 100%),
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+    linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 0.03),
+      rgba(0, 255, 0, 0.01),
+      rgba(0, 0, 255, 0.03)
+    );
+  z-index: 10002;
+  background-size:
+    100% 100%,
+    100% 3px,
+    3px 100%;
   pointer-events: none;
+}
+
+.scanline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 10px;
+  background: rgba(166, 52, 41, 0.1);
+  opacity: 0.5;
+  z-index: 10001;
+  pointer-events: none;
+  animation: scanline-move 4s linear infinite;
+}
+
+@keyframes scanline-move {
+  0% {
+    top: -10%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+@keyframes scanlineAnim {
+  0% {
+    bottom: 100%;
+  }
+  100% {
+    bottom: -100px;
+  }
+}
+
+.terminal-container {
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+  padding: 20px;
 }
 
 .terminal-container {
@@ -186,24 +347,74 @@ body {
 
 /* Logo Styling */
 .boot-logo {
-  font-size: 3rem;
+  font-size: 5rem;
   font-weight: 900;
-  letter-spacing: 12px;
-  text-transform: uppercase;
+  letter-spacing: -3px;
+  position: relative;
   color: #fff;
-  text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
-  animation: logoPulse 2s infinite ease-in-out;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  width: 100% !important;
+  /* 1. THE STRIPE EFFECT */
+  /* This creates the horizontal lines specifically across the text */
+  background: linear-gradient(
+    to bottom,
+    #fff 50%,
+    rgba(255, 255, 255, 0.2) 50%
+  );
+  background-size: 100% 4px; /* Adjust 4px to make stripes thicker/thinner */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  /* 2. THE GLOW */
+  filter: drop-shadow(0 0 10px rgba(166, 52, 41, 0.8));
+
+  /* 3. THE CRT FLICKER */
+  animation: crt-flicker 0.15s infinite;
 }
 
 .os-brand {
-  color: var(--primary-color);
-  border: 1px solid var(--primary-color);
-  padding: 0 10px;
-  margin-left: 5px;
+  /* Red stripes for the OS part */
+  background: linear-gradient(
+    to bottom,
+    #a63429 50%,
+    rgba(166, 52, 41, 0.3) 50%
+  );
+  background-size: 100% 4px;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- CRT ANIMATIONS --- */
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.98;
+    transform: skewX(0.5deg);
+  }
+  5% {
+    opacity: 0.95;
+    transform: skewX(-0.5deg);
+  }
+  10% {
+    opacity: 0.99;
+  }
+  15% {
+    opacity: 0.92;
+    transform: skewX(0.2deg);
+  }
+  20% {
+    opacity: 1;
+    transform: skewX(0);
+  }
+  100% {
+    opacity: 0.99;
+  }
 }
 
 /* Loading Bar instead of a Spinner */
 .loading-wrapper {
+  position: relative;
   width: 300px;
   display: flex;
   flex-direction: column;
@@ -211,11 +422,20 @@ body {
   gap: 10px;
 }
 
+.boot-spinner {
+  width: 60px;
+  height: 60px;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+  border-top-color: #a63429;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 1s linear infinite;
+}
+
 .progress-bar-container {
   width: 100%;
   height: 2px;
   background: rgba(255, 255, 255, 0.1);
-  position: relative;
   overflow: hidden;
 }
 
@@ -225,6 +445,7 @@ body {
   width: 30%;
   background: var(--primary-color);
   box-shadow: 0 0 15px var(--primary-color);
+  transition: width 0.4s ease;
   animation: progressSlide 2s infinite ease-in-out;
 }
 
@@ -238,9 +459,11 @@ body {
 }
 
 .boot-metadata {
-  font-size: 0.6rem;
-  color: var(--text-dim);
-  letter-spacing: 1px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: #a63429; /* Red terminal text */
+  opacity: 0.6;
+  text-transform: uppercase;
 }
 
 /* Animations */
@@ -1392,7 +1615,7 @@ body.sidebar-open #wolf-layout {
 #wolf-system-alert.success {
   background: #4ade80;
   color: #000;
-  border-bottom: 3px solid #22c55e;
+  border-bottom: 3px solid #ffffff;
 }
 
 /* ERROR THEME (Wolf Red) */
@@ -1739,4 +1962,94 @@ body.sidebar-open #wolf-layout {
 .wolf-swal-confirm-green:hover {
   background: #06c816 !important;
   box-shadow: 0 0 15px rgba(8, 234, 27, 0.4);
+}
+
+/* --- WOLF OS CINEMATIC STAGE SYSTEM --- */
+#main-content {
+  overflow: hidden;
+  position: relative;
+  perspective: 1000px;
+}
+
+.ledger-page-wrapper {
+  width: 100%;
+  /* Use a fixed transition - no keyframes needed */
+  transition:
+    transform 0.6s cubic-bezier(0.7, 0, 0.3, 1),
+    opacity 0.5s ease !important;
+  backface-visibility: hidden;
+}
+
+/* STARTING POSITIONS (Hidden) */
+.stage-right {
+  transform: translateX(100%) !important;
+  opacity: 0 !important;
+}
+
+.stage-left {
+  transform: translateX(-100%) !important;
+  opacity: 0 !important;
+}
+
+/* ACTIVE POSITION (Center) */
+.stage-center {
+  transform: translateX(0) !important;
+  opacity: 1 !important;
+}
+
+/* Skeleton Container */
+.skeleton-wrapper {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Base Skeleton Block */
+.skeleton {
+  background: #2a2a2a; /* Match your Wolf OS dark theme */
+  background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Shapes */
+.skeleton-title {
+  width: 40%;
+  height: 32px;
+  margin-bottom: 10px;
+}
+.skeleton-text {
+  width: 100%;
+  height: 16px;
+}
+.skeleton-box {
+  width: 100%;
+  height: 200px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Smooth fade-in for content */
+.fade-in {
+  animation: fadeIn 0.4s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
