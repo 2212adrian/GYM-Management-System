@@ -1,0 +1,448 @@
+<style>
+  /* --- WOLF OS CORE UI (ZERO SCROLL) --- */
+  .hub-wrapper {
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* ABSOLUTE NO SCROLL */
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(circle at center, #0f0f0f, #000);
+    box-sizing: border-box;
+    /* Tactical Grid Overlay */
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .hub-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 15px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* --- HEADER --- */
+  .hub-header {
+    text-align: center;
+    padding: 5px 0;
+    margin-bottom: 5px;
+  }
+  .hub-title {
+    font-weight: 900;
+    letter-spacing: 5px;
+    font-size: 1.2rem;
+    color: #fff;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .text-danger {
+    color: #ff3e3e;
+    text-shadow: 0 0 10px rgba(255, 62, 62, 0.5);
+  }
+  .hub-subtitle {
+    font-size: 8px;
+    color: #444;
+    letter-spacing: 2px;
+    margin-top: 4px;
+    font-family: monospace;
+    text-transform: uppercase;
+  }
+
+  /* --- TACTICAL PANELS --- */
+  .hub-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly; /* Squeezes content to fit height */
+    gap: 10px;
+  }
+
+  .hub-panel {
+    position: relative;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(20, 20, 20, 0.4);
+    border-left: 3px solid transparent;
+    transition: all 0.4s ease;
+  }
+
+  /* HUD Corner Brackets */
+  .panel-corners::before,
+  .panel-corners::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: rgba(255, 255, 255, 0.05);
+    border-style: solid;
+  }
+  .panel-corners::before {
+    top: 0;
+    right: 0;
+    border-width: 1px 1px 0 0;
+  }
+  .panel-corners::after {
+    bottom: 0;
+    right: 0;
+    border-width: 0 1px 1px 0;
+  }
+
+  /* COLOR THEMES */
+  .main-panel {
+    border-color: #555;
+    --accent: #fff;
+  }
+  .admin-panel {
+    border-color: #ffcc00;
+    --accent: #ffcc00;
+    background: rgba(255, 204, 0, 0.02);
+  }
+  .system-panel {
+    border-color: #3498db;
+    --accent: #3498db;
+    background: rgba(52, 152, 219, 0.02);
+  }
+
+  /* --- GRID LOGIC --- */
+  .hub-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, 1fr); /* Mobile default */
+  }
+
+  @media (min-width: 1024px) {
+    .hub-grid {
+      grid-template-columns: repeat(3, 1fr) !important;
+    }
+    /* Prevents the 3rd item from jumping to a new row on desktop */
+    .hub-grid button:nth-child(3) {
+      grid-column: auto !important;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .hub-grid button:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* Stretch odd/logout items to full width */
+  .logout-btn2,
+  .hub-grid button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* --- INTERACTIVE CARDS --- */
+  .hub-card,
+  .logout-btn2 {
+    background: rgba(10, 10, 10, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.4vh 10px; /* Scaling height to prevent scroll */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    color: var(--accent);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Decorative Ring */
+  .card-ring {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    opacity: 0.02;
+    pointer-events: none;
+    transition: all 0.4s ease;
+    transform: scale(0.8);
+    background: radial-gradient(circle, currentColor, transparent 75%);
+  }
+
+  /* HOVER EFFECTS */
+  .hub-card:hover,
+  .logout-btn2:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px -5px var(--accent);
+  }
+
+  .hub-card:hover .card-ring,
+  .logout-btn2:hover .card-ring {
+    opacity: 0.15;
+    transform: scale(1.4);
+  }
+
+  .hub-card:hover i,
+  .logout-btn2:hover i {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+
+  .hub-card:active,
+  .logout-btn2:active {
+    transform: scale(0.96);
+    filter: brightness(1.3);
+  }
+
+  /* Icons & Text */
+  .hub-card i,
+  .logout-btn2 i {
+    font-size: 22px;
+    z-index: 2;
+    transition: 0.3s;
+  }
+  .hub-card span,
+  .logout-btn2 span {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #fff;
+    z-index: 2;
+  }
+
+  /* --- SPECIFIC LOGOUT (RED ALERT) --- */
+  .logout-btn2 {
+    --accent: #ff4444;
+    color: #ff4444;
+    margin-top: 5px;
+    flex-direction: row !important;
+    gap: 15px;
+    background: rgba(255, 68, 68, 0.05);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+  }
+  .logout-btn2:hover {
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+  }
+
+  .section-label {
+    font-size: 8px;
+    font-weight: 900;
+    color: #666;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* --- BREADCRUMB REDIRECT PULSE --- */
+  @keyframes wolfPulse {
+    0% {
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+    50% {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent);
+    }
+    100% {
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+  .active-section-glow {
+    animation: wolfPulse 1.2s ease-in-out 2;
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  /* MOBILE ASPECT RATIO FIXES */
+  @media (max-height: 650px) {
+    .hub-container {
+      padding: 5px 15px;
+    }
+    .hub-card {
+      padding: 12px 5px;
+    }
+    .hub-title {
+      font-size: 1rem;
+    }
+    .hub-subtitle {
+      margin-top: 2px;
+    }
+    .hub-panel {
+      padding: 8px;
+    }
+  }
+
+  /* --- SECURE PROTOCOL BOX --- */
+  .protocol-notice-box {
+    margin-top: 40px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid;
+    animation: fadeInNotice 1s ease-out;
+  }
+
+  .secure-blue {
+    border-color: #00d9ff !important;
+    background: rgba(0, 217, 255, 0.03) !important;
+    box-shadow: 0 0 15px rgba(0, 217, 255, 0.1) !important;
+  }
+
+  .notice-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #00f2ff; /* Neon cyan */
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .notice-header i {
+    font-size: 14px;
+  }
+
+  .notice-body {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+    font-family: monospace;
+  }
+
+  /* Ensure notice doesn't push logout off-screen on small phones */
+  @media (max-height: 700px) {
+    .protocol-notice-box {
+      padding: 8px;
+      margin-top: 5px;
+    }
+    .notice-body {
+      font-size: 8px;
+      line-height: 1.2;
+    }
+  }
+
+  @keyframes fadeInNotice {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>
+
+<div class="hub-wrapper">
+  <div class="hub-container">
+    <!-- SYSTEM HEADER -->
+    <header class="hub-header">
+      <h2 class="hub-title">COMMAND <span class="text-danger">CENTER</span></h2>
+      <p class="hub-subtitle">SECURE TERMINAL // WOLF OS V4.0</p>
+    </header>
+
+    <div class="hub-content">
+      <!-- MAIN TERMINAL PANEL (SILVER) -->
+      <div class="hub-panel main-panel" id="hub-main">
+        <div class="panel-corners"></div>
+        <label class="section-label">MAIN TERMINAL</label>
+        <div class="hub-grid">
+          <button class="hub-card" onclick="navigateTo('dashboard')">
+            <div class="card-ring"></div>
+            <i class="bx bx-home-alt"></i>
+            <span>HOME</span>
+          </button>
+          <button class="hub-card" onclick="navigateTo('sales')">
+            <div class="card-ring"></div>
+            <i class="bx bx-shopping-bag"></i>
+            <span>SALES</span>
+          </button>
+          <button class="hub-card" onclick="navigateTo('logbook')">
+            <div class="card-ring"></div>
+            <i class="bx bx-book-content"></i>
+            <span>LOGBOOK</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ADMINISTRATION PANEL (GOLD) -->
+      <div class="hub-panel admin-panel" id="hub-admin">
+        <div class="panel-corners"></div>
+        <label class="section-label">ADMINISTRATION</label>
+        <div class="hub-grid">
+          <button class="hub-card" onclick="navigateTo('members')">
+            <div class="card-ring"></div>
+            <i class="bx bx-group"></i>
+            <span>MEMBERS</span>
+          </button>
+          <button class="hub-card" onclick="navigateTo('products')">
+            <div class="card-ring"></div>
+            <i class="bx bx-package"></i>
+            <span>PRODUCTS</span>
+          </button>
+          <button class="hub-card" onclick="navigateTo('equipments')">
+            <div class="card-ring"></div>
+            <i class="bx bx-dumbbell"></i>
+            <span>EQUIPMENTS</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- SYSTEM TOOLS PANEL (BLUE) -->
+      <div class="hub-panel system-panel" id="hub-system">
+        <div class="panel-corners"></div>
+        <label class="section-label">SYSTEM TOOLS</label>
+        <div class="hub-grid">
+          <button class="hub-card" onclick="navigateTo('audit-log')">
+            <div class="card-ring"></div>
+            <i class="bx bx-shield-quarter"></i>
+            <span>AUDIT LOG</span>
+          </button>
+          <button class="hub-card" onclick="navigateTo('settings')">
+            <div class="card-ring"></div>
+            <i class="bx bx-cog"></i>
+            <span>SETTINGS</span>
+          </button>
+
+          <!-- STRETCHED RED LOGOUT -->
+          <button class="logout-btn2" onclick="handleLogout()">
+            <div class="card-ring"></div>
+            <i class="bx bx-log-out"></i>
+            <span>TERMINATE ENCRYPTED SESSION</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ACCESS PROTOCOL NOTICE -->
+      <div class="protocol-notice-box secure-blue">
+        <div class="notice-header">
+          <i class="bx bx-shield-quarter"></i>
+          <span>ACCESS PROTOCOL</span>
+        </div>
+        <div class="notice-body">
+          Lost your way? This is your central navigation hub. Use the tactical
+          panels below to jump directly to the module you need—whether it's
+          tracking daily sales, managing members, or configuring system tools.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    // Logic to highlight the section if the user was redirected from a breadcrumb
+    const target = window.pendingHubSection;
+    if (target) {
+      const el = document.getElementById(`hub-${target}`);
+      if (el) {
+        setTimeout(() => {
+          el.classList.add('active-section-glow');
+          window.pendingHubSection = null;
+        }, 400);
+      }
+    }
+  })();
+</script>

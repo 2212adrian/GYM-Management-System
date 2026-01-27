@@ -245,7 +245,58 @@ function wolfRefreshView() {
  */
 async function navigateTo(pageName) {
   const mainContent = document.getElementById('main-content');
+  const brandEl = document.getElementById('topbar-brand');
   if (!mainContent) return;
+
+  const navigationMap = {
+    home: { label: 'WOLF <span>PALOMAR</span> GYM', parent: null },
+    hub: { label: 'COMMAND CENTER', parent: 'WOLF OS', section: 'main' },
+    // Admin Category
+    members: {
+      label: 'MEMBERS',
+      parent: 'MANAGEMENT',
+      parentRoute: 'hub',
+      section: 'admin',
+    },
+    products: {
+      label: 'PRODUCTS',
+      parent: 'MANAGEMENT',
+      parentRoute: 'hub',
+      section: 'admin',
+    },
+    'management/products': {
+      label: 'PRODUCTS',
+      parent: 'MANAGEMENT',
+      parentRoute: 'hub',
+      section: 'admin',
+    },
+    // Ledger Category
+    sales: {
+      label: 'SALES',
+      parent: 'LEDGER',
+      parentRoute: 'hub',
+      section: 'main',
+    },
+    logbook: {
+      label: 'LOGBOOK',
+      parent: 'LEDGER',
+      parentRoute: 'hub',
+      section: 'main',
+    },
+    // System Category
+    settings: {
+      label: 'SETTINGS',
+      parent: 'SYSTEM',
+      parentRoute: 'hub',
+      section: 'system',
+    },
+    'audit-log': {
+      label: 'AUDIT LOG',
+      parent: 'SYSTEM',
+      parentRoute: 'hub',
+      section: 'system',
+    },
+  };
 
   // --- SKELETON UI ---
   const skeletonUI = `
@@ -329,6 +380,45 @@ async function navigateTo(pageName) {
       // 6. Wrap incoming HTML in the intro animation class
       mainContent.innerHTML = `<div class="wolf-page-intro">${html}</div>`;
 
+      if (brandEl) {
+        const isMobile = window.innerWidth <= 1024;
+        const info = navigationMap[pageName];
+
+        if (!info || pageName === 'home') {
+          // Reset to Logo for Home
+          brandEl.innerHTML = 'WOLF <span>PALOMAR</span> GYM';
+          brandEl.style.fontSize = ''; // Reset size
+        } else {
+          // 1. Determine sizes
+          const baseFontSize = isMobile ? '0.85rem' : '1rem';
+          const parentOpacity = '0.5';
+
+          // 2. Clickable Parent Logic
+          const isAlreadyOnParent = pageName === info.parentRoute;
+          const parentHTML = isAlreadyOnParent
+            ? `<span style="opacity: ${parentOpacity};">${info.parent}</span>`
+            : `<span class="breadcrumb-link" 
+           onclick="window.pendingHubSection='${info.section}'; navigateTo('hub')" 
+           style="cursor:pointer; opacity: ${parentOpacity}; transition: opacity 0.2s;">
+       ${info.parent}
+     </span>`;
+
+          // 3. Set the HTML with the Blue Arrow
+          brandEl.style.fontSize = baseFontSize;
+          brandEl.style.display = 'flex';
+          brandEl.style.alignItems = 'center';
+          brandEl.style.justifyContent = 'center'; // Keeps it centered in the top bar
+
+          brandEl.innerHTML = `
+      <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
+        ${parentHTML}
+        <i class='bx bx-chevron-right' style="color: #3498db; font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
+        <span style="letter-spacing: 1px; font-weight: 800; color: white;">${info.label}</span>
+      </div>
+    `;
+        }
+      }
+
       // 7. INITIALIZE PAGE MANAGERS
       if (isLedger && window.wolfData) {
         wolfData.activeMode = pageName;
@@ -383,6 +473,7 @@ async function navigateTo(pageName) {
         .querySelectorAll('[data-page]')
         .forEach((el) => el.classList.remove('active'));
     } catch (fatal) {
+      if (brandEl) brandEl.innerHTML = 'WOLF <span>PALOMAR</span> GYM';
       mainContent.innerHTML = offlineUI;
       mainContent.style.opacity = '1';
     }
@@ -457,7 +548,7 @@ async function initUI() {
         clearInterval(bootInterval);
         if (callback) callback();
       }
-    }, 550);
+    }, 300);
   }
 
   /**
@@ -480,7 +571,7 @@ async function initUI() {
           setTimeout(() => (loadingOverlay.style.display = 'none'), 100);
         }
       }, 300);
-    }, 1000);
+    }, 700);
   }
 
   // --- START BOOT LOGIC ---
@@ -519,7 +610,7 @@ async function initUI() {
     });
 
     await finalizeSystemBoot();
-  }, 2000);
+  }, 1000);
 }
 
 /**

@@ -1,4 +1,32 @@
 <style>
+  /* Breadcrumb hover effect */
+  .breadcrumb-link:hover {
+    opacity: 1 !important;
+    color: #3498db; /* Optional: turn blue on hover to match the arrow */
+  }
+
+  /* Ensure the brand-name container doesn't wrap on PC */
+  #topbar-brand {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .breadcrumb-container {
+    animation: fadeInBreadcrumb 0.3s ease-out;
+  }
+
+  @keyframes fadeInBreadcrumb {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .topbar {
     height: 60px;
     display: flex;
@@ -158,5 +186,5 @@
     <i class="bx bx-volume-full" id="muteIcon"></i>
     <span class="nav-text">AUDIO: NULL</span>
   </a>
-  <div class="brand-name">WOLF <span>PALOMAR</span> GYM</div>
+  <div class="brand-name" id="topbar-brand">WOLF <span>PALOMAR</span> GYM</div>
 </header>

@@ -874,27 +874,6 @@ button:hover:not(:disabled) {
   animation: bluePulse 3s infinite ease-in-out;
 }
 
-.notice-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #4da6ff; /* Lighter blue for visibility */
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-}
-
-.notice-header i {
-  font-size: 16px;
-}
-
-.notice-body {
-  font-size: 10px;
-  color: #a0aec0;
-  line-height: 1.5;
-}
-
 @keyframes bluePulse {
   0%,
   100% {
@@ -980,6 +959,27 @@ button:hover:not(:disabled) {
   background: rgba(0, 217, 255, 0.05) !important;
   box-shadow: 0 0 15px rgba(0, 217, 255, 0.2) !important;
   margin: 26px;
+}
+
+.notice-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4da6ff; /* Lighter blue for visibility */
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.notice-header i {
+  font-size: 16px;
+}
+
+.notice-body {
+  font-size: 10px;
+  color: #a0aec0;
+  line-height: 1.5;
 }
 .secure-blue .notice-header {
   color: #00f2ff;
