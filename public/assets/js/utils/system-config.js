@@ -1,5 +1,5 @@
 const WOLF_CONFIG = {
-  noLoadingScreen: false,
+  noLoadingScreen: true,
   VERSION: 'v0.3.6',
   FULL_VERSION: 'GYM V0.3.6',
   BRAND_WHITE: 'WOLF',

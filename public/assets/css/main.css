@@ -949,6 +949,32 @@ body.sidebar-open #wolf-layout {
   cursor: pointer;
   text-transform: uppercase;
 }
+
+.search-collapsible {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: 0.4s;
+}
+.search-collapsible.active {
+  max-height: 100px;
+  opacity: 1;
+  margin-bottom: 20px;
+}
+.ledger-search-box {
+  background: #111;
+  border-radius: 14px;
+  padding: 14px 20px;
+  display: flex;
+  border: 1px solid #222;
+}
+.ledger-search-box input {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 100%;
+  outline: none;
+}
 /* Filter Search (Sales Only) */
 .filter-container {
   background: #111;
@@ -2052,4 +2078,10 @@ body.sidebar-open #wolf-layout {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.image-box img.selected {
+  outline: 2px solid var(--wolf-red);
+  box-shadow: 0 0 12px rgba(166, 52, 41, 0.8);
+  transform: translateY(-2px);
 }

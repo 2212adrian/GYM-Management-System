@@ -44,7 +44,6 @@ window.wolfRetry = async function () {
 
 const WOLF_PURIFIER = (dirty) => {
   return DOMPurify.sanitize(dirty, {
-    // Allow styling
     ALLOWED_TAGS: [
       'div',
       'span',
@@ -72,30 +71,32 @@ const WOLF_PURIFIER = (dirty) => {
       'h4',
       'h5',
       'h6',
-      'style', // ✅ THIS is the big one
+      'style',
+      'form',
+      'textarea',
+      'select',
+      'option',
+      'img', // ⬅ add these
     ],
-
-    // Allow layout + UI attributes
     ALLOWED_ATTR: [
       'class',
       'id',
-      'style', // ✅ inline styles
+      'style',
       'data-page',
       'data-date',
       'data-day',
       'data-id',
+      'data-product-id', // ⬅ add
       'href',
       'type',
       'value',
       'placeholder',
       'aria-label',
       'role',
+      'src',
+      'alt', // ⬅ add src, alt
     ],
-
-    // Keep CSS working
     KEEP_CONTENT: true,
-
-    // Explicitly forbid scripts
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick'],
   });
@@ -140,16 +141,24 @@ const themeManager = {
 themeManager.init();
 
 // --- 1. CORE UTILS ---
-async function loadComponent(id, path) {
-  if (window.applySystemConfig) window.applySystemConfig(); // Apply system config if available
-  const el = document.getElementById(id);
-  if (!el) return;
+async function loadComponent(targetId, url) {
+  const container = document.getElementById(targetId);
+  if (!container) return;
+
   try {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`Failed to load ${path}`);
-    el.innerHTML = WOLF_PURIFIER(await res.text());
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load component');
+    const html = await res.text();
+
+    container.insertAdjacentHTML('beforeend', html);
+
+    // After injecting, move any <style> tags to <head>
+    const styles = container.querySelectorAll('style');
+    styles.forEach((styleEl) => {
+      document.head.appendChild(styleEl); // moves it from container to head
+    });
   } catch (err) {
-    console.error('Component Load Error:', err);
+    console.error('loadComponent error:', err);
   }
 }
 
@@ -398,10 +407,10 @@ async function navigateTo(pageName) {
           const parentHTML = isAlreadyOnParent
             ? `<span style="opacity: ${parentOpacity};">${info.parent}</span>`
             : `<span class="breadcrumb-link" 
-           onclick="window.pendingHubSection='${info.section}'; navigateTo('hub')" 
-           style="cursor:pointer; opacity: ${parentOpacity}; transition: opacity 0.2s;">
-       ${info.parent}
-     </span>`;
+               onclick="window.pendingHubSection='${info.section}'; navigateTo('hub')" 
+               style="cursor:pointer; opacity: ${parentOpacity}; transition: opacity 0.2s;">
+            ${info.parent}
+          </span>`;
 
           // 3. Set the HTML with the Blue Arrow
           brandEl.style.fontSize = baseFontSize;
@@ -410,12 +419,12 @@ async function navigateTo(pageName) {
           brandEl.style.justifyContent = 'center'; // Keeps it centered in the top bar
 
           brandEl.innerHTML = `
-      <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
-        ${parentHTML}
-        <i class='bx bx-chevron-right' style="color: #3498db; font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
-        <span style="letter-spacing: 1px; font-weight: 800; color: white;">${info.label}</span>
-      </div>
-    `;
+          <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
+            ${parentHTML}
+            <i class='bx bx-chevron-right' style="color: #3498db; font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
+            <span style="letter-spacing: 1px; font-weight: 800; color: white;">${info.label}</span>
+          </div>
+        `;
         }
       }
 
@@ -432,7 +441,26 @@ async function navigateTo(pageName) {
         (pageName === 'management/products' || pageName === 'products') &&
         typeof ProductManager !== 'undefined'
       ) {
+        Toastify({
+          text: 'ProductManager.init() from navigateTo',
+          duration: 2000,
+        }).showToast();
         ProductManager.init();
+
+        // 1) Ensure modal CSS is loaded once
+        if (!document.getElementById('add-product-modal-css')) {
+          const link = document.createElement('link');
+          link.id = 'add-product-modal-css';
+          link.rel = 'stylesheet';
+          link.href = '/assets/components/add-product-modal.css';
+          document.head.appendChild(link);
+        }
+
+        // 2) Mount Add Product modal HTML into the products page
+        loadComponent(
+          'product-modal-container',
+          '/assets/components/add-product-modal.html',
+        );
       }
 
       // 8. Reveal content
@@ -622,6 +650,21 @@ function setupGlobalClickHandlers() {
   window.wolfEventHandlersAttached = true;
 
   document.addEventListener('click', async (e) => {
+    // ADD PRODUCT BUTTON (products page header)
+    const addProductBtn = e.target.closest('#btn-add-product');
+    if (addProductBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const modal = document.getElementById('product-modal-overlay');
+      if (modal) {
+        modal.style.display = 'flex';
+      } else {
+        alert('Add Product modal not found in DOM');
+      }
+      return;
+    }
+
     // 1. SIDEBAR DROPDOWNS
     const dropdownToggle = e.target.closest('.nav-dropdown > .nav-item-side');
     if (dropdownToggle) {
@@ -654,18 +697,24 @@ function setupGlobalClickHandlers() {
     }
 
     // 2. SEARCH ENGINE
+    // 2. SEARCH ENGINE
     const searchToggle = e.target.closest('#toggle-search-btn');
     if (searchToggle) {
+      e.preventDefault();
+      e.stopPropagation();
+
       const container = document.getElementById('ledger-search-container');
-      const input = document.getElementById('ledger-main-search');
+      const input = document.getElementById('product-main-search');
       if (!container || !input) return;
 
-      const isOpening = container.classList.toggle('active');
-      searchToggle.classList.toggle('active');
+      const isActive = container.classList.toggle('active');
 
-      if (isOpening) {
-        setTimeout(() => input.focus(), 300);
-        if (window.wolfAudio) window.wolfAudio.play('notif');
+      if (isActive) {
+        setTimeout(() => input.focus(), 150);
+      } else {
+        input.value = '';
+        const clearBtn = document.getElementById('search-clear-btn');
+        if (clearBtn) clearBtn.style.display = 'none';
       }
       return;
     }

@@ -135,6 +135,85 @@ const wolfData = {
     // The refreshSummaryHUD handles the math
     const newRowHTML = this.renderSingleSaleCard(sale, 0); // index 0 for instant pop
     container.insertAdjacentHTML('afterbegin', newRowHTML);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const sku = skuInput.value.trim();
+      const name = nameInput.value.trim();
+      const price = parseFloat(priceInput.value || '0');
+      const qty = unlimitedCheckbox?.checked
+        ? 999999
+        : parseInt(qtyInput.value || '0', 10);
+      const desc = document.getElementById('master-desc')?.value || null;
+      const brand = document.getElementById('master-brand')?.value || null;
+
+      // Require minimal fields
+      if (!name || !qty || !price) {
+        if (statusEl)
+          statusEl.textContent = 'Name, quantity, and price are required.';
+        return;
+      }
+
+      // If this entry came from a food name search (no barcode id) and no image selected
+      if (!sku && !selectedImageUrl) {
+        if (statusEl) {
+          statusEl.textContent =
+            'Please select one image before adding to sales.';
+        }
+        return;
+      }
+
+      try {
+        // 1. Ensure product exists (use existing, or create if needed)
+        const productIdFromForm = form.dataset.productId || null;
+        let finalProductId = productIdFromForm;
+
+        if (!finalProductId) {
+          const { data: productRow, error: prodErr } = await supabaseClient
+            .from('products')
+            .insert({
+              sku: sku || undefined, // let trigger generate SKU if empty
+              name,
+              description: desc,
+              price,
+              qty,
+              image_url: selectedImageUrl || null,
+              is_active: true,
+            })
+            .select()
+            .single();
+          if (prodErr) throw prodErr;
+          finalProductId = productRow.productid;
+        }
+
+        // 2. Insert sale row
+        const { data: sale, error: saleErr } = await supabaseClient
+          .from('sales')
+          .insert({
+            productid: finalProductId,
+            qty,
+            price,
+          })
+          .select()
+          .single();
+        if (saleErr) throw saleErr;
+
+        // 3. Let ledger UI handle rendering
+        if (
+          window.wolfData &&
+          typeof window.wolfData.addSaleRow === 'function'
+        ) {
+          window.wolfData.addSaleRow(sale);
+        }
+
+        if (statusEl) statusEl.textContent = 'Sale added.';
+        modal.style.display = 'none';
+      } catch (err) {
+        console.error(err);
+        if (statusEl) statusEl.textContent = 'Error adding sale.';
+      }
+    });
   },
 
   updateSaleRow(sale) {

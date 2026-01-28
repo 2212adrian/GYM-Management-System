@@ -266,7 +266,7 @@
       <button class="icon-btn" id="btn-view-trash">
         <i class="bx bx-archive"></i>
       </button>
-      <button class="icon-btn active" id="toggle-search-btn">
+      <button class="icon-btn active" id="toggle-search-btn" type="button">
         <i class="bx bx-search"></i>
       </button>
       <button class="icon-btn red" id="btn-add-product">
@@ -300,12 +300,17 @@
   <!-- Search Engine Hub -->
   <div class="search-collapsible active" id="ledger-search-container">
     <div class="ledger-search-box">
-      <i class="bx bx-package text-secondary"></i>
+      <i class="bx bx-search text-secondary"></i>
       <input
         type="text"
         id="product-main-search"
-        placeholder="Search by name or SKU..."
+        placeholder="Search product by name or SKU..."
       />
+      <i
+        class="bx bx-x text-secondary"
+        id="search-clear-btn"
+        style="cursor: pointer; display: none"
+      ></i>
     </div>
   </div>
 
@@ -314,3 +319,5 @@
     <!-- Skeleton will show here first -->
   </div>
 </div>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
