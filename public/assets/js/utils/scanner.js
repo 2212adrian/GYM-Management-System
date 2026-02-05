@@ -158,21 +158,26 @@ window.wolfScanner = {
 
     const quickAuth = document.getElementById('quickAuthToggle')?.checked;
 
+    // Normalize: uppercase + remove spaces
+    const normalized = String(text || '')
+      .toUpperCase()
+      .replace(/\s+/g, '');
+
     // Stop camera and hide scanner
     await this.stop();
 
     // ROUTING LOGIC
     if (this.activeCallback) {
       // Use case: Scanner opened by a specific function to get a string
-      this.activeCallback(text);
+      this.activeCallback(normalized);
     } else if (window.salesManager) {
       // Use case: Global POS usage
       if (quickAuth) {
         // Instant process (SKIPS MODAL)
-        await window.salesManager.processQuickSale(text);
+        await window.salesManager.processQuickSale(normalized);
       } else {
         // Open Modal with Pre-filled SKU
-        await window.salesManager.openSaleTerminal(text);
+        await window.salesManager.openSaleTerminal(normalized);
       }
     }
 
@@ -212,12 +217,75 @@ window.wolfScanner = {
     const input = document.getElementById('manualCodeInput');
     const group = document.getElementById('manualInputGroup');
     const confirmBtn = document.getElementById('manualConfirmBtn');
+    const results = document.getElementById('custom-search-results');
+    let searchTimer = null;
 
     if (input) {
       // 1. Force Uppercase & UI Animation
       input.addEventListener('input', (e) => {
         e.target.value = e.target.value.toUpperCase();
         group.classList.toggle('has-content', e.target.value.trim().length > 0);
+      });
+
+      // 1.1 Product name search -> use SKU
+      input.addEventListener('input', () => {
+        const query = input.value.trim();
+        if (!results) return;
+
+        if (searchTimer) clearTimeout(searchTimer);
+        if (query.length < 1) {
+          results.classList.remove('active');
+          results.innerHTML = '';
+          return;
+        }
+
+        searchTimer = setTimeout(async () => {
+          let data = [];
+
+          if (window.supabaseClient) {
+            const res = await window.supabaseClient
+              .from('products')
+              .select('name, sku')
+              .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
+              .order('name', { ascending: true })
+              .limit(6);
+
+            if (!res.error) data = res.data || [];
+          }
+
+          // Fallback to in-memory products if available
+          if ((!data || data.length === 0) && window.ProductManager?.allProducts) {
+            const q = query.toLowerCase();
+            data = window.ProductManager.allProducts
+              .filter(
+                (p) =>
+                  (p.name && p.name.toLowerCase().includes(q)) ||
+                  (p.sku && p.sku.toLowerCase().includes(q)),
+              )
+              .slice(0, 6)
+              .map((p) => ({ name: p.name, sku: p.sku }));
+          }
+
+          if (!results) return;
+
+          if (!data || data.length === 0) {
+            results.classList.remove('active');
+            results.innerHTML = '';
+            return;
+          }
+
+          results.innerHTML = data
+            .map(
+              (p) => `
+              <div class="dropdown-item" data-sku="${p.sku || ''}">
+                <span>${(p.name || '').toUpperCase()}</span>
+                <span class="sku">PR-${(p.sku || '').toUpperCase()}</span>
+              </div>
+            `,
+            )
+            .join('');
+          results.classList.add('active');
+        }, 250);
       });
 
       // 2. ENTER KEY LOGIC (Submits the form)
@@ -236,6 +304,22 @@ window.wolfScanner = {
         const val = input.value.trim();
         if (val) this.processResult(val, 'MANUAL_ENTRY');
       };
+    }
+
+    // 3.5 Dropdown selection -> use SKU as code
+    if (results) {
+      results.addEventListener('click', (e) => {
+        const item = e.target.closest('.dropdown-item');
+        if (!item) return;
+        const sku = item.getAttribute('data-sku') || '';
+        if (!sku) return;
+
+        if (input) input.value = sku.toUpperCase();
+        results.classList.remove('active');
+        results.innerHTML = '';
+        if (group) group.classList.add('has-content');
+        this.processResult(sku, 'MANUAL_PICK');
+      });
     }
 
     // 4. Close UI

@@ -9,7 +9,7 @@ window.logbookManager = {
 
   async openLogbookTerminal() {
     console.log('Wolf OS: Initializing Logbook Entry Protocol...');
-
+    if (window.wolfAudio) window.wolfAudio.play('notif');
     // 1. Ensure Atomic Time is synced first to prevent "Invalid Date"
     if (window.wolfData && window.wolfData.syncServerTime) {
       await window.wolfData.syncServerTime();
@@ -34,8 +34,6 @@ window.logbookManager = {
         modal.style.display = 'flex';
         this.attachLogbookListeners(modal);
         this.startTerminalClock(modal);
-
-        if (window.wolfAudio) window.wolfAudio.play('notif');
       }
     } catch (err) {
       console.error('Wolf OS: Modal Load Fault:', err);
@@ -153,10 +151,12 @@ window.logbookManager = {
   closeLogbookTerminal() {
     const modal = document.getElementById('logbook-modal-overlay');
     if (modal) {
-      modal.style.display = 'none';
+      const card = modal.querySelector('.wolf-modal-card');
+      modal.classList.add('closing');
+      if (card) card.classList.add('closing');
       clearInterval(this.clockInterval);
       // Clean up DOM to prevent ID conflicts
-      setTimeout(() => modal.remove(), 300);
+      setTimeout(() => modal.remove(), 260);
     }
   },
 

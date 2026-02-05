@@ -24,6 +24,11 @@ const wolfData = {
   lastTotal: 0,
   activeAF: null, // store active auto-filter
   lastTraffic: 0,
+  goalTargets: {
+    DAILY: 0,
+    WEEKLY: 0,
+    MONTHLY: 0,
+  },
 
   // --- NAVIGATION SYNC ENGINE ---
   syncNavigationUI(currentMode) {
@@ -123,6 +128,49 @@ const wolfData = {
 
     this.animateValue(el, this.lastTotal, targetValue, 800);
     this.lastTotal = targetValue;
+
+    // Update sidebar target box using DAILY target (sales mode only)
+    if (this.activeMode === 'sales') {
+      this.updateTargetBox(targetValue);
+    }
+  },
+
+  async loadGoalTargets() {
+    if (!window.supabaseClient) return;
+
+    const periods = ['DAILY', 'WEEKLY', 'MONTHLY'];
+    for (const period of periods) {
+      const { data, error } = await supabaseClient
+        .from('goal_target')
+        .select('*')
+        .eq('period_type', period)
+        .order('start_date', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        this.goalTargets[period] = Number(data[0].target_amount || 0);
+      }
+    }
+
+    // Sync sidebar target box
+    this.updateTargetBox(this.lastTotal);
+  },
+
+  updateTargetBox(currentValue = 0) {
+    const target = Number(this.goalTargets?.DAILY || 0);
+    const percentEl = document.getElementById('sidebar-target-percent');
+    const barEl = document.getElementById('sidebar-target-bar');
+    if (!percentEl || !barEl) return;
+
+    if (target <= 0) {
+      percentEl.textContent = '0%';
+      barEl.style.width = '0%';
+      return;
+    }
+
+    const pct = Math.min(100, Math.max(0, (currentValue / target) * 100));
+    percentEl.textContent = `${Math.round(pct)}%`;
+    barEl.style.width = `${pct}%`;
   },
 
   // --- UI methods ---
@@ -377,6 +425,7 @@ const wolfData = {
     this.syncNavigationUI(mode);
     this.initChrono(mode);
     await this.syncServerTime();
+    await this.loadGoalTargets();
   },
 
   // ==========================================

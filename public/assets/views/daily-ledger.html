@@ -72,13 +72,64 @@
 
   /* --- 3. SUMMARY HUD --- */
   .ledger-summary-card {
-    background: linear-gradient(145deg, #111, #0a0a0a);
-    border: 1px solid #1a1a1a;
-    border-radius: 24px;
-    padding: 30px;
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 20, 0.85),
+      rgba(10, 10, 10, 0.95)
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(166, 52, 41, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 15px;
+    border-radius: 20px;
+    padding: 25px 20px;
     text-align: center;
-    margin-bottom: 10px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-image:
+      url(/assets/images/textures/dark-mosaic.png),
+      radial-gradient(circle at 50% 0%, rgba(166, 52, 41, 0.1), transparent);
+    background-blend-mode: overlay, normal;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .ledger-summary-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(166, 52, 41, 0.6);
+    box-shadow:
+      0 15px 35px rgba(166, 52, 41, 0.15),
+      0 5px 15px rgba(0, 0, 0, 0.5);
+  }
+
+  .ledger-summary-card::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 3px;
+    height: 3px;
+    background: #a63429;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #a63429;
+    opacity: 0.6;
+  }
+
+  .ledger-summary-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: #a63429;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+  }
+
+  .ledger-summary-card:hover::after {
+    width: 40%;
   }
 
   .summary-label {

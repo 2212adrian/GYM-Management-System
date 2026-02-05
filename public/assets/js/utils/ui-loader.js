@@ -140,6 +140,66 @@ const themeManager = {
 // Initialize theme immediately to prevent "white flash"
 themeManager.init();
 
+// --- GLOBAL LOGOUT HANDLER (SweetAlert confirm) ---
+window.handleLogout = async function () {
+  const swal = window.Swal;
+  const db = window.supabaseClient;
+
+  const confirmLogout = async () => {
+    try {
+      if (db?.auth?.signOut) {
+        await db.auth.signOut();
+      } else {
+        // Fallback if client is missing for any reason
+        sessionStorage.clear();
+        window.location.replace('/index.html');
+      }
+    } catch (err) {
+      if (swal) {
+        swal.fire({
+          title: 'LOGOUT FAILED',
+          html: `<div style="color:#a63429; font-size:3rem; margin-bottom:12px;"><i class='bx bx-error-alt'></i></div>
+                 <p style="color:#888; font-size:13px;">${err.message || 'Unknown error'}</p>`,
+          background: '#111',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'wolf-swal-popup wolf-border-red',
+            title: 'wolf-swal-title',
+            confirmButton: 'btn-wolf-red',
+          },
+          confirmButtonText: 'OK',
+        });
+      } else {
+        alert(`Logout failed: ${err.message || 'Unknown error'}`);
+      }
+    }
+  };
+
+  if (swal) {
+    const res = await swal.fire({
+      title: 'TERMINATE SESSION?',
+      html: `<div style="color:#ff4d4d; font-size:3rem; margin-bottom:12px;"><i class='bx bx-power-off'></i></div>
+             <p style="color:#888; font-size:13px;">You will be logged out of Wolf OS.</p>`,
+      showCancelButton: true,
+      confirmButtonText: 'LOGOUT',
+      cancelButtonText: 'CANCEL',
+      reverseButtons: true,
+      background: '#111',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'wolf-swal-popup wolf-border-red',
+        title: 'wolf-swal-title',
+        confirmButton: 'btn-wolf-red',
+        cancelButton: 'btn-wolf-secondary',
+      },
+    });
+
+    if (res.isConfirmed) await confirmLogout();
+  } else {
+    if (confirm('Log out of Wolf OS?')) await confirmLogout();
+  }
+};
+
 // --- 1. CORE UTILS ---
 async function loadComponent(targetId, url) {
   const container = document.getElementById(targetId);
@@ -176,21 +236,39 @@ function updateNavHighlights(pageName) {
       el.classList.add('active');
       // SWAP TO SOLID (bxs)
       if (icon) {
-        icon.className = icon.className.replace(
-          /\bbx-([a-z0-9-]+)\b/g,
-          'bxs-$1',
-        );
+        if (icon.classList.contains('bx-target')) {
+          icon.className = 'bxf bx-target';
+        } else {
+          icon.className = icon.className.replace(
+            /\bbx-([a-z0-9-]+)\b/g,
+            'bxs-$1',
+          );
+        }
       }
     } else {
       el.classList.remove('active');
       // REVERT TO OUTLINE (bx)
       if (icon) {
-        icon.className = icon.className.replace(
-          /\bbxs-([a-z0-9-]+)\b/g,
-          'bx-$1',
-        );
+        if (icon.classList.contains('bx-target') || icon.classList.contains('bxf')) {
+          icon.className = 'bx bx-target';
+        } else {
+          icon.className = icon.className.replace(
+            /\bbxs-([a-z0-9-]+)\b/g,
+            'bx-$1',
+          );
+        }
       }
     }
+  });
+
+  syncDropdownActiveLabels();
+}
+
+function syncDropdownActiveLabels() {
+  document.querySelectorAll('.nav-dropdown').forEach((dropdown) => {
+    const activeSub = dropdown.querySelector('.sub-item.active');
+    if (activeSub) dropdown.classList.add('active-only');
+    else dropdown.classList.remove('active-only');
   });
 }
 
@@ -362,7 +440,6 @@ async function navigateTo(pageName) {
   try {
     let path;
     let isLedger = false;
-
     // 4. ROUTING LOGIC
     if (pageName === 'sales' || pageName === 'logbook') {
       path = '/assets/views/daily-ledger.html';
@@ -441,26 +518,7 @@ async function navigateTo(pageName) {
         (pageName === 'management/products' || pageName === 'products') &&
         typeof ProductManager !== 'undefined'
       ) {
-        Toastify({
-          text: 'ProductManager.init() from navigateTo',
-          duration: 2000,
-        }).showToast();
         ProductManager.init();
-
-        // 1) Ensure modal CSS is loaded once
-        if (!document.getElementById('add-product-modal-css')) {
-          const link = document.createElement('link');
-          link.id = 'add-product-modal-css';
-          link.rel = 'stylesheet';
-          link.href = '/assets/components/add-product-modal.css';
-          document.head.appendChild(link);
-        }
-
-        // 2) Mount Add Product modal HTML into the products page
-        loadComponent(
-          'product-modal-container',
-          '/assets/components/add-product-modal.html',
-        );
       }
 
       // 8. Reveal content
@@ -649,7 +707,36 @@ function setupGlobalClickHandlers() {
   if (window.wolfEventHandlersAttached) return;
   window.wolfEventHandlersAttached = true;
 
+  const collapseSidebar = () => {
+    const sidebarElement = document.getElementById('wolfSidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!sidebarElement) return;
+
+    sidebarElement.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    if (backdrop) backdrop.classList.remove('active');
+
+    const closeIcon = document.getElementById('closeIcon');
+    const versionLabel = sidebarElement.querySelector('.version');
+    if (closeIcon) closeIcon.className = 'bxf bx-caret-big-right';
+    if (versionLabel) versionLabel.style.display = 'none';
+
+    // Close all dropdowns for a clean collapse
+    document
+      .querySelectorAll('.nav-dropdown')
+      .forEach((d) => d.classList.remove('open'));
+  };
+
   document.addEventListener('click', async (e) => {
+    // LOGOUT (sidebar + hub button)
+    const logoutBtn = e.target.closest('.logout-btn, .logout-btn2');
+    if (logoutBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.handleLogout) window.handleLogout();
+      return;
+    }
+
     // ADD PRODUCT BUTTON (products page header)
     const addProductBtn = e.target.closest('#btn-add-product');
     if (addProductBtn) {
@@ -700,12 +787,15 @@ function setupGlobalClickHandlers() {
     // 2. SEARCH ENGINE
     const searchToggle = e.target.closest('#toggle-search-btn');
     if (searchToggle) {
+      const container = document.getElementById('ledger-search-container');
+      const input =
+        document.getElementById('product-main-search') ||
+        document.getElementById('member-main-search') ||
+        document.getElementById('ledger-main-search');
+      if (!container || !input) return;
+
       e.preventDefault();
       e.stopPropagation();
-
-      const container = document.getElementById('ledger-search-container');
-      const input = document.getElementById('product-main-search');
-      if (!container || !input) return;
 
       const isActive = container.classList.toggle('active');
 
@@ -715,6 +805,22 @@ function setupGlobalClickHandlers() {
         input.value = '';
         const clearBtn = document.getElementById('search-clear-btn');
         if (clearBtn) clearBtn.style.display = 'none';
+      }
+      return;
+    }
+
+    // 2.1 TRASH / ARCHIVE (Ledger header)
+    const clearSalesBtn = e.target.closest('#clear-sales-btn');
+    if (clearSalesBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (
+        window.salesManager &&
+        typeof window.salesManager.openTrashBin === 'function'
+      ) {
+        window.salesManager.openTrashBin();
+      } else {
+        console.warn('Wolf OS: salesManager not available for trash modal.');
       }
       return;
     }
@@ -731,6 +837,11 @@ function setupGlobalClickHandlers() {
       // LOCKDOWN: Sync UI immediately (Active turns Red + Unclickable)
       if (window.wolfData && window.wolfData.syncNavigationUI) {
         window.wolfData.syncNavigationUI(targetPage);
+      }
+
+      // Close sidebar after any navigation click on mobile only
+      if (navBtn.closest('#wolfSidebar') && window.innerWidth < 768) {
+        collapseSidebar();
       }
       return;
     }
@@ -777,8 +888,6 @@ function setupGlobalClickHandlers() {
           .querySelectorAll('.nav-dropdown')
           .forEach((d) => d.classList.remove('open'));
       }
-
-      if (window.wolfAudio) window.wolfAudio.play('notif');
     }
   });
 

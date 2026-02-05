@@ -4,10 +4,12 @@
   --wolf-bg: #050505;
 }
 
-/* ========= OVERLAY ========= */
+/* ========= BASE OVERLAY (shared) ========= */
+/* ========= BASE OVERLAY (shared) ========= */
 .master-modal-overlay {
   position: fixed;
   inset: 0;
+  visibility: hidden;
   display: none;
   background: rgba(0, 0, 0, 0.96);
   backdrop-filter: blur(12px);
@@ -17,30 +19,28 @@
   padding: 16px 12px;
   overflow-y: auto;
   opacity: 0;
-  transition: opacity 0.26s ease;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease,
+    transform 0.22s ease;
 }
 
 .master-modal-overlay.is-open {
   display: flex;
   opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
-#product-modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: none;
-  background: rgba(0, 0, 0, 0.9);
-  transition: opacity 0.22s ease;
-  z-index: 9999;
-}
-
-#product-modal-overlay.is-open {
-  display: flex;
-  opacity: 1;
-}
-
-#product-modal-overlay.is-closing {
+.master-modal-overlay.is-closing {
   opacity: 0;
+  transform: translateY(24px);
+}
+
+/* ========= PRODUCT OVERLAY (just overrides) ========= */
+#product-modal-overlay {
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 9999;
 }
 
 /* ========= MODAL CONTAINER ========= */
@@ -59,11 +59,12 @@
   display: flex;
   flex-direction: column;
   transform-origin: center top;
-  opacity: 0;
+  opacity: 1;
   transform: translateY(26px) scale(0.94) rotateX(6deg);
   transition:
     opacity 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
     transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: terminalSlideIn 0.35s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 /* open/close animation states (controlled via JS) */

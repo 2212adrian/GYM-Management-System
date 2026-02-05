@@ -1,0 +1,171 @@
+<style>
+  .equip-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .equip-wrapper {
+      max-width: 1200px;
+      min-width: 650px;
+    }
+  }
+
+  .equip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .equip-title {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .equip-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .equip-card {
+    background: linear-gradient(180deg, #171717, #0f0f0f);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 22px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  .equip-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .equip-thumb {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #222;
+    border: 1px solid #2a2a2a;
+    overflow: hidden;
+  }
+
+  .equip-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .equip-name {
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .equip-sub {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .equip-status {
+    font-size: 9px;
+    font-weight: 900;
+    color: #f0b429;
+    letter-spacing: 1px;
+  }
+
+  .equip-actions {
+    display: flex;
+    gap: 10px;
+    color: #aaa;
+  }
+
+  .equip-actions i {
+    cursor: pointer;
+  }
+
+  .equip-add {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--wolf-red);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="equip-wrapper">
+  <div class="equip-header">
+    <div class="equip-title">EQUIPMENT DATABASE (static)</div>
+    <button class="equip-add"><i class="bx bx-plus"></i></button>
+  </div>
+
+  <div class="equip-list">
+    <div class="equip-card">
+      <div class="equip-info">
+        <div class="equip-thumb">
+          <img src="/assets/images/placeholder.png" alt="Treadmill" />
+        </div>
+        <div>
+          <div class="equip-name">TREADMILL X-PRO</div>
+          <div class="equip-sub">EQ-001 · EXCELLENT</div>
+        </div>
+      </div>
+      <div class="equip-actions">
+        <i class="bx bx-edit"></i>
+        <i class="bx bx-trash"></i>
+      </div>
+    </div>
+
+    <div class="equip-card">
+      <div class="equip-info">
+        <div class="equip-thumb">
+          <img src="/assets/images/placeholder.png" alt="Power Rack" />
+        </div>
+        <div>
+          <div class="equip-name">OLYMPIC POWER RACK</div>
+          <div class="equip-sub">EQ-002 · EXCELLENT</div>
+        </div>
+      </div>
+      <div class="equip-actions">
+        <i class="bx bx-edit"></i>
+        <i class="bx bx-trash"></i>
+      </div>
+    </div>
+
+    <div class="equip-card">
+      <div class="equip-info">
+        <div class="equip-thumb">
+          <img src="/assets/images/placeholder.png" alt="Bench" />
+        </div>
+        <div>
+          <div class="equip-name">ADJUSTABLE BENCH FB1</div>
+          <div class="equip-sub">EQ-003 · GOOD</div>
+        </div>
+      </div>
+      <div class="equip-actions">
+        <i class="bx bx-edit"></i>
+        <i class="bx bx-trash"></i>
+      </div>
+    </div>
+  </div>
+</div>

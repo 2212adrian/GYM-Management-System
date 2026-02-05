@@ -1,0 +1,289 @@
+<style>
+  .settings-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .settings-wrapper {
+      max-width: 1300px;
+      min-width: 650px;
+    }
+  }
+
+  .settings-title {
+    font-size: 1.2rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  .settings-card {
+    background: linear-gradient(180deg, #151515, #0d0d0d);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 26px;
+    padding: 20px;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75);
+    margin-bottom: 18px;
+  }
+
+  .profile-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .profile-avatar {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: #1e1e1e;
+    border: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+  }
+
+  .profile-name {
+    font-size: 11px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .profile-role {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .settings-row:last-child {
+    border-bottom: none;
+  }
+
+  .settings-label {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #bbb;
+    text-transform: uppercase;
+  }
+
+  .settings-sub {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .toggle {
+    width: 38px;
+    height: 20px;
+    border-radius: 999px;
+    background: #333;
+    position: relative;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ff3b3b;
+  }
+
+  .toggle.active {
+    background: #1d2a4a;
+  }
+
+  .toggle.active::after {
+    left: 21px;
+    background: #4da6ff;
+  }
+
+  .range-track {
+    height: 10px;
+    background: #202020;
+    border-radius: 999px;
+    border: 1px solid #2a2a2a;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .range-fill {
+    position: absolute;
+    height: 100%;
+    width: 40%;
+    background: #a63429;
+  }
+
+  .warning-box {
+    border: 1px solid rgba(180, 112, 35, 0.4);
+    background: rgba(180, 112, 35, 0.08);
+    color: #b47023;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 10px;
+    border-radius: 12px;
+    margin: 12px 0;
+  }
+
+  .maintenance-item {
+    background: #1d1d1d;
+    border: 1px solid #2a2a2a;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: uppercase;
+  }
+
+  .settings-input {
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .settings-actions {
+    display: grid;
+    gap: 10px;
+  }
+
+  .settings-btn {
+    background: #a63429;
+    border: none;
+    color: #fff;
+    padding: 14px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 12px;
+  }
+
+  .settings-btn.secondary {
+    background: #1f1f1f;
+    color: #aaa;
+    border: 1px solid #333;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="settings-wrapper">
+  <div class="settings-title">PROFILE SETTINGS (static)</div>
+
+  <div class="settings-card">
+    <div class="profile-banner">
+      <div class="profile-avatar">
+        <i class="bx bx-user"></i>
+      </div>
+      <div class="profile-name">PALOMAR ADMIN</div>
+      <div class="profile-role">ADMIN</div>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">ACTION SOUNDS</div>
+        <div class="settings-sub">SYSTEM ALERTS AND CONFIRMATIONS</div>
+      </div>
+      <div class="toggle"></div>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">VICTORY VISUALS</div>
+        <div class="settings-sub">CONFETTI ON MAJOR ACTIONS</div>
+      </div>
+      <div class="toggle active"></div>
+    </div>
+    <div class="settings-row" style="flex-direction: column; gap: 8px">
+      <div style="width: 100%">
+        <div class="settings-label">INTERFACE SIZE</div>
+        <div class="settings-sub">SCALE UI FOR QUICK ACCESS</div>
+      </div>
+      <div class="range-track" style="width: 100%">
+        <div class="range-fill" style="width: 55%"></div>
+      </div>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          width: 100%;
+          font-size: 9px;
+          color: #666;
+          font-weight: 900;
+        "
+      >
+        <span>SMALL</span>
+        <span>MED</span>
+        <span>BIG</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-label" style="margin-bottom: 8px">
+      DATABASE MAINTENANCE
+    </div>
+    <div class="warning-box">
+      WARNING: IMPORTING DATA WILL COMPLETELY OVERWRITE THE CURRENT SYSTEM
+      STATE.
+    </div>
+    <div style="display: grid; gap: 10px">
+      <div class="maintenance-item">
+        EXPORT SYSTEM DATA <i class="bx bx-chevron-right"></i>
+      </div>
+      <div class="maintenance-item">
+        RESTORE FROM BACKUP <i class="bx bx-chevron-right"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-label">DISPLAY NAME</div>
+    <input class="settings-input" value="Palomar Admin" />
+    <div class="settings-label" style="margin-top: 12px">NEW PASSWORD</div>
+    <input class="settings-input" placeholder="Leave blank to keep current..." />
+  </div>
+
+  <div class="settings-actions">
+    <button class="settings-btn">UPDATE ACCOUNT</button>
+    <button class="settings-btn secondary">TERMINATE SESSION</button>
+  </div>
+</div>

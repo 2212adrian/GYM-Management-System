@@ -36,48 +36,83 @@ function openProductModal() {
   const overlay = document.getElementById('product-modal-overlay');
   const container = overlay?.querySelector('.master-terminal-container');
   if (!overlay || !container) return;
-  const input = document.getElementById('master-asset-id');
-  if (input) {
-    input.readOnly = true;
-    input.disabled = false;
+
+  // 1) Dynamically add CSS if not present
+  let modalCSS = document.getElementById('add-product-modal-css');
+  if (!modalCSS) {
+    modalCSS = document.createElement('link');
+    modalCSS.id = 'add-product-modal-css';
+    modalCSS.rel = 'stylesheet';
+    modalCSS.href = '/assets/components/add-product-modal.css';
+    modalCSS.dataset.dynamic = 'true'; // mark it as dynamic
+    document.head.appendChild(modalCSS);
   }
 
-  if (isProductModalOpen) return;
-  isProductModalOpen = true;
+  // 2) Mount HTML (optional)
+  loadComponent(
+    'product-modal-container',
+    '/assets/components/add-product-modal.html',
+  );
 
-  generateBarcodeId();
-
-  // clear any previous inline styles / closing state
-  overlay.style.display = '';
-  overlay.style.opacity = '';
+  // 3) Open overlay
+  overlay.style.display = 'flex';
+  overlay.style.opacity = '1';
   overlay.classList.remove('is-closing');
-
   overlay.classList.add('is-open');
+
   container.classList.remove('modal-closing');
   container.classList.add('modal-open');
+
+  window.isProductModalOpen = true;
+  generateBarcodeId();
 }
 
 function closeProductModal() {
   const overlay = document.getElementById('product-modal-overlay');
   const container = overlay?.querySelector('.master-terminal-container');
-  if (!overlay || !container) return;
+  if (!overlay || !container || !window.isProductModalOpen) return;
 
-  if (!isProductModalOpen) return;
-  isProductModalOpen = false;
+  window.isProductModalOpen = false;
 
-  // panel outro animation
+  // Clear form fields
+  const formElements = [
+    'master-asset-id',
+    'master-name',
+    'master-price',
+    'master-qty',
+    'master-brand',
+    'master-desc',
+  ];
+  formElements.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  const imgBox = document.getElementById('imageContainer');
+  const statusEl = document.getElementById('status');
+  if (imgBox) imgBox.innerHTML = '';
+  if (statusEl) statusEl.textContent = '';
+  // Reset dataset so next open re-prefills
+  const form = document.getElementById('master-product-form');
+  if (form) form.dataset.productId = '';
+
+  // Outro animation
   container.classList.remove('modal-open');
   container.classList.add('modal-closing');
-
-  // overlay fade-out
   overlay.classList.add('is-closing');
 
   setTimeout(() => {
-    // after animations, fully hide
-    overlay.classList.remove('is-open', 'is-closing');
     container.classList.remove('modal-closing');
-    overlay.style.display = 'none'; // now it's already transparent
-  }, 220); // match your longest transition (panel or overlay)
+    overlay.classList.remove('is-closing', 'is-open');
+    overlay.style.display = 'none';
+    overlay.style.opacity = '0';
+
+    // Remove dynamically added CSS
+    const modalCSS = document.querySelector(
+      '#add-product-modal-css[data-dynamic="true"]',
+    );
+    if (modalCSS) modalCSS.remove();
+  }, 220);
 }
 
 /* ========= FORM VALIDATION (HIGHLIGHT + SHAKE) ========= */
@@ -342,7 +377,6 @@ const ProductManager = {
       });
     }
 
-    /* --- modal close via button or backdrop uses open/close API --- */
     if (closeBtn) {
       closeBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -859,7 +893,26 @@ const ProductManager = {
     z-index: 100000;
     padding: 20px;
     animation: modalFadeIn 0.3s ease-out forwards;
+     transform: translateY(24px);
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease,
+    transform 0.22s ease;
   }
+
+  .master-modal-overlay.is-open {
+  display: flex;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* when closing */
+.master-modal-overlay.is-closing {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(24px);
+}
 
   @keyframes modalFadeIn {
     from { opacity: 0; transform: scale(0.98); }
@@ -876,8 +929,24 @@ const ProductManager = {
     box-shadow:
       0 28px 65px rgba(0,0,0,0.9),
       0 0 0 1px rgba(255,255,255,0.04);
+       transform: translateY(26px) scale(0.94) rotateX(6deg);
+  transition:
+    opacity 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
     animation: terminalSlideIn 0.35s cubic-bezier(0.19, 1, 0.22, 1);
   }
+
+  /* open/close animation states (controlled via JS) */
+.master-terminal-container.modal-open {
+  opacity: 1;
+  transform: translateY(0) scale(1) rotateX(0deg);
+}
+
+.master-terminal-container.modal-closing {
+  opacity: 0;
+  transform: translateY(22px) scale(0.9) rotateX(10deg);
+}
+
 
   @keyframes terminalSlideIn {
     from { opacity: 0; transform: translateY(24px) scale(0.97); }
@@ -1339,6 +1408,7 @@ const ProductManager = {
     }
   },
 
+  /* --- RENDER LOGIC (with corrected call site) --- */
   render(list) {
     const container = document.getElementById('products-list');
     if (!container) return;
@@ -1353,74 +1423,163 @@ const ProductManager = {
         });
 
         return `
-        <div class="col-12 col-md-6 col-xl-4 animate__animated animate__fadeInUp"
-             style="animation-delay: ${index * 0.05}s">
-          <div class="product-card-scene">
-            <div class="product-card" id="prod-${p.productid}" data-product-id="${p.productid}">
-              
-              <div class="card-face card-front">
-                <div class="stock-badge ${stockStatus}">${stockLabel}</div>
+            <div class="col-12 col-md-6 col-xl-4 animate__animated animate__fadeInUp"
+                 style="animation-delay: ${index * 0.05}s">
+             <div class="product-card-scene">
+                <div class="product-card" id="prod-${p.productid}" data-product-id="${p.productid}">
+                 
+                <div class="card-face card-front">
+                  <div class="stock-badge ${stockStatus}">${stockLabel}</div>
 
-                <div class="card-actions-top">
-                  <button class="btn-edit-product" data-product-id="${p.productid}" title="Edit">
-                    <i class="bx bx-edit-alt"></i>
-                  </button>
-                  <button class="btn-delete-product" data-product-id="${p.productid}" title="Archive">
-                    <i class="bx bx-trash"></i>
-                  </button>
-                  <button
-                    class="btn-add-sale"
-                    data-product-id="${p.productid}"
-                    title="Add to Sales">
-                    <i class="bx bx-cart-add"></i>
-                  </button>
-                </div>
-
-                <div class="product-visual">
-                  <img src="${p.image_url || '/assets/images/placeholder.png'}" alt="Product Preview">
-                </div>
-
-                <div class="info-section">
-                  <div class="info-group">
-                    <label>PRODUCT NAME</label>
-                    <div class="value text-truncate">${(p.name || '').toUpperCase()}</div>
+                  <div class="card-actions-top">
+                    <button class="btn-edit-product" data-product-id="${p.productid}" title="Edit">
+                      <i class="bx bx-edit-alt"></i>
+                    </button>
+                    <button class="btn-delete-product" data-product-id="${p.productid}" title="Archive">
+                      <i class="bx bx-trash"></i>
+                    </button>
+                    <button
+                      class="btn-add-sale"
+                      data-product-id="${p.productid}"
+                      title="Add to Sales">
+                      <i class="bx bx-cart-add"></i>
+                    </button>
                   </div>
-                  <div class="d-flex justify-content-between align-items-end mt-2">
+
+                  <div class="product-visual">
+                    <img src="${p.image_url || '/assets/images/placeholder.png'}" 
+                         alt="Product Preview" 
+                         data-product-name="${p.name || ''}"
+                         data-product-id="${p.productid}">
+                  </div>
+
+                  <div class="info-section">
                     <div class="info-group">
-                      <label>SKU IDENTIFIER</label>
-                      <div class="value small" style="font-family:monospace; color:#666;">${p.sku || ''}</div>
+                      <label>PRODUCT NAME</label>
+                      <div class="value text-truncate">${(p.name || '').toUpperCase()}</div>
                     </div>
-                    <div class="price-tag">₱${priceText}</div>
+                    <div class="d-flex justify-content-between align-items-end mt-2">
+                      <div class="info-group">
+                        <label>SKU IDENTIFIER</label>
+                        <div class="value small" style="font-family:monospace; color:#666;">${p.sku || ''}</div>
+                      </div>
+                      <div class="price-tag">₱${priceText}</div>
+                    </div>
+                  </div>
+
+                  <div class="card-footer mt-auto pt-3">
+                    <div style="
+                      border-top: 1px solid rgba(255,255,255,0.05);
+                      padding-top: 10px;
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 9px;
+                      font-weight: 900;
+                      color: #444;
+                    ">
+                      <span>STOCK_LEVEL: ${p.qty} UNITS</span>
+                      <span>CLICK_TO_MANAGE</span>
+                    </div>
                   </div>
                 </div>
 
-                <div class="card-footer mt-auto pt-3">
-                  <div style="
-                    border-top: 1px solid rgba(255,255,255,0.05);
-                    padding-top: 10px;
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 9px;
-                    font-weight: 900;
-                    color: #444;
-                  ">
-                    <span>STOCK_LEVEL: ${p.qty} UNITS</span>
-                    <span>CLICK_TO_MANAGE</span>
-                  </div>
+                <div class="card-face card-back">
+                  <div class="back-header">MANAGEMENT - ${p.sku || ''}</div>
+                  <div class="back-footer">REVERSE_INTERFACE_EXIT</div>
                 </div>
-              </div>
 
-              <div class="card-face card-back">
-                <div class="back-header">MANAGEMENT - ${p.sku || ''}</div>
-                <div class="back-footer">REVERSE_INTERFACE_EXIT</div>
               </div>
-
             </div>
           </div>
-        </div>
-      `;
+        `;
       })
       .join('');
+
+    // Initialize Pixabay API key
+    window.PIXABAY_KEY = '54360015-81e98130630ae3ed1faf5a9b9';
+
+    list.forEach((product) => {
+      const card = document.getElementById(`prod-${product.productid}`);
+      if (!card) return;
+
+      const img = card.querySelector('img');
+      if (!img) return;
+
+      img.onerror = async () => {
+        img.onerror = null; // prevent infinite loop
+
+        try {
+          const productName =
+            img.dataset.productName || product.name || 'product';
+          const searchQuery = encodeURIComponent(
+            productName.replace(/[^\w\s]/g, '').trim(),
+          );
+
+          // Pixabay API call for product image
+          const pixabayResponse = await fetch(
+            `https://pixabay.com/api/?key=${window.PIXABAY_KEY}&q=${searchQuery}&image_type=photo&orientation=horizontal&per_page=3&safesearch=true`,
+          );
+
+          const pixabayData = await pixabayResponse.json();
+
+          if (pixabayData.hits && pixabayData.hits.length > 0) {
+            const newImageUrl = pixabayData.hits[0].webformatURL;
+
+            // Update the image source
+            img.src = newImageUrl;
+            img.alt = `${productName} - Stock Photo`;
+
+            // Update the product in Supabase
+            const { error } = await supabaseClient
+              .from('products')
+              .update({ image_url: newImageUrl })
+              .eq('productid', product.productid);
+
+            if (error) {
+              console.warn('Failed to update image_url in database:', error);
+            } else {
+              console.log(`✅ Updated image for ${productName}:`, newImageUrl);
+              Toastify({
+                text: `📸 New image for ${productName}`,
+                duration: 2000,
+                gravity: 'top',
+                position: 'right',
+                style: {
+                  border: '1px solid #4CAF50',
+                  background: '#0a0a0a',
+                  borderRadius: '8px',
+                  fontWeight: '700',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  color: '#fff',
+                },
+              }).showToast();
+            }
+          } else {
+            // Fallback to placeholder if no Pixabay results
+            img.src = '/assets/images/placeholder.png';
+            console.log(`No Pixabay images found for "${productName}"`);
+          }
+        } catch (error) {
+          console.error('Pixabay API error:', error);
+          img.src = '/assets/images/placeholder.png';
+
+          Toastify({
+            text: `Image fetch failed for ${product.name || 'product'}`,
+            duration: 2500,
+            gravity: 'top',
+            position: 'right',
+            style: {
+              border: '1px solid #ff9800',
+              background: '#0a0a0a',
+              borderRadius: '8px',
+              fontWeight: '700',
+              fontFamily: 'JetBrains Mono, monospace',
+              color: '#fff',
+            },
+          }).showToast();
+        }
+      };
+    });
   },
 
   edit(productId) {
@@ -1479,9 +1638,39 @@ const ProductManager = {
     const product = this.allProducts.find((p) => p.productid === productId);
     if (!product) return;
 
+    // If modal is already open, do not re-inject HTML (prevents input wipe)
+    if (window.isProductModalOpen) {
+      const form = document.getElementById('master-product-form');
+      if (form && form.dataset.productId !== product.productid) {
+        form.dataset.productId = ''; // force refresh for different product
+      } else {
+        return;
+      }
+    }
+
+    // 1) Dynamically add CSS if not present
+    let modalCSS = document.getElementById('add-product-modal-css');
+    if (!modalCSS) {
+      modalCSS = document.createElement('link');
+      modalCSS.id = 'add-product-modal-css';
+      modalCSS.rel = 'stylesheet';
+      modalCSS.href = '/assets/components/add-product-modal.css';
+      modalCSS.dataset.dynamic = 'true'; // mark it as dynamic
+      document.head.appendChild(modalCSS);
+    }
+
+    // 2) Mount HTML only if missing (avoid re-render wiping inputs)
+    if (!document.getElementById('product-modal-overlay')) {
+      loadComponent(
+        'product-modal-container',
+        '/assets/components/add-product-modal.html',
+      );
+    }
+
     const modal = document.getElementById('product-modal-overlay');
+    const container = modal?.querySelector('.master-terminal-container');
     const form = document.getElementById('master-product-form');
-    if (!modal || !form) return;
+    if (!modal || !form || !container) return;
 
     const skuInput = document.getElementById('master-asset-id');
     const nameInput = document.getElementById('master-name');
@@ -1494,30 +1683,57 @@ const ProductManager = {
 
     if (!skuInput || !nameInput || !priceInput || !qtyInput) return;
 
-    skuInput.value = product.sku || '';
-    nameInput.value = product.name || '';
-    priceInput.value = product.price || 0;
-    qtyInput.value = 1;
-    if (brandInput) brandInput.value = product.brand || '';
-    if (descInput) descInput.value = product.description || '';
+    const lastId = form.dataset.productId;
+    const needsPrefill =
+      lastId !== product.productid ||
+      !nameInput.value ||
+      !skuInput.value ||
+      !priceInput.value;
 
-    if (imgBox) {
-      imgBox.innerHTML = '';
-      if (product.image_url) {
-        const img = document.createElement('img');
-        img.src = product.image_url;
-        img.alt = product.name || 'Product';
-        img.classList.add('selected');
-        img.dataset.selected = 'true';
-        imgBox.appendChild(img);
-        if (statusEl) statusEl.textContent = 'Using saved product image.';
-      } else if (statusEl) {
-        statusEl.textContent = '';
+    // Prefill if product changed or fields are empty
+    if (needsPrefill) {
+      skuInput.value = product.sku || '';
+      nameInput.value = product.name || '';
+      priceInput.value = product.price || 0;
+      qtyInput.value = 1;
+      if (brandInput) brandInput.value = product.brand || '';
+      if (descInput) descInput.value = product.description || '';
+
+      if (imgBox) {
+        imgBox.innerHTML = '';
+        if (product.image_url) {
+          const img = document.createElement('img');
+          img.src = product.image_url;
+          img.alt = product.name || 'Product';
+          img.classList.add('selected');
+          img.dataset.selected = 'true';
+          imgBox.appendChild(img);
+          if (statusEl) statusEl.textContent = 'Using saved product image.';
+        } else if (statusEl) {
+          statusEl.textContent = '';
+        }
       }
     }
 
+    // Track current product id
     form.dataset.productId = product.productid;
+
+    // Match openProductModal behaviour
+    if (skuInput) {
+      skuInput.readOnly = true;
+      skuInput.disabled = false;
+    }
+
+    if (window.isProductModalOpen) return;
+    window.isProductModalOpen = true;
+
     modal.style.display = 'flex';
+    modal.style.opacity = '1';
+    modal.classList.remove('is-closing');
+    modal.classList.add('is-open');
+
+    container.classList.remove('modal-closing');
+    container.classList.add('modal-open');
   },
 
   toggleFlip(id) {

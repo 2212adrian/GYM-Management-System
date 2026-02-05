@@ -1,0 +1,239 @@
+<style>
+  .goal-center-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .goal-center-wrapper {
+      max-width: 1200px;
+      min-width: 650px;
+    }
+  }
+
+  .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .goal-title {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .goal-subtitle {
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .goal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  @media (max-width: 1023px) {
+    .goal-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .goal-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .goal-card .goal-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .goal-card .goal-period {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #777;
+    text-transform: uppercase;
+    font-weight: 900;
+  }
+
+  .goal-card .goal-status {
+    font-size: 9px;
+    color: #2b3674;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 800;
+  }
+
+  .goal-amount {
+    font-size: 2.4rem;
+    font-weight: 900;
+    font-style: italic;
+    color: #fff;
+    text-shadow:
+      0 0 15px rgba(166, 52, 41, 0.35),
+      2px 2px 0px rgba(0, 0, 0, 0.8);
+  }
+
+  .goal-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .goal-input {
+    flex: 1;
+    background: #0a0a0a;
+    border: 1px solid #222;
+    border-radius: 12px;
+    color: #fff;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    outline: none;
+  }
+
+  .goal-input:focus {
+    border-color: var(--wolf-red);
+    box-shadow: 0 0 12px rgba(166, 52, 41, 0.2);
+  }
+
+  .goal-btn {
+    background: var(--wolf-red);
+    color: #fff;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .goal-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
+
+  .goal-btn:active {
+    transform: translateY(0);
+  }
+
+  .goal-progress {
+    height: 8px;
+    background: #111;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid #222;
+  }
+
+  .goal-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #a63429, #ff6b5f);
+    box-shadow: 0 0 12px rgba(166, 52, 41, 0.5);
+  }
+
+  .goal-footnote {
+    font-size: 9px;
+    color: #666;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="goal-center-wrapper" id="goal-center-page">
+  <div class="goal-header">
+    <div>
+      <div class="goal-title">GOAL CENTER</div>
+      <div class="goal-subtitle">REVENUE TARGETS - PHP (₱)</div>
+    </div>
+  </div>
+
+  <div class="goal-grid">
+    <div class="hud-item goal-card" id="goal-daily-card">
+      <div class="goal-meta">
+        <span class="goal-period">TODAY</span>
+        <span class="goal-status">DAILY TARGET</span>
+      </div>
+      <div class="goal-amount" id="goal-daily-amount">₱0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-daily-progress"></div>
+      </div>
+      <div class="goal-input-row">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-daily-input"
+          placeholder="SET DAILY TARGET"
+          min="0"
+        />
+        <button class="goal-btn" id="goal-daily-save">SET</button>
+      </div>
+      <div class="goal-footnote" id="goal-daily-window">ACTIVE: TODAY</div>
+    </div>
+
+    <div class="hud-item goal-card" id="goal-weekly-card">
+      <div class="goal-meta">
+        <span class="goal-period">THIS WEEK</span>
+        <span class="goal-status">WEEKLY TARGET</span>
+      </div>
+      <div class="goal-amount" id="goal-weekly-amount">₱0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-weekly-progress"></div>
+      </div>
+      <div class="goal-input-row">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-weekly-input"
+          placeholder="SET WEEKLY TARGET"
+          min="0"
+        />
+        <button class="goal-btn" id="goal-weekly-save">SET</button>
+      </div>
+      <div class="goal-footnote" id="goal-weekly-window">ACTIVE: THIS WEEK</div>
+    </div>
+
+    <div class="hud-item goal-card" id="goal-monthly-card">
+      <div class="goal-meta">
+        <span class="goal-period">THIS MONTH</span>
+        <span class="goal-status">MONTHLY TARGET</span>
+      </div>
+      <div class="goal-amount" id="goal-monthly-amount">₱0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-monthly-progress"></div>
+      </div>
+      <div class="goal-input-row">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-monthly-input"
+          placeholder="SET MONTHLY TARGET"
+          min="0"
+        />
+        <button class="goal-btn" id="goal-monthly-save">SET</button>
+      </div>
+      <div class="goal-footnote" id="goal-monthly-window">
+        ACTIVE: THIS MONTH
+      </div>
+    </div>
+  </div>
+</div>

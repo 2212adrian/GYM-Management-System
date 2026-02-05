@@ -84,48 +84,97 @@ window.salesManager = {
       await this.fetchProducts();
     }
 
+    // Check SKU if provided
+    let prod;
     if (preScannedSku) {
-      const prod = this.allProducts.find((p) => p.sku === preScannedSku);
-
+      prod = this.allProducts.find((p) => p.sku === preScannedSku);
       if (!prod) {
-        // Stop here, show alert, do NOT open the modal
         this.showSystemAlert(`SKU [${preScannedSku}] NOT FOUND`, 'error');
         return;
       }
     }
 
-    const oldModal = document.getElementById('sale-terminal-overlay');
-    if (oldModal) oldModal.remove();
+    // Ensure modal HTML exists
+    let modal = document.getElementById('sale-terminal-overlay');
+    let styleEl = document.getElementById('sale-terminal-style');
 
-    if (!document.getElementById('sale-terminal-overlay')) {
+    if (!modal) {
       const res = await fetch('/assets/components/record-sale-modal.html');
       const html = await res.text();
-      document.body.insertAdjacentHTML('beforeend', html);
-    }
-    const modal = document.getElementById('sale-terminal-overlay');
-    if (modal) {
-      modal.style.display = 'flex';
-      this.showTopInstruction(true);
-      await this.fetchProducts();
-      this.attachSaleListeners(modal);
-      this.resetPreview();
 
-      // If we have a SKU from the scanner, lock it immediately
-      if (preScannedSku) {
-        const prod = this.allProducts.find((p) => p.sku === preScannedSku);
-        if (prod) {
-          const searchInput = modal.querySelector('#sale-product-search');
-          searchInput.value = prod.name;
-          this.lockProduct(prod);
-          const qtyInp = modal.querySelector('#sale-qty');
-          qtyInp.value = 1;
-          qtyInp.classList.add('auto-filled');
-          this.validateTransaction();
-        } else {
-          this.showSystemAlert(`SKU [${preScannedSku}] NOT FOUND`, 'error');
-        }
+      // Temporary container to extract HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+
+      // Extract and inject style safely
+      const styleTag = tempDiv.querySelector('style');
+      if (styleTag && !styleEl) {
+        styleTag.id = 'sale-terminal-style';
+        document.head.appendChild(styleTag);
       }
+
+      // Insert modal container
+      const modalEl = tempDiv.querySelector('#sale-terminal-overlay');
+      if (!modalEl) return;
+
+      document.body.appendChild(modalEl);
+      modal = modalEl;
     }
+
+    const container = modal.querySelector('.master-terminal-container');
+    if (!container) return;
+
+    // Reset inline styles and closing state
+    modal.style.display = '';
+    modal.style.visibility = '';
+    modal.style.opacity = '';
+    modal.classList.remove('is-closing');
+    container.classList.remove('modal-closing');
+
+    // Trigger modal ENTER animation
+    modal.classList.add('is-open');
+    container.classList.add('modal-open');
+
+    this.showTopInstruction(true);
+    await this.fetchProducts();
+    this.attachSaleListeners(modal);
+    this.resetPreview();
+
+    // Auto-fill pre-scanned SKU
+    if (prod) {
+      const searchInput = modal.querySelector('#sale-product-search');
+      if (searchInput) searchInput.value = prod.name;
+
+      this.lockProduct(prod);
+
+      const qtyInp = modal.querySelector('#sale-qty');
+      if (qtyInp) {
+        qtyInp.value = 1;
+        qtyInp.classList.add('auto-filled');
+      }
+
+      this.validateTransaction();
+    }
+  },
+
+  closeSaleTerminal() {
+    const modal = document.getElementById('sale-terminal-overlay');
+    if (!modal) return;
+
+    const container = modal.querySelector('.master-terminal-container');
+    modal.classList.remove('is-open');
+    container.classList.remove('modal-open');
+
+    // Add closing animation classes if you use them
+    modal.classList.add('is-closing');
+    container.classList.add('modal-closing');
+
+    // Remove modal and style after animation
+    setTimeout(() => {
+      modal.remove();
+      const style = document.getElementById('sale-terminal-style');
+      if (style) style.remove();
+    }, 300); // match your animation duration
   },
 
   async processQuickSale(sku) {
@@ -324,11 +373,11 @@ window.salesManager = {
 
     // --- 4. CLOSE MODAL ---
     closeBtn.onclick = () => {
-      modal.style.display = 'none';
+      resultsDiv.classList.remove('active');
+      this.closeSaleTerminal();
       this.showTopInstruction(false);
       this.selectedProductId = null;
     };
-
     // --- 5. VALIDATION ---
     qtyInput.oninput = () => {
       const val = parseInt(qtyInput.value) || 0;
@@ -349,6 +398,9 @@ window.salesManager = {
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#searchWrapper'))
         resultsDiv.classList.remove('active');
+      if (e.target.closest('#closeSaleModal')) {
+        e.preventDefault();
+      }
     });
   },
 
@@ -695,7 +747,6 @@ window.salesManager = {
     }
     this.generateRandomID();
     modal.style.display = 'flex';
-    if (window.wolfAudio) window.wolfAudio.play('notif');
   },
 
   generateRandomID() {
@@ -712,10 +763,6 @@ window.salesManager = {
     const unlimitedCheck = document.getElementById('master-unlimited');
     const qtyInput = document.getElementById('master-qty');
 
-    if (closeBtn)
-      closeBtn.onclick = () => {
-        modal.style.display = 'none';
-      };
     if (genBtn)
       genBtn.onclick = () => {
         this.generateRandomID();

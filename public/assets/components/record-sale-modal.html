@@ -321,13 +321,32 @@
   .master-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(12px);
+    visibility: hidden;
     display: none;
+    background: rgba(0, 0, 0, 0.96);
+    backdrop-filter: blur(12px);
     justify-content: center;
     align-items: center;
     z-index: 100000;
-    padding: 20px;
+    padding: 16px 12px;
+    overflow-y: auto;
+    opacity: 0;
+    transition:
+      opacity 0.3s ease,
+      visibility 0.3s ease,
+      transform 0.22s ease;
+  }
+
+  .master-modal-overlay.is-open {
+    display: flex;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .master-modal-overlay.is-closing {
+    opacity: 0;
+    transform: translateY(24px);
   }
 
   #master-asset-id {
@@ -345,6 +364,16 @@
     box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
     animation: terminalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     overflow: visible !important;
+  }
+
+  .master-terminal-container.modal-closing {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+    filter: blur(6px);
+    transition:
+      opacity 0.22s ease,
+      transform 0.22s ease,
+      filter 0.22s ease;
   }
 
   /* Change fonts */
@@ -915,6 +944,7 @@
     }
   }
 </style>
+
 <div id="sale-terminal-overlay" class="master-modal-overlay">
   <!-- SYSTEM ALERT INJECTED HERE DYNAMICALLY OR HARDCODED -->
   <div id="wolf-system-alert" class="system-alert-top">

@@ -3,7 +3,7 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@500;800&display=swap');
 
   /* --- 2. CORE OVERLAY --- */
-  .master-modal-overlay {
+  #sales-trash-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.95);
@@ -19,16 +19,16 @@
       visibility 0.3s ease;
   }
 
-  .master-modal-overlay.closing {
+  #sales-trash-overlay.closing {
     opacity: 0;
   }
 
-  .master-modal-overlay.closing .master-terminal-container {
+  #sales-trash-overlay.closing .master-terminal-container {
     animation: terminalSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 
   /* --- 3. TERMINAL CONTAINER --- */
-  .master-terminal-container {
+  #sales-trash-overlay .master-terminal-container {
     background: #0d0d0d;
     width: 100%;
     max-width: 520px;
@@ -42,14 +42,14 @@
   }
 
   /* --- 4. HEADER BRANDING --- */
-  .terminal-header {
+  #sales-trash-overlay .terminal-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 25px;
   }
 
-  .terminal-title {
+  #sales-trash-overlay .terminal-title {
     font-weight: 900;
     font-size: 1.6rem; /* Increased size */
     letter-spacing: -0.5px;
@@ -57,11 +57,11 @@
     color: #fff;
   }
 
-  .terminal-title span {
+  #sales-trash-overlay .terminal-title span {
     color: #eab308;
   } /* Amber Accent */
 
-  .terminal-protocol {
+  #sales-trash-overlay .terminal-protocol {
     font-size: 10px;
     color: #555;
     font-weight: 800;
@@ -70,7 +70,7 @@
     margin-top: 6px;
   }
 
-  .terminal-close-btn {
+  #sales-trash-overlay .terminal-close-btn {
     background: #1a1a1a;
     border: 1px solid #333;
     color: #666;
@@ -85,7 +85,7 @@
     justify-content: center;
   }
 
-  .terminal-close-btn:hover {
+  #sales-trash-overlay .terminal-close-btn:hover {
     background: #eab308;
     color: #000;
     transform: rotate(90deg);
@@ -276,7 +276,7 @@
   /* --- 10. RESPONSIVENESS --- */
   @media (min-width: 1024px) {
     /* PC */
-    .master-terminal-container {
+    #sales-trash-overlay .master-terminal-container {
       /* This creates the 50% middle block, leaving 25% space on each side */
       width: 50vw;
 
@@ -303,7 +303,7 @@
 
   @media (max-width: 767px) {
     /* Mobile */
-    .master-terminal-container {
+    #sales-trash-overlay .master-terminal-container {
       max-width: 95%;
       padding: 20px;
       border-radius: 24px;
