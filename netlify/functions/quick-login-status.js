@@ -112,6 +112,39 @@ function isValidRequestCredentials(row, requestId, requestSecret) {
   return stored === deterministicHash;
 }
 
+function normalizePreviewContext(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  return {
+    ip: String(source.ip || '').trim().slice(0, 128),
+    city: String(source.city || '').trim().slice(0, 128),
+    region: String(source.region || '').trim().slice(0, 128),
+    country: String(source.country || '').trim().slice(0, 128),
+    countryCode: String(source.countryCode || '').trim().slice(0, 32),
+  };
+}
+
+function signPreviewContext(requestId, requestSecretHash, previewContext) {
+  const canonical = normalizePreviewContext(previewContext);
+  return crypto
+    .createHmac('sha256', quickLoginSecret)
+    .update(
+      `${requestId}|${requestSecretHash}|${JSON.stringify(canonical)}`,
+    )
+    .digest('hex');
+}
+
+function verifyPreviewContext(
+  requestId,
+  requestSecretHash,
+  previewContext,
+  previewSig,
+) {
+  const sig = String(previewSig || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/i.test(sig)) return false;
+  const expected = signPreviewContext(requestId, requestSecretHash, previewContext);
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
   if (event.httpMethod !== 'POST') {
@@ -135,6 +168,8 @@ exports.handler = async (event) => {
     const requestId = String(payload.requestId || '').trim();
     const requestSecret = String(payload.requestSecret || '').trim();
     const consume = Boolean(payload.consume);
+    const previewContextInput = normalizePreviewContext(payload.previewContext);
+    const previewSigInput = String(payload.previewSig || '').trim();
 
     if (!requestId || !requestSecret) {
       return json(400, { error: 'requestId and requestSecret are required' });
@@ -183,6 +218,25 @@ exports.handler = async (event) => {
         return json(401, { error: 'Invalid quick-login credentials' });
       }
     }
+
+    const hasVerifiedPreview =
+      !consume &&
+      verifyPreviewContext(
+        requestId,
+        row.request_secret_hash,
+        previewContextInput,
+        previewSigInput,
+      );
+
+    const displayLocation = hasVerifiedPreview
+      ? previewContextInput
+      : {
+          ip: 'Protected by SHA-256',
+          city: 'Protected by SHA-256',
+          region: 'Protected by SHA-256',
+          country: 'Protected by SHA-256',
+          countryCode: 'Protected by SHA-256',
+        };
 
     const now = Date.now();
     const expiresAtMs = row.expires_at ? new Date(row.expires_at).getTime() : 0;
@@ -303,13 +357,8 @@ exports.handler = async (event) => {
       expiresAt: row.expires_at,
       remainingSeconds:
         expiresAtMs > now ? Math.max(1, Math.ceil((expiresAtMs - now) / 1000)) : 0,
-      location: {
-        ip: 'Protected by SHA-256',
-        city: 'Protected by SHA-256',
-        region: 'Protected by SHA-256',
-        country: 'Protected by SHA-256',
-        countryCode: 'Protected by SHA-256',
-      },
+      location: displayLocation,
+      previewVerified: hasVerifiedPreview,
       approvedByEmail: row.approved_by_email || null,
     });
   } catch (err) {

@@ -158,6 +158,17 @@ window.wolfScanner = {
       return {
         requestId: String(data.requestId),
         requestSecret: String(data.requestSecret),
+        previewContext:
+          data.previewContext && typeof data.previewContext === 'object'
+            ? {
+                ip: String(data.previewContext.ip || ''),
+                city: String(data.previewContext.city || ''),
+                region: String(data.previewContext.region || ''),
+                country: String(data.previewContext.country || ''),
+                countryCode: String(data.previewContext.countryCode || ''),
+              }
+            : null,
+        previewSig: String(data.previewSig || ''),
       };
     } catch (_) {
       return null;
@@ -174,6 +185,8 @@ window.wolfScanner = {
       body: JSON.stringify({
         requestId: payload.requestId,
         requestSecret: payload.requestSecret,
+        previewContext: payload.previewContext,
+        previewSig: payload.previewSig,
         consume: false,
       }),
     });
@@ -203,6 +216,27 @@ window.wolfScanner = {
       .join(', ') || 'Unknown location';
 
     const ipLine = location.ip || 'Unknown IP';
+    const sanitizePlain = (value) => {
+      const raw = String(value ?? '');
+      if (window.DOMPurify) {
+        return window.DOMPurify.sanitize(raw, {
+          ALLOWED_TAGS: [],
+          ALLOWED_ATTR: [],
+        });
+      }
+      return raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
+    const safeIpLine = sanitizePlain(ipLine);
+    const safeLocationLine = sanitizePlain(locationLine);
+    const safeSessionRef = sanitizePlain(
+      String(payload.requestId).slice(0, 10).toUpperCase(),
+    );
 
     let isConfirmed = false;
     if (window.Swal) {
@@ -211,13 +245,13 @@ window.wolfScanner = {
         html: `
           <div style="text-align:left; font-size:13px; color:#aab3c2; line-height:1.6;">
             <div style="margin-bottom:8px;">
-              <strong style="color:#e7eefc;">Request IP:</strong><br>${ipLine}
+              <strong style="color:#e7eefc;">Request IP:</strong><br>${safeIpLine}
             </div>
             <div style="margin-bottom:8px;">
-              <strong style="color:#e7eefc;">Location:</strong><br>${locationLine}
+              <strong style="color:#e7eefc;">Location:</strong><br>${safeLocationLine}
             </div>
             <div>
-              <strong style="color:#e7eefc;">Session Ref:</strong><br>${String(payload.requestId).slice(0, 10).toUpperCase()}
+              <strong style="color:#e7eefc;">Session Ref:</strong><br>${safeSessionRef}
             </div>
           </div>
         `,

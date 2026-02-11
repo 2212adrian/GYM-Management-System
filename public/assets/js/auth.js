@@ -34,6 +34,7 @@ const OTP_CLICK_SPAM_THRESHOLD = 3;
 const OTP_CLICK_SPAM_LOCK_SECONDS = 30;
 const OTP_COOLDOWN_STORAGE_KEY = 'wolf_otp_cooldown_ends_at';
 const REMEMBER_DEVICE_KEY = 'wolf_remember_device';
+const QUICK_LOGIN_QR_CACHE_KEY = 'wolf_quick_login_qr_cache';
 const QUICK_LOGIN_POLL_MS = 1800;
 const QUICK_LOGIN_EXPIRE_FALLBACK_SECONDS = 120;
 const QUICK_LOGIN_REGEN_COOLDOWN_FALLBACK_SECONDS = 8;
@@ -518,6 +519,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function readQuickLoginQrCache() {
+    try {
+      const raw = localStorage.getItem(QUICK_LOGIN_QR_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function clearQuickLoginQrCache() {
+    try {
+      localStorage.removeItem(QUICK_LOGIN_QR_CACHE_KEY);
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+
+  function getValidQuickLoginQrCache() {
+    const cached = readQuickLoginQrCache();
+    if (!cached) return null;
+
+    const expiresAtMs = cached.expiresAt ? new Date(cached.expiresAt).getTime() : 0;
+    if (expiresAtMs > 0 && expiresAtMs <= Date.now()) {
+      clearQuickLoginQrCache();
+      return null;
+    }
+
+    return cached;
+  }
+
+  function saveQuickLoginQrCache(payload) {
+    try {
+      localStorage.setItem(QUICK_LOGIN_QR_CACHE_KEY, JSON.stringify(payload));
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+
   function setQuickLoginRefreshLabel(label, iconClass = 'bx bx-refresh') {
     if (!quickLoginRefreshBtn) return;
     quickLoginRefreshBtn.innerHTML = `<i class="${iconClass}"></i><span>${label}</span>`;
@@ -673,11 +715,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       setQuickLoginStatus('Generating one-time QR session...', 'info');
       clearQuickLoginTimers();
+      const cachedQuickLogin = getValidQuickLoginQrCache();
+      const cachedPreviewContext = cachedQuickLogin?.previewContext || null;
+      const cachedPreviewSig = cachedQuickLogin?.previewSig || null;
 
       const res = await fetch('/.netlify/functions/quick-login-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forceNew: Boolean(forceNew) }),
+        body: JSON.stringify({
+          forceNew: Boolean(forceNew),
+          cachedPreviewContext,
+          cachedPreviewSig,
+        }),
       });
 
       let payload = {};
@@ -699,14 +748,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
       }
 
-      quickLoginActiveRequest = payload;
+      let effectiveQrValue = payload.qrValue;
+      let effectivePreviewContext = payload.previewContext || null;
+      let effectivePreviewSig = payload.previewSig || null;
+
+      if (
+        (!effectivePreviewContext || !effectivePreviewSig) &&
+        cachedQuickLogin &&
+        cachedQuickLogin.requestId === payload.requestId &&
+        cachedQuickLogin.qrValue
+      ) {
+        effectiveQrValue = cachedQuickLogin.qrValue;
+        effectivePreviewContext =
+          cachedQuickLogin.previewContext || effectivePreviewContext;
+        effectivePreviewSig = cachedQuickLogin.previewSig || effectivePreviewSig;
+      }
+
+      quickLoginActiveRequest = {
+        ...payload,
+        qrValue: effectiveQrValue,
+        previewContext: effectivePreviewContext,
+        previewSig: effectivePreviewSig,
+      };
       if (quickLoginRefEl) {
         quickLoginRefEl.textContent = String(payload.requestId || '---')
           .slice(0, 8)
           .toUpperCase();
       }
 
-      await renderQuickLoginQr(payload.qrValue);
+      await renderQuickLoginQr(effectiveQrValue);
+      if (effectivePreviewContext && effectivePreviewSig) {
+        saveQuickLoginQrCache({
+          requestId: payload.requestId,
+          qrValue: effectiveQrValue,
+          expiresAt: payload.expiresAt,
+          previewContext: effectivePreviewContext,
+          previewSig: effectivePreviewSig,
+        });
+      }
       updateQuickLoginTimer(payload.expiresAt);
       setQuickLoginStatus(
         payload.reusedPending
@@ -777,6 +856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         payload.status === 'consumed'
       ) {
         clearQuickLoginTimers();
+        clearQuickLoginQrCache();
         setQuickLoginStatus(
           payload.status === 'consumed'
             ? 'Quick-login code already used. Regenerate QR.'
@@ -791,6 +871,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       clearQuickLoginTimers();
+      clearQuickLoginQrCache();
       setQuickLoginStatus(
         'Approval received. Synchronizing secure session...',
         'success',

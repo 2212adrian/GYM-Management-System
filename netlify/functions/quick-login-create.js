@@ -97,6 +97,40 @@ function deriveRequestSecret(requestId) {
     .digest('hex');
 }
 
+function normalizePreviewContext(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  return {
+    ip: String(source.ip || '').trim().slice(0, 128),
+    city: String(source.city || '').trim().slice(0, 128),
+    region: String(source.region || '').trim().slice(0, 128),
+    country: String(source.country || '').trim().slice(0, 128),
+    countryCode: String(source.countryCode || '').trim().slice(0, 32),
+  };
+}
+
+function signPreviewContext(requestId, requestSecretHash, previewContext) {
+  const canonical = normalizePreviewContext(previewContext);
+  return crypto
+    .createHmac('sha256', quickLoginSecret)
+    .update(
+      `${requestId}|${requestSecretHash}|${JSON.stringify(canonical)}`,
+    )
+    .digest('hex');
+}
+
+function verifyPreviewContext(
+  requestId,
+  requestSecretHash,
+  previewContext,
+  previewSig,
+) {
+  const sig = String(previewSig || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/i.test(sig)) return false;
+
+  const expected = signPreviewContext(requestId, requestSecretHash, previewContext);
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
 function base64urlEncode(value) {
   return Buffer.from(value, 'utf8').toString('base64url');
 }
@@ -205,6 +239,10 @@ exports.handler = async (event) => {
     }
 
     const forceNew = Boolean(payload.forceNew);
+    const cachedPreviewContext = normalizePreviewContext(
+      payload.cachedPreviewContext,
+    );
+    const cachedPreviewSig = String(payload.cachedPreviewSig || '').trim();
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const now = new Date();
@@ -240,6 +278,21 @@ exports.handler = async (event) => {
         latestPendingRequest.request_secret_hash;
 
       if (isStillValid && canRestoreExisting) {
+        let previewContext = null;
+        let previewSig = null;
+        if (
+          cachedPreviewSig &&
+          verifyPreviewContext(
+            latestPendingRequest.request_id,
+            latestPendingRequest.request_secret_hash,
+            cachedPreviewContext,
+            cachedPreviewSig,
+          )
+        ) {
+          previewContext = cachedPreviewContext;
+          previewSig = cachedPreviewSig.toLowerCase();
+        }
+
         const createdAtMs = latestPendingRequest.created_at
           ? new Date(latestPendingRequest.created_at).getTime()
           : nowMs;
@@ -251,13 +304,15 @@ exports.handler = async (event) => {
           ),
         );
 
-        const qrPayload = base64urlEncode(
-          JSON.stringify({
-            requestId: latestPendingRequest.request_id,
-            requestSecret: reusableRequestSecret,
-            v: 1,
-          }),
-        );
+        const qrPayloadData = {
+          requestId: latestPendingRequest.request_id,
+          requestSecret: reusableRequestSecret,
+          v: 1,
+          ...(previewContext && previewSig
+            ? { previewContext, previewSig }
+            : {}),
+        };
+        const qrPayload = base64urlEncode(JSON.stringify(qrPayloadData));
 
         return json(200, {
           requestId: latestPendingRequest.request_id,
@@ -267,12 +322,17 @@ exports.handler = async (event) => {
           regenerateRemainingSeconds,
           reusedPending: true,
           qrValue: `WOLFQL1.${qrPayload}`,
-          location: {
-            ip: 'Protected by SHA-256',
-            city: 'Protected by SHA-256',
-            region: 'Protected by SHA-256',
-            country: 'Protected by SHA-256',
-          },
+          location:
+            previewContext && previewSig
+              ? previewContext
+              : {
+                  ip: 'Protected by SHA-256',
+                  city: 'Protected by SHA-256',
+                  region: 'Protected by SHA-256',
+                  country: 'Protected by SHA-256',
+                },
+          previewContext,
+          previewSig,
         });
       }
 
@@ -315,6 +375,18 @@ exports.handler = async (event) => {
     const requestSecretHash = hashSecret(requestSecret);
 
     const location = await resolveGeo(requesterIpRaw);
+    const previewContext = normalizePreviewContext({
+      ip: requesterIpRaw,
+      city: location.city,
+      region: location.region,
+      country: location.country,
+      countryCode: location.countryCode,
+    });
+    const previewSig = signPreviewContext(
+      requestId,
+      requestSecretHash,
+      previewContext,
+    );
 
     const { error } = await supabase.from('quick_login_requests').insert({
       request_id: requestId,
@@ -339,6 +411,8 @@ exports.handler = async (event) => {
         requestId,
         requestSecret,
         v: 1,
+        previewContext,
+        previewSig,
       }),
     );
 
@@ -350,12 +424,9 @@ exports.handler = async (event) => {
       regenerateRemainingSeconds: quickLoginRegenerateCooldownSeconds,
       reusedPending: false,
       qrValue: `WOLFQL1.${qrPayload}`,
-      location: {
-        ip: 'Protected by SHA-256',
-        city: 'Protected by SHA-256',
-        region: 'Protected by SHA-256',
-        country: 'Protected by SHA-256',
-      },
+      location: previewContext,
+      previewContext,
+      previewSig,
     });
   } catch (err) {
     return json(500, { error: err.message || 'Unexpected server error' });
