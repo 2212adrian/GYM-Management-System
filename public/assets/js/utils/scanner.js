@@ -154,21 +154,37 @@ window.wolfScanner = {
       const decoded = atob(base64 + padding);
       const data = JSON.parse(decoded);
 
-      if (!data?.requestId || !data?.requestSecret) return null;
-      return {
-        requestId: String(data.requestId),
-        requestSecret: String(data.requestSecret),
-        previewContext:
-          data.previewContext && typeof data.previewContext === 'object'
+      const requestId = data?.requestId || data?.r;
+      const requestSecret = data?.requestSecret || data?.s;
+      if (!requestId || !requestSecret) return null;
+
+      const compactPreview = Array.isArray(data?.p) ? data.p : null;
+      const previewContextRaw =
+        data?.previewContext && typeof data.previewContext === 'object'
+          ? data.previewContext
+          : compactPreview && compactPreview.length >= 4
             ? {
-                ip: String(data.previewContext.ip || ''),
-                city: String(data.previewContext.city || ''),
-                region: String(data.previewContext.region || ''),
-                country: String(data.previewContext.country || ''),
-                countryCode: String(data.previewContext.countryCode || ''),
+                ip: compactPreview[0],
+                city: compactPreview[1],
+                region: compactPreview[2],
+                country: compactPreview[3],
+              }
+            : null;
+
+      return {
+        requestId: String(requestId),
+        requestSecret: String(requestSecret),
+        previewContext:
+          previewContextRaw && typeof previewContextRaw === 'object'
+            ? {
+                ip: String(previewContextRaw.ip || ''),
+                city: String(previewContextRaw.city || ''),
+                region: String(previewContextRaw.region || ''),
+                country: String(previewContextRaw.country || ''),
+                countryCode: String(previewContextRaw.countryCode || ''),
               }
             : null,
-        previewSig: String(data.previewSig || ''),
+        previewSig: String(data.previewSig || data.g || ''),
       };
     } catch (_) {
       return null;

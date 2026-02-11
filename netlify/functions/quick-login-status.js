@@ -119,7 +119,6 @@ function normalizePreviewContext(input) {
     city: String(source.city || '').trim().slice(0, 128),
     region: String(source.region || '').trim().slice(0, 128),
     country: String(source.country || '').trim().slice(0, 128),
-    countryCode: String(source.countryCode || '').trim().slice(0, 32),
   };
 }
 

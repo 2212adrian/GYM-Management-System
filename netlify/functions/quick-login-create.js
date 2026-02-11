@@ -104,7 +104,6 @@ function normalizePreviewContext(input) {
     city: String(source.city || '').trim().slice(0, 128),
     region: String(source.region || '').trim().slice(0, 128),
     country: String(source.country || '').trim().slice(0, 128),
-    countryCode: String(source.countryCode || '').trim().slice(0, 32),
   };
 }
 
@@ -321,11 +320,19 @@ exports.handler = async (event) => {
         );
 
         const qrPayloadData = {
-          requestId: latestPendingRequest.request_id,
-          requestSecret: reusableRequestSecret,
+          r: latestPendingRequest.request_id,
+          s: reusableRequestSecret,
           v: 1,
           ...(previewContext && previewSig
-            ? { previewContext, previewSig }
+            ? {
+                p: [
+                  previewContext.ip,
+                  previewContext.city,
+                  previewContext.region,
+                  previewContext.country,
+                ],
+                g: previewSig,
+              }
             : {}),
         };
         const qrPayload = base64urlEncode(JSON.stringify(qrPayloadData));
@@ -424,11 +431,16 @@ exports.handler = async (event) => {
 
     const qrPayload = base64urlEncode(
       JSON.stringify({
-        requestId,
-        requestSecret,
+        r: requestId,
+        s: requestSecret,
         v: 1,
-        previewContext,
-        previewSig,
+        p: [
+          previewContext.ip,
+          previewContext.city,
+          previewContext.region,
+          previewContext.country,
+        ],
+        g: previewSig,
       }),
     );
 

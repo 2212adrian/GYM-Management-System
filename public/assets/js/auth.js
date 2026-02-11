@@ -643,12 +643,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function renderQuickLoginQr(qrValue) {
     if (!quickLoginCanvas) return;
     quickLoginCanvas.classList.remove('is-ready');
+    const qrCanvasSize = window.matchMedia('(max-width: 640px)').matches
+      ? 300
+      : 340;
 
     if (window.QRCode?.toCanvas) {
       await window.QRCode.toCanvas(quickLoginCanvas, qrValue, {
-        width: 220,
+        width: qrCanvasSize,
         margin: 1,
-        errorCorrectionLevel: 'M',
+        errorCorrectionLevel: 'L',
         color: {
           dark: '#0f1012',
           light: '#ffffff',
@@ -672,13 +675,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       throw new Error('QR canvas context is unavailable');
     }
 
-    const canvasSize = 220;
-    const margin = 8;
+    const canvasSize = qrCanvasSize;
+    const margin = 6;
     const moduleCount = qr.getModuleCount();
     const innerSize = canvasSize - margin * 2;
 
     quickLoginCanvas.width = canvasSize;
     quickLoginCanvas.height = canvasSize;
+    ctx.imageSmoothingEnabled = false;
 
     ctx.clearRect(0, 0, canvasSize, canvasSize);
     ctx.fillStyle = '#ffffff';

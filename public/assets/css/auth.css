@@ -747,8 +747,8 @@ button:hover:not(:disabled) {
 
 .quick-login-qr-shell {
   position: relative;
-  width: 270px;
-  height: 270px;
+  width: 336px;
+  height: 336px;
   margin: 0 auto;
   border-radius: 22px;
   display: grid;
@@ -785,8 +785,8 @@ button:hover:not(:disabled) {
   border-radius: 10px;
   background: #ffffff;
   padding: 10px;
-  width: 236px !important;
-  height: 236px !important;
+  width: 302px !important;
+  height: 302px !important;
   box-sizing: border-box;
   opacity: 0;
   transform: scale(0.96);
@@ -1727,14 +1727,14 @@ body.light-theme .quick-login-refresh {
   }
 
   .quick-login-qr-shell {
-    width: 228px;
-    height: 228px;
+    width: 270px;
+    height: 270px;
     border-radius: 18px;
   }
 
   #quickLoginQrCanvas {
-    width: 198px !important;
-    height: 198px !important;
+    width: 236px !important;
+    height: 236px !important;
     padding: 8px;
   }
 }
