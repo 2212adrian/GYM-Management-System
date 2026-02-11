@@ -39,8 +39,8 @@ const MemberManager = {
       .map(
         () => `
       <div class="col-12 col-md-6 col-xl-4 opacity-50">
-        <div style="height: 220px; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
-          <div class="skel-shimmer" style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: skel-loading 1.5s infinite;"></div>
+        <div style="height: 220px; background: var(--skeleton-base); border-radius: 20px; border: 1px solid var(--border-color); position: relative; overflow: hidden;">
+          <div class="skel-shimmer" style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(90deg, transparent, var(--skeleton-mid), transparent); animation: skel-loading 1.5s infinite;"></div>
         </div>
       </div>
     `,
@@ -53,9 +53,9 @@ const MemberManager = {
       .fill(0)
       .map(
         () => `
-      <div class="wolf-skel-pill" style="display:flex; align-items:center; gap:15px; padding:12px; margin-bottom:10px; background:rgba(255,255,255,0.02); border-radius:12px; border:1px dashed rgba(255,255,255,0.1);">
-        <div style="width:40px; height:40px; background:rgba(255,255,255,0.05); border-radius:10px;"></div>
-        <div style="width:120px; height:12px; background:rgba(255,255,255,0.05); border-radius:4px;"></div>
+      <div class="wolf-skel-pill" style="display:flex; align-items:center; gap:15px; padding:12px; margin-bottom:10px; background:var(--surface-elevated); border-radius:12px; border:1px dashed var(--border-color);">
+        <div style="width:40px; height:40px; background:var(--skeleton-base); border-radius:10px;"></div>
+        <div style="width:120px; height:12px; background:var(--skeleton-mid); border-radius:4px;"></div>
       </div>
     `,
       )

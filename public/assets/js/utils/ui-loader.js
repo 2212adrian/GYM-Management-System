@@ -95,6 +95,8 @@ const WOLF_PURIFIER = (dirty) => {
       'role',
       'src',
       'alt', // ⬅ add src, alt
+      'accept',
+      'hidden',
     ],
     KEEP_CONTENT: true,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
@@ -330,10 +332,93 @@ function wolfRefreshView() {
 /**
  * WOLF OS - NAVIGATION ENGINE (NETLIFY & OFFLINE OPTIMIZED)
  */
+async function closeAllActiveModals() {
+  const forceHideModalElement = (modal) => {
+    if (!modal) return;
+
+    modal.style.display = 'none';
+    modal.style.opacity = '0';
+    modal.classList.remove('is-open', 'is-closing', 'closing');
+
+    const container = modal.querySelector('.master-terminal-container');
+    if (container) {
+      container.classList.remove('modal-open', 'modal-closing');
+    }
+  };
+
+  const forceHideModal = (id) => {
+    const modal = document.getElementById(id);
+    forceHideModalElement(modal);
+  };
+
+  try {
+    if (typeof closeProductModal === 'function' && window.isProductModalOpen) {
+      closeProductModal();
+    }
+  } catch (err) {
+    console.warn('Wolf OS: Product modal close handler failed.', err);
+  }
+  forceHideModal('product-modal-overlay');
+  window.isProductModalOpen = false;
+
+  try {
+    if (
+      window.salesManager &&
+      typeof window.salesManager.closeSaleTerminal === 'function'
+    ) {
+      window.salesManager.closeSaleTerminal();
+    }
+  } catch (err) {
+    console.warn('Wolf OS: Sales terminal close handler failed.', err);
+  }
+  forceHideModal('sale-terminal-overlay');
+
+  try {
+    if (
+      window.logbookManager &&
+      typeof window.logbookManager.closeLogbookTerminal === 'function'
+    ) {
+      window.logbookManager.closeLogbookTerminal();
+    }
+  } catch (err) {
+    console.warn('Wolf OS: Logbook terminal close handler failed.', err);
+  }
+  forceHideModal('logbook-modal-overlay');
+
+  try {
+    if (window.salesManager && typeof window.salesManager.closeTrash === 'function') {
+      window.salesManager.closeTrash();
+    }
+  } catch (err) {
+    console.warn('Wolf OS: Trash modal close handler failed.', err);
+  }
+  forceHideModal('sales-trash-overlay');
+
+  try {
+    if (
+      window.wolfScanner &&
+      typeof window.wolfScanner.stop === 'function' &&
+      document.getElementById('wolf-scanner-overlay')
+    ) {
+      await window.wolfScanner.stop();
+    }
+  } catch (err) {
+    console.warn('Wolf OS: Scanner close handler failed.', err);
+  }
+  forceHideModal('wolf-scanner-overlay');
+  forceHideModal('scanResultModal');
+
+  document
+    .querySelectorAll('.master-modal-overlay, .wolf-modal-overlay, .modal-overlay')
+    .forEach((modal) => forceHideModalElement(modal));
+}
+
 async function navigateTo(pageName) {
   const mainContent = document.getElementById('main-content');
   const brandEl = document.getElementById('topbar-brand');
   if (!mainContent) return;
+
+  await closeAllActiveModals();
 
   const navigationMap = {
     home: { label: 'WOLF <span>PALOMAR</span> GYM', parent: null },
@@ -391,10 +476,11 @@ async function navigateTo(pageName) {
       <style>
         .wolf-skeleton { padding: 40px; max-width: 1200px; margin: 0 auto; opacity: 0; animation: fadeInSkel 0.3s forwards; }
         .skel-shimmer {
-          background: linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%);
+          background: linear-gradient(90deg, var(--skeleton-base, #242a32) 25%, var(--skeleton-mid, #313844) 50%, var(--skeleton-base, #242a32) 75%);
           background-size: 200% 100%;
           animation: skel-loading 1.5s infinite linear;
           border-radius: 8px;
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
         }
         @keyframes skel-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         @keyframes fadeInSkel { from { opacity: 0; } to { opacity: 1; } }
@@ -412,11 +498,11 @@ async function navigateTo(pageName) {
 
   // --- OFFLINE UI ---
   const offlineUI = `
-    <div class="wolf-page-intro" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:70vh; text-align:center; color:white;">
+    <div class="wolf-page-intro" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:70vh; text-align:center; color:var(--text-main);">
       <i class='bx bx-wifi-off' style="font-size:80px; color:#a63429; margin-bottom:20px;"></i>
       <h1 style="font-size:32px; font-weight:900; margin:0; letter-spacing:-1px;">SIGNAL LOST</h1>
-      <p style="color:#888; max-width:400px; margin:15px 0 30px 0; line-height:1.6;">The encrypted uplink to Wolf OS was severed.</p>
-      <button class="retry-btn" onclick="window.wolfRetry()" style="background:#a63429; color:white; border:none; padding:12px 30px; font-weight:bold; border-radius:8px; cursor:pointer; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+      <p style="color:var(--text-muted); max-width:400px; margin:15px 0 30px 0; line-height:1.6;">The encrypted uplink to Wolf OS was severed.</p>
+      <button class="retry-btn" onclick="window.wolfRetry()" style="background:#a63429; color:var(--text-on-accent); border:none; padding:12px 30px; font-weight:bold; border-radius:8px; cursor:pointer; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
         <i class='bx bx-refresh' style="font-size:20px;"></i>
         <span>RETRY CONNECTION</span>
       </button>
@@ -499,7 +585,7 @@ async function navigateTo(pageName) {
           <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
             ${parentHTML}
             <i class='bx bx-chevron-right' style="color: #3498db; font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
-            <span style="letter-spacing: 1px; font-weight: 800; color: white;">${info.label}</span>
+            <span style="letter-spacing: 1px; font-weight: 800; color: var(--text-main);">${info.label}</span>
           </div>
         `;
         }

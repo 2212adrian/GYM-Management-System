@@ -31,6 +31,17 @@ function generateBarcodeId() {
   input.value = String(num);
 }
 
+function stripSkuPrefix(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^PR[-\s]*/i, '');
+}
+
+function ensureSkuPrefix(value) {
+  const code = stripSkuPrefix(value).toUpperCase();
+  return code ? `PR-${code}` : '';
+}
+
 /* ========= MODAL OPEN/CLOSE WITH ANIMATION ========= */
 function openProductModal() {
   const overlay = document.getElementById('product-modal-overlay');
@@ -48,13 +59,7 @@ function openProductModal() {
     document.head.appendChild(modalCSS);
   }
 
-  // 2) Mount HTML (optional)
-  loadComponent(
-    'product-modal-container',
-    '/assets/components/add-product-modal.html',
-  );
-
-  // 3) Open overlay
+  // 2) Open overlay
   overlay.style.display = 'flex';
   overlay.style.opacity = '1';
   overlay.classList.remove('is-closing');
@@ -87,10 +92,32 @@ function closeProductModal() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const unlimitedCheckbox = document.getElementById('master-unlimited');
+  const qtyInput = document.getElementById('master-qty');
+  if (unlimitedCheckbox) unlimitedCheckbox.checked = false;
+  if (qtyInput) {
+    qtyInput.disabled = false;
+    qtyInput.required = true;
+    qtyInput.placeholder = '0';
+  }
 
   const imgBox = document.getElementById('imageContainer');
+  const uploadImgBox = document.getElementById('uploadImageContainer');
+  const uploadImageName = document.getElementById('upload-image-name');
+  const uploadInput = document.getElementById('upload-image-input');
+  const tabWeb = document.getElementById('image-tab-web');
+  const tabUpload = document.getElementById('image-tab-upload');
+  const panelWeb = document.getElementById('image-web-panel');
+  const panelUpload = document.getElementById('image-upload-panel');
   const statusEl = document.getElementById('status');
   if (imgBox) imgBox.innerHTML = '';
+  if (uploadImgBox) uploadImgBox.innerHTML = '';
+  if (uploadImageName) uploadImageName.textContent = 'No file selected';
+  if (uploadInput) uploadInput.value = '';
+  if (tabWeb) tabWeb.classList.add('is-active');
+  if (tabUpload) tabUpload.classList.remove('is-active');
+  if (panelWeb) panelWeb.classList.add('is-active');
+  if (panelUpload) panelUpload.classList.remove('is-active');
   if (statusEl) statusEl.textContent = '';
   // Reset dataset so next open re-prefills
   const form = document.getElementById('master-product-form');
@@ -121,8 +148,12 @@ function validateProductForm() {
   const priceInput = document.getElementById('master-price');
   const qtyInput = document.getElementById('master-qty');
   const barcodeInput = document.getElementById('master-asset-id');
+  const unlimitedCheckbox = document.getElementById('master-unlimited');
 
-  const required = [nameInput, priceInput, qtyInput, barcodeInput];
+  const required = [nameInput, priceInput, barcodeInput];
+  if (!unlimitedCheckbox?.checked) {
+    required.push(qtyInput);
+  }
   let firstInvalid = null;
 
   required.forEach((el) => {
@@ -236,7 +267,11 @@ const ProductManager = {
     const form = document.getElementById('master-product-form');
     if (!modal || !form) return;
 
+    if (form.dataset.modalLogicBound === 'true') return;
+    form.dataset.modalLogicBound = 'true';
+
     const imgBox = document.getElementById('imageContainer');
+    const uploadImgBox = document.getElementById('uploadImageContainer');
     const statusEl = document.getElementById('status');
     const closeBtn = document.getElementById('closeProductModal');
     const qtyInput = document.getElementById('master-qty');
@@ -246,75 +281,248 @@ const ProductManager = {
     const skuInput = document.getElementById('master-asset-id');
     const lookupInput = document.getElementById('lookup-input');
     const lookupBtn = document.getElementById('lookupBtn');
+    const tabWeb = document.getElementById('image-tab-web');
+    const tabUpload = document.getElementById('image-tab-upload');
+    const panelWeb = document.getElementById('image-web-panel');
+    const panelUpload = document.getElementById('image-upload-panel');
+    const uploadInput = document.getElementById('upload-image-input');
+    const uploadTrigger = document.getElementById('upload-image-trigger');
+    const uploadImageAction = document.getElementById('upload-image-action');
+    const uploadImageName = document.getElementById('upload-image-name');
     const PIXABAY_KEY = '54360015-81e98130630ae3ed1faf5a9b9';
+    const MAX_IMAGE_DATA_URL_LENGTH = 500000;
     let selectedImageUrl = null;
 
-    /* --- internal helpers --- */
-    function resetImageSelection() {
+    if (uploadInput) {
+      uploadInput.setAttribute('accept', 'image/*');
+      uploadInput.setAttribute('hidden', '');
+    }
+
+    function setStatus(text) {
+      if (statusEl) statusEl.textContent = text || '';
+    }
+
+    function clearContainer(container) {
+      if (container) container.innerHTML = '';
+    }
+
+    function clearImageSelectionClasses() {
+      [imgBox, uploadImgBox].forEach((container) => {
+        if (!container) return;
+        container.querySelectorAll('img').forEach((img) => {
+          img.classList.remove('selected');
+          img.dataset.selected = 'false';
+        });
+      });
+    }
+
+    function selectImage(img) {
+      if (!img) return;
+      clearImageSelectionClasses();
+      img.classList.add('selected');
+      img.dataset.selected = 'true';
+      selectedImageUrl = img.src;
+    }
+
+    function activateImageTab(tabName) {
+      const isWeb = tabName === 'web';
+      if (tabWeb) tabWeb.classList.toggle('is-active', isWeb);
+      if (tabUpload) tabUpload.classList.toggle('is-active', !isWeb);
+      if (panelWeb) panelWeb.classList.toggle('is-active', isWeb);
+      if (panelUpload) panelUpload.classList.toggle('is-active', !isWeb);
+    }
+
+    function appendImage(container, src, alt, options = {}) {
+      if (!container || !src) return null;
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = alt || 'Product image';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      container.appendChild(img);
+
+      img.addEventListener('click', () => {
+        selectImage(img);
+        setStatus('Image selected.');
+      });
+
+      if (options.autoSelect) {
+        selectImage(img);
+      }
+
+      return img;
+    }
+
+    function setUploadStateIdle() {
+      if (uploadTrigger) uploadTrigger.classList.remove('is-selected');
+      if (uploadImageAction) uploadImageAction.textContent = 'Attach Image File';
+      if (uploadImageName) uploadImageName.textContent = 'No file selected';
+      if (uploadInput) uploadInput.value = '';
+    }
+
+    function setUploadStateSelected(fileName) {
+      if (uploadTrigger) uploadTrigger.classList.add('is-selected');
+      if (uploadImageAction) uploadImageAction.textContent = 'Change Image File';
+      if (uploadImageName) uploadImageName.textContent = fileName || 'Selected file';
+    }
+
+    function resetImageState() {
       selectedImageUrl = null;
-      if (imgBox) imgBox.innerHTML = '';
-      if (statusEl) statusEl.textContent = '';
+      clearContainer(imgBox);
+      clearContainer(uploadImgBox);
+      setUploadStateIdle();
+      activateImageTab('web');
+      setStatus('');
+    }
+
+    function isHttpUrl(value) {
+      return /^https?:\/\/\S+/i.test(value || '');
+    }
+
+    async function optimizeImageFile(file) {
+      const rawDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Unable to read selected file.'));
+        reader.readAsDataURL(file);
+      });
+
+      const img = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Invalid image file.'));
+        image.src = rawDataUrl;
+      });
+
+      const maxDimension = 900;
+      const ratio = Math.min(1, maxDimension / Math.max(img.width, img.height));
+      const width = Math.max(1, Math.round(img.width * ratio));
+      const height = Math.max(1, Math.round(img.height * ratio));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Image processing is not supported on this device.');
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      let quality = 0.86;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+      while (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH && quality > 0.55) {
+        quality -= 0.08;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+
+      if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
+        throw new Error('Image is too large. Please use a smaller file.');
+      }
+
+      return dataUrl;
     }
 
     async function fetchPixabayImages(query) {
-      resetImageSelection();
-      if (statusEl) statusEl.textContent = 'Searching images on Pixabay...';
+      clearContainer(imgBox);
+      clearContainer(uploadImgBox);
+      setUploadStateIdle();
+      selectedImageUrl = null;
+      activateImageTab('web');
+      setStatus('Searching images on Pixabay...');
 
-      const res = await fetch(
-        `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(
-          query,
-        )}&image_type=photo&per_page=4`,
-      );
-      const data = await res.json();
+      try {
+        const res = await fetch(
+          `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(
+            query,
+          )}&image_type=photo&per_page=4`,
+        );
 
-      if (!imgBox) return;
-      imgBox.innerHTML = '';
+        if (!res.ok) {
+          setStatus(
+            res.status === 429
+              ? 'Pixabay API limit reached.'
+              : 'Unable to fetch images.',
+          );
+          return;
+        }
 
-      if (data.hits && data.hits.length > 0) {
+        const data = await res.json();
+        if (!data?.hits?.length) {
+          setStatus('No images found for this query.');
+          return;
+        }
+
         data.hits.forEach((photo) => {
-          const img = document.createElement('img');
-          img.src = photo.webformatURL;
-          img.alt = query;
-          imgBox.appendChild(img);
+          appendImage(imgBox, photo.webformatURL, query);
         });
-        if (statusEl) statusEl.textContent = 'Click an image to select it.';
-      } else {
-        if (statusEl) statusEl.textContent = 'No images found for this query.';
+
+        setStatus('Click one image to select it.');
+      } catch (err) {
+        console.error('Pixabay lookup error:', err);
+        setStatus('Image search failed.');
       }
     }
 
     async function searchBarcode(barcode) {
-      resetImageSelection();
-      if (statusEl)
-        statusEl.textContent = 'Fetching product info from barcode...';
+      clearContainer(imgBox);
+      clearContainer(uploadImgBox);
+      setUploadStateIdle();
+      selectedImageUrl = null;
+      activateImageTab('web');
+      setStatus('Fetching product info from barcode...');
 
-      const res = await fetch(
-        `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      );
-      const data = await res.json();
+      try {
+        const res = await fetch(
+          `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+        );
+        const data = await res.json();
+        const brandInput = document.getElementById('master-brand');
 
-      const productNameEl = document.getElementById('master-name');
-      const productBrandEl = document.getElementById('master-brand');
-
-      if (data.status === 1) {
-        const product = data.product;
-        if (productNameEl) productNameEl.value = product.product_name || '';
-        if (productBrandEl) productBrandEl.value = product.brands || '';
-        if (statusEl) statusEl.textContent = 'Product info found!';
-
-        if (product.image_url && imgBox) {
-          const img = document.createElement('img');
-          img.src = product.image_url;
-          img.alt = product.product_name || 'Product Image';
-          img.classList.add('selected');
-          img.dataset.selected = 'true';
-          imgBox.appendChild(img);
-          selectedImageUrl = img.src;
+        if (data.status !== 1) {
+          setStatus('Product not found with this barcode.');
+          return;
         }
-      } else {
-        if (statusEl)
-          statusEl.textContent = 'Product not found with this barcode.';
+
+        const product = data.product || {};
+        if (nameInput) nameInput.value = product.product_name || '';
+        if (brandInput) brandInput.value = product.brands || '';
+
+        if (product.image_url) {
+          appendImage(imgBox, product.image_url, product.product_name, {
+            autoSelect: true,
+          });
+          setStatus('Barcode image attached and selected.');
+        } else {
+          setStatus('Product found. No image available.');
+        }
+      } catch (err) {
+        console.error('Barcode lookup error:', err);
+        setStatus('Barcode lookup failed.');
       }
+    }
+
+    function attachDirectImageUrl(url) {
+      clearContainer(imgBox);
+      clearContainer(uploadImgBox);
+      setUploadStateIdle();
+      selectedImageUrl = null;
+      activateImageTab('web');
+
+      const img = appendImage(imgBox, url, 'Linked image', { autoSelect: true });
+      if (!img) {
+        setStatus('Unable to attach image link.');
+        return;
+      }
+
+      img.addEventListener('error', () => {
+        if (selectedImageUrl === url) selectedImageUrl = null;
+        setStatus('Image link could not be loaded.');
+      });
+
+      setStatus('Image link detected. Attached and selected.');
     }
 
     function handleLookup() {
@@ -322,51 +530,53 @@ const ProductManager = {
       const value = lookupInput.value.trim();
       if (!value) return;
 
-      const firstChar = value.charAt(0);
-      if (/\d/.test(firstChar)) {
-        // treat as barcode
-        if (skuInput) skuInput.value = value;
+      if (isHttpUrl(value)) {
+        if (nameInput) nameInput.value = '';
+        attachDirectImageUrl(value);
+        return;
+      }
+
+      if (/^\d/.test(value.charAt(0))) {
+        if (skuInput) {
+          skuInput.value = stripSkuPrefix(value).slice(0, 32);
+        }
         searchBarcode(value);
+        return;
+      }
+
+      if (nameInput) nameInput.value = value;
+      fetchPixabayImages(value);
+    }
+
+    function applyUnlimitedState() {
+      if (!qtyInput || !unlimitedCheckbox) return;
+      if (unlimitedCheckbox.checked) {
+        qtyInput.value = '';
+        qtyInput.disabled = true;
+        qtyInput.required = false;
+        qtyInput.placeholder = 'UNLIMITED';
       } else {
-        // treat as name
-        if (nameInput) nameInput.value = value;
-        fetchPixabayImages(value);
+        qtyInput.disabled = false;
+        qtyInput.required = true;
+        qtyInput.placeholder = '0';
       }
     }
 
-    /* --- qty unlimited toggle --- */
     if (qtyInput && unlimitedCheckbox) {
-      unlimitedCheckbox.addEventListener('change', () => {
-        if (unlimitedCheckbox.checked) {
-          qtyInput.value = '';
-          qtyInput.disabled = true;
-          qtyInput.placeholder = 'UNLIMITED';
-        } else {
-          qtyInput.disabled = false;
-          qtyInput.placeholder = '0';
-        }
-      });
+      unlimitedCheckbox.addEventListener('change', applyUnlimitedState);
+      applyUnlimitedState();
     }
 
-    /* --- image selection click --- */
-    if (imgBox) {
-      imgBox.addEventListener('click', (e) => {
+    [imgBox, uploadImgBox].forEach((container) => {
+      if (!container) return;
+      container.addEventListener('click', (e) => {
         const img = e.target.closest('img');
         if (!img) return;
-
-        imgBox.querySelectorAll('img').forEach((node) => {
-          node.classList.remove('selected');
-          node.dataset.selected = 'false';
-        });
-
-        img.classList.add('selected');
-        img.dataset.selected = 'true';
-        selectedImageUrl = img.src;
-        if (statusEl) statusEl.textContent = 'Image selected.';
+        selectImage(img);
+        setStatus('Image selected.');
       });
-    }
+    });
 
-    /* --- lookup button + Enter --- */
     if (lookupBtn && lookupInput) {
       lookupBtn.addEventListener('click', handleLookup);
       lookupInput.addEventListener('keydown', (e) => {
@@ -377,83 +587,138 @@ const ProductManager = {
       });
     }
 
+    if (tabWeb) {
+      tabWeb.addEventListener('click', () => {
+        activateImageTab('web');
+      });
+    }
+
+    if (tabUpload) {
+      tabUpload.addEventListener('click', () => {
+        activateImageTab('upload');
+      });
+    }
+
+    if (uploadTrigger && uploadInput) {
+      uploadTrigger.addEventListener('click', () => uploadInput.click());
+      uploadTrigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          uploadInput.click();
+        }
+      });
+    }
+
+    if (uploadInput) {
+      uploadInput.addEventListener('change', async () => {
+        const file = uploadInput.files?.[0];
+        if (!file) return;
+
+        if (!String(file.type || '').startsWith('image/')) {
+          showValidationError('Please select a valid image file.');
+          setUploadStateIdle();
+          return;
+        }
+
+        activateImageTab('upload');
+        setStatus('Processing image file...');
+
+        try {
+          const dataUrl = await optimizeImageFile(file);
+          clearContainer(uploadImgBox);
+          clearContainer(imgBox);
+          appendImage(uploadImgBox, dataUrl, file.name, { autoSelect: true });
+          setUploadStateSelected(file.name);
+          setStatus('Attached image file selected.');
+        } catch (err) {
+          console.error('Upload image processing error:', err);
+          selectedImageUrl = null;
+          clearContainer(uploadImgBox);
+          setUploadStateIdle();
+          setStatus(err.message || 'Unable to process image file.');
+          showValidationError(err.message || 'Unable to process image file.');
+        }
+      });
+    }
+
     if (closeBtn) {
       closeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        resetImageState();
         closeProductModal();
       });
     }
 
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
+        resetImageState();
         closeProductModal();
       }
     });
 
-    /* --- FORM SUBMIT: validate + Supabase --- */
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       if (!validateProductForm()) return;
 
-      const sku = (skuInput?.value || '').trim();
+      const skuCode = stripSkuPrefix(skuInput?.value || '');
+      const sku = ensureSkuPrefix(skuCode);
       const name = (nameInput?.value || '').trim();
-      const price = parseFloat(priceInput?.value || '0');
+      const price = Number.parseFloat(priceInput?.value || '0');
       const qty = unlimitedCheckbox?.checked
         ? 999999
-        : parseInt(qtyInput?.value || '0', 10);
+        : Number.parseInt(qtyInput?.value || '', 10);
       const desc =
         document.getElementById('master-desc')?.value?.trim() || null;
       const brand =
         document.getElementById('master-brand')?.value?.trim() || null;
 
-      if (!sku && !selectedImageUrl) {
-        showValidationError(
-          'Please select one image or barcode before adding.',
-        );
+      if (skuInput) skuInput.value = skuCode;
+
+      if (!sku) {
+        showValidationError('Please generate a SKU code before adding.');
+        skuInput?.focus();
+        return;
+      }
+
+      if (!unlimitedCheckbox?.checked && (!Number.isInteger(qty) || qty < 0)) {
+        showValidationError('Please enter a valid stock quantity.');
+        qtyInput?.focus();
         return;
       }
 
       try {
         const productIdFromForm = form.dataset.productId || null;
-        let finalProductId = productIdFromForm;
-        let productRow = null;
+        const res = await fetch('/.netlify/functions/add-product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: productIdFromForm || null,
+            sku,
+            name,
+            description: desc,
+            brand,
+            price,
+            qty,
+            imageUrl: selectedImageUrl || null,
+          }),
+        });
 
-        // 1) Ensure product exists (or create)
-        if (!finalProductId) {
-          const { data, error } = await supabaseClient
-            .from('products')
-            .insert({
-              sku: sku || undefined,
-              name,
-              description: desc,
-              brand,
-              price,
-              qty,
-              image_url: selectedImageUrl || null,
-              is_active: true,
-            })
-            .select()
-            .single();
-          if (error) throw error;
-          productRow = data;
-          finalProductId = data.productid;
+        let result = {};
+        try {
+          result = await res.json();
+        } catch (_) {
+          // keep default object
         }
 
-        // 2) Insert into sales
-        const { data: sale, error: saleErr } = await supabaseClient
-          .from('sales')
-          .insert({
-            product_id: finalProductId,
-            qty,
-            unit_price: price,
-          })
-          .select()
-          .single();
-        if (saleErr) throw saleErr;
+        if (!res.ok) {
+          throw new Error(result?.error || 'Failed to add product/sale.');
+        }
 
-        // 3) Update ledger UI
+        const sale = result?.sale;
+        if (!sale) throw new Error('Missing sale response from server.');
+
         if (
           window.wolfData &&
           typeof window.wolfData.addSaleRow === 'function'
@@ -461,13 +726,13 @@ const ProductManager = {
           window.wolfData.addSaleRow(sale);
         }
 
-        // 4) Refresh products list
         if (typeof ProductManager.fetchProducts === 'function') {
-          ProductManager.fetchProducts();
+          await ProductManager.fetchProducts();
         }
 
+        const qtyLabel = unlimitedCheckbox?.checked ? 'UNLIMITED' : qty;
         Toastify({
-          text: `PRODUCT ADDED: ${name.toUpperCase()} x${qty}`,
+          text: `PRODUCT ADDED: ${name.toUpperCase()} x${qtyLabel}`,
           duration: 2500,
           gravity: 'top',
           position: 'right',
@@ -481,6 +746,7 @@ const ProductManager = {
           },
         }).showToast();
 
+        resetImageState();
         closeProductModal();
       } catch (err) {
         console.error('Add to sale error:', err);
@@ -498,7 +764,7 @@ const ProductManager = {
             color: '#fff',
           },
         }).showToast();
-        if (statusEl) statusEl.textContent = 'Error adding product/sale.';
+        setStatus('Error adding product/sale.');
       }
     });
   },
@@ -907,6 +1173,8 @@ const ProductManager = {
   transform: translateY(0);
 }
 
+
+
 /* when closing */
 .master-modal-overlay.is-closing {
   opacity: 0;
@@ -1220,8 +1488,6 @@ const ProductManager = {
     gap: 12px;
   }
 
-  @media (min-width: 768px) {
-    .master-terminal-container { max-width: 600px; }
   }
 
   @media (max-width: 767px) {
@@ -1355,9 +1621,9 @@ const ProductManager = {
         () => `
       <div class="col-12 col-md-6 col-xl-4 opacity-50">
         <div class="hud-item" style="height: 350px;">
-          <div class="skel-shimmer" style="height: 150px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 20px;"></div>
-          <div class="skel-shimmer" style="width: 70%; height: 20px; background: rgba(255,255,255,0.05); margin-bottom: 10px;"></div>
-          <div class="skel-shimmer" style="width: 40%; height: 15px; background: rgba(255,255,255,0.05);"></div>
+          <div class="skel-shimmer" style="height: 150px; background: var(--skeleton-base); border-radius: 12px; margin-bottom: 20px;"></div>
+          <div class="skel-shimmer" style="width: 70%; height: 20px; background: var(--skeleton-mid); margin-bottom: 10px;"></div>
+          <div class="skel-shimmer" style="width: 40%; height: 15px; background: var(--skeleton-mid);"></div>
         </div>
       </div>
     `,
@@ -1373,6 +1639,7 @@ const ProductManager = {
       const { data, error } = await window.supabaseClient
         .from('products')
         .select('*')
+        .eq('is_active', true)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -1591,28 +1858,66 @@ const ProductManager = {
     const product = this.allProducts.find((p) => p.productid === productId);
     if (!product) return;
 
+    if (product.is_active === false) {
+      Toastify({
+        text: 'Product is already archived',
+        duration: 2500,
+        backgroundColor: '#f39c12',
+      }).showToast();
+      this.allProducts = this.allProducts.filter((p) => p.productid !== productId);
+      this.render(this.allProducts);
+      return;
+    }
+
     if (!confirm(`Archive product "${product.name || ''}"?`)) return;
 
     (async () => {
       try {
-        // 1) insert into trash_bin
-        const { error: trashErr } = await window.supabaseClient
+        // 1) prevent duplicate trash rows for the same product
+        const { data: existingTrash, error: existingTrashErr } = await window.supabaseClient
           .from('trash_bin')
-          .insert({
-            original_id: String(product.productid),
-            table_name: 'products',
-            deleted_data: product,
-          });
-        if (trashErr) throw trashErr;
+          .select('id')
+          .eq('table_name', 'products')
+          .eq('original_id', String(product.productid))
+          .limit(1)
+          .maybeSingle();
+        if (existingTrashErr) throw existingTrashErr;
 
-        // 2) mark product inactive (or delete)
-        const { error: delErr } = await window.supabaseClient
+        // 2) insert into trash_bin only when no prior archived copy exists
+        if (!existingTrash) {
+          const { error: trashErr } = await window.supabaseClient
+            .from('trash_bin')
+            .insert({
+              original_id: String(product.productid),
+              table_name: 'products',
+              deleted_data: product,
+            });
+          if (trashErr) throw trashErr;
+        }
+
+        // 3) mark product inactive once (idempotent)
+        const { data: archivedRows, error: delErr } = await window.supabaseClient
           .from('products')
           .update({ is_active: false })
-          .eq('productid', product.productid);
+          .eq('productid', product.productid)
+          .eq('is_active', true)
+          .select('productid');
         if (delErr) throw delErr;
 
-        // 3) update local cache and re-render
+        if (!archivedRows?.length) {
+          Toastify({
+            text: 'Product already archived',
+            duration: 2500,
+            backgroundColor: '#f39c12',
+          }).showToast();
+          this.allProducts = this.allProducts.filter(
+            (p) => p.productid !== product.productid,
+          );
+          this.render(this.allProducts);
+          return;
+        }
+
+        // 4) update local cache and re-render
         this.allProducts = this.allProducts.filter(
           (p) => p.productid !== product.productid,
         );
@@ -1692,7 +1997,7 @@ const ProductManager = {
 
     // Prefill if product changed or fields are empty
     if (needsPrefill) {
-      skuInput.value = product.sku || '';
+      skuInput.value = stripSkuPrefix(product.sku || '');
       nameInput.value = product.name || '';
       priceInput.value = product.price || 0;
       qtyInput.value = 1;

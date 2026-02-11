@@ -1,7 +1,18 @@
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('node:crypto');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const ipHashSecret =
+  process.env.IP_HASH_SECRET ||
+  process.env.OTP_HASH_SECRET ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  supabaseKey;
+
+function hashIp(ip, secret) {
+  return crypto.createHash('sha256').update(`${ip}:${secret}`).digest('hex');
+}
 
 exports.handler = async (event, context) => {
   // Enable CORS
@@ -39,12 +50,13 @@ exports.handler = async (event, context) => {
                      event.headers['x-real-ip'] ||
                      event.requestContext?.identity?.sourceIp ||
                      'unknown';
+    const clientIpHash = hashIp(clientIP, ipHashSecret);
 
     // Update or insert cooldown record
     const { error } = await supabase
       .from('otp_cooldowns')
       .upsert({
-        ip_address: clientIP,
+        ip_address: clientIpHash,
         last_sent_at: new Date().toISOString()
       }, {
         onConflict: 'ip_address'
@@ -60,7 +72,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         message: 'Cooldown updated',
-        ip: clientIP
+        ipHash: clientIpHash
       })
     };
 

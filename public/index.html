@@ -22,6 +22,7 @@
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/assets/js/libraries/qrcode-generator.min.js"></script>
     <script src="assets/js/utils/supabase-init.js"></script>
     <script src="assets/js/utils/system-config.js"></script>
     <script src="assets/js/utils/auth-guard.js"></script>
@@ -240,6 +241,54 @@
       </div>
     </div>
 
+    <!-- QUICK LOGIN QR MODAL -->
+    <div id="quickLoginModal" class="quick-login-modal" aria-hidden="true">
+      <div class="quick-login-backdrop" id="quickLoginBackdrop"></div>
+      <div class="quick-login-card">
+        <button
+          type="button"
+          class="quick-login-close"
+          id="quickLoginClose"
+          aria-label="Close quick login"
+        >
+          <i class="bx bx-x"></i>
+        </button>
+
+        <div class="quick-login-head">
+          <div class="quick-login-icon">
+            <i class="bx bx-shield-quarter"></i>
+          </div>
+          <h3>Quick Login Portal</h3>
+          <p>Scan this one-time code from a trusted signed-in terminal.</p>
+        </div>
+
+        <div class="quick-login-qr-shell">
+          <div class="quick-login-qr-glow"></div>
+          <canvas id="quickLoginQrCanvas" width="260" height="260"></canvas>
+        </div>
+
+        <div class="quick-login-status" id="quickLoginStatus">
+          Initializing secure QR channel...
+        </div>
+
+        <div class="quick-login-meta">
+          <div class="quick-login-meta-item">
+            <span>Session Ref</span>
+            <strong id="quickLoginRef">---</strong>
+          </div>
+          <div class="quick-login-meta-item">
+            <span>Expires In</span>
+            <strong id="quickLoginTimer">--s</strong>
+          </div>
+        </div>
+
+        <button type="button" class="quick-login-refresh" id="quickLoginRefresh">
+          <i class="bx bx-refresh"></i>
+          <span>Regenerate QR</span>
+        </button>
+      </div>
+    </div>
+
     <!-- EXIT CONFIRMATION MODAL -->
     <div id="confirmExitModal" class="modal-overlay">
       <div class="modal-content warning-modal">
@@ -316,9 +365,19 @@
                 <button type="submit" id="loginBtn">LOGIN NOW</button>
               </form>
 
-              <a href="#" class="link-muted" id="forgotLink"
-                >Forgot password?</a
-              >
+              <div class="auth-action-row">
+                <a href="#" class="link-muted" id="forgotLink"
+                  >Forgot password?</a
+                >
+                <button
+                  type="button"
+                  class="quick-login-launch"
+                  id="quickLoginLaunch"
+                >
+                  <i class="bx bx-qr-scan"></i>
+                  <span>Quick Login</span>
+                </button>
+              </div>
               <div id="loginOutput"></div>
 
               <div
@@ -344,9 +403,9 @@
 
             <div class="flip-card-back">
               <div class="brand">RECOVERY <span>MODE</span></div>
-              <div id="recoveryContainer">
+              <div id="recoveryContainer" class="recovery-container">
                 <!-- STEP 1: INITIAL VIEW -->
-                <div id="recoveryStep1" class="active-step">
+                <div id="recoveryStep1" class="recovery-step active-step">
                   <p class="desc">
                     Enter authorized email to receive security key.
                   </p>

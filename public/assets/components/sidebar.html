@@ -1,12 +1,8 @@
 <style>
   :root {
-    --side-bg: #111111;
-    --accent-red: #a63429;
-    --text-primary: #ffffff;
-    --text-muted: #666666; /* Unclicked Gray */
+    --accent-red: var(--wolf-red);
     --rail-width: 80px;
     --expanded-width: 280px;
-    --sub-menu-bg: #080808;
   }
 
   /* 1. MASTER PANEL */
@@ -17,14 +13,14 @@
     z-index: 10000;
     display: flex;
     flex-direction: column;
-    background: var(--sub-menu-bg);
+    background: var(--shell-sidebar-bg);
     background-image: url('/assets/images/textures/diagmonds.png');
     background-blend-mode: overlay;
     background-size: auto;
     background-repeat: repeat;
     /* This makes the background move with the element */
     background-attachment: local;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid var(--shell-sidebar-divider);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     padding-bottom: 15px;
@@ -89,7 +85,7 @@
     display: flex;
     align-items: center;
     height: 54px;
-    color: var(--text-muted); /* #666666 */
+    color: var(--shell-nav-item-muted);
     text-decoration: none;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -116,8 +112,8 @@
 
   /* HOVER (Only non-active) */
   .nav-item-side:not(.active):hover {
-    background: rgba(255, 255, 255, 0.02);
-    color: #fff;
+    background: var(--shell-sidebar-hover);
+    color: var(--text-main);
   }
 
   /* 3. ACTIVE STATE (THE LOCK) */
@@ -139,7 +135,7 @@
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.4s ease;
-    background: var(--sub-menu-bg);
+    background: var(--shell-sidebar-sub-bg);
   }
   .nav-dropdown.open .sub-nav-list {
     max-height: 500px;
@@ -184,7 +180,7 @@
     pointer-events: none;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 0;
-    color: #fff !important;
+    color: var(--shell-sidebar-watermark) !important;
   }
 
   .sub-bg-icon.active .sub-bg-icon {
@@ -198,17 +194,17 @@
     pointer-events: none;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 0;
-    color: #fff !important;
+    color: var(--shell-sidebar-watermark) !important;
   }
 
   .sub-item:not(.active):hover .sub-bg-icon {
     transform: translateY(-50%) scale(0.4) rotate(-10deg);
     opacity: 1;
     filter: blur(0px);
-    color: gold !important;
+    color: var(--gold-accent) !important;
     text-shadow:
-      0 0 70px gold,
-      0 0 16px gold;
+      0 0 70px var(--gold-accent),
+      0 0 16px var(--gold-accent);
   }
 
   .sub-item:not(.active):hover .sub-bg-icon,
@@ -216,10 +212,10 @@
     transform: translateY(-50%) scale(0.4) rotate(-10deg);
     opacity: 1;
     filter: blur(0px);
-    color: gold !important;
+    color: var(--gold-accent) !important;
     text-shadow:
-      0 0 70px gold,
-      0 0 16px gold;
+      0 0 70px var(--gold-accent),
+      0 0 16px var(--gold-accent);
   }
 
   /* MISC UI */
@@ -233,19 +229,19 @@
   .sidebar-section-label {
     font-size: 0.6rem;
     font-weight: 800;
-    color: rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
     padding: 10px 0 10px 25px;
     text-transform: uppercase;
   }
   .sidebar-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--shell-sidebar-divider);
     margin: 10px 25px;
   }
   .btn-disconnect {
     display: flex;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--shell-sidebar-divider);
     color: var(--accent-red);
     font-weight: 800;
     cursor: pointer;
@@ -256,7 +252,7 @@
     top: 22px;
     font-size: 10px;
     font-weight: 800;
-    color: rgb(84, 84, 84);
+    color: var(--text-muted);
     pointer-events: none;
     display: none;
   }
@@ -268,7 +264,7 @@
   <div class="sidebar-header">
     <button
       id="sidebarClose"
-      style="background: none; border: none; color: #666; cursor: pointer"
+      style="background: none; border: none; color: var(--text-muted); cursor: pointer"
     >
       <i
         class="bxf bx-caret-big-right"
@@ -282,13 +278,13 @@
   <div class="profile-area" style="padding: 0 25px 15px">
     <div
       class="user-name"
-      style="font-weight: 800; color: #fff; white-space: nowrap"
+      style="font-weight: 800; color: var(--text-main); white-space: nowrap"
     >
       PALOMAR ADMIN
     </div>
     <div
       class="user-email"
-      style="font-size: 0.75rem; color: #555; white-space: nowrap"
+      style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap"
     >
       admin@palomargym.com
     </div>
@@ -298,11 +294,11 @@
   <div
     class="target-box"
     style="
-      background: #161616;
+      background: var(--shell-sidebar-card-bg);
       border-radius: 12px;
       padding: 12px;
       margin: 0 20px 20px;
-      border: 1px solid #222;
+      border: 1px solid var(--shell-sidebar-card-border);
     "
   >
     <div
@@ -310,16 +306,16 @@
         display: flex;
         justify-content: space-between;
         font-size: 0.65rem;
-        color: #555;
+        color: var(--text-muted);
       "
     >
       <span>TARGET</span>
-      <b id="sidebar-target-percent" style="color: #fff">0%</b>
+      <b id="sidebar-target-percent" style="color: var(--text-main)">0%</b>
     </div>
     <div
       style="
         height: 4px;
-        background: #222;
+        background: var(--shell-sidebar-track);
         margin-top: 8px;
         border-radius: 5px;
         overflow: hidden;

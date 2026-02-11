@@ -805,6 +805,91 @@
     margin-bottom: 0 !important;
     padding: 0 !important;
   }
+
+  /* --- TABLET RESPONSIVENESS --- */
+  @media (min-width: 601px) and (max-width: 1024px) {
+    .ledger-page-wrapper {
+      padding: 16px;
+    }
+
+    .ledger-header {
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .ledger-brand {
+      font-size: 1.25rem;
+      white-space: normal;
+      line-height: 1.1;
+    }
+
+    .week-nav-container {
+      gap: 10px;
+    }
+
+    .chrono-nav-btn {
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+
+    .chrono-nav-btn .btn-label {
+      font-size: 9px;
+      letter-spacing: 0.6px;
+    }
+
+    .chrono-hud-node {
+      padding: 10px 12px;
+      height: 48px;
+    }
+
+    .day-btn {
+      padding: 12px 0;
+      font-size: 8px;
+    }
+  }
+
+  /* --- LIGHT THEME OVERRIDES --- */
+  body.light-theme .ledger-brand {
+    color: var(--text-main);
+  }
+
+  body.light-theme .ledger-summary-card {
+    background: linear-gradient(145deg, var(--surface-elevated), var(--card-bg));
+    background-image: none;
+    border: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  body.light-theme .summary-label,
+  body.light-theme .hud-protocol,
+  body.light-theme #week-range-display {
+    color: var(--text-muted);
+  }
+
+  body.light-theme .summary-value,
+  body.light-theme .protocol-label,
+  body.light-theme .hud-data,
+  body.light-theme .ledger-search-box input {
+    color: var(--text-main);
+  }
+
+  body.light-theme .chrono-nav-btn,
+  body.light-theme .chrono-hud-node,
+  body.light-theme .snap-today-btn,
+  body.light-theme .chrono-snap-btn,
+  body.light-theme .ledger-search-box,
+  body.light-theme .day-btn,
+  body.light-theme .day-selector-outer-box {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-main);
+  }
+
+  body.light-theme .date-status-pill:hover {
+    background: rgba(56, 45, 34, 0.08);
+  }
 </style>
 <script src="/assets/js/utils/gatekeeper.js"></script>
 <script src="/assets/js/utils/auth-guard.js"></script>

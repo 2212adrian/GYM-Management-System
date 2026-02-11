@@ -33,10 +33,10 @@
       width: 520px;
       border-radius: 100px;
       height: 85px;
-      border: 1px solid #333;
-      background: rgba(26, 26, 26, 0.95) !important;
+      border: 1px solid var(--shell-nav-border);
+      background: var(--shell-nav-bg) !important;
       backdrop-filter: blur(10px);
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+      box-shadow: var(--shell-nav-shadow);
     }
   }
 
@@ -45,7 +45,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    color: #666666; /* Gray if hasn't been clicked */
+    color: var(--shell-nav-item-muted);
     flex: 1;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -58,7 +58,7 @@
   }
 
   .nav-item i {
-    color: #666666; /* Icon matches text when not clicked */
+    color: var(--shell-nav-item-muted);
     font-size: 24px;
     margin-bottom: 2px;
     transition: all 0.3s ease;
@@ -74,10 +74,10 @@
   /* HOVER: Only for items that are NOT active */
   .nav-item:not(.active):hover {
     opacity: 1;
-    color: #fff;
+    color: var(--text-main);
   }
   .nav-item:not(.active):hover i {
-    color: #fff;
+    color: var(--text-main);
     transform: scale(1.1);
   }
 
@@ -129,7 +129,7 @@
     background: var(--wolf-red);
     border-radius: 50%;
     border: 6px solid var(--bg-dark) !important;
-    color: white;
+    color: var(--text-on-accent);
     font-size: 32px;
     display: flex;
     align-items: center;

@@ -28,8 +28,12 @@ async function ensureSupabaseClient() {
 
 // --- 2. CONFIGURATION ---
 const MAX_ATTEMPTS = 5;
-const OTP_COOLDOWN_SECONDS = 60;
 const LOGIN_LOCKOUT_MINUTES = 5;
+const OTP_CLICK_SPAM_WINDOW_MS = 1000;
+const OTP_CLICK_SPAM_THRESHOLD = 3;
+const OTP_CLICK_SPAM_LOCK_SECONDS = 30;
+const QUICK_LOGIN_POLL_MS = 1800;
+const QUICK_LOGIN_EXPIRE_FALLBACK_SECONDS = 120;
 const typewriterWords = [
   'Beyond Strength',
   'Beyond Limit',
@@ -86,6 +90,10 @@ function typeCarousel() {
 
 // --- UTILS: LOGIN LOCKOUT TIMER ---
 let loginTimerInterval = null;
+let loginOutputHideTimer = null;
+let loginOutputHideAnimationTimer = null;
+const resetOutputHideTimers = new WeakMap();
+const resetOutputHideAnimationTimers = new WeakMap();
 
 // --- UTILS: GET IP ---
 async function getClientIP() {
@@ -109,16 +117,186 @@ function shakeField(el) {
   }, 420);
 }
 
+function hideLoginOutput(immediate = false) {
+  const loginOutput = document.getElementById('loginOutput');
+  if (!loginOutput) return;
+
+  if (loginOutputHideTimer) {
+    clearTimeout(loginOutputHideTimer);
+    loginOutputHideTimer = null;
+  }
+  if (loginOutputHideAnimationTimer) {
+    clearTimeout(loginOutputHideAnimationTimer);
+    loginOutputHideAnimationTimer = null;
+  }
+
+  if (immediate) {
+    loginOutput.classList.remove('is-entering', 'is-hiding', 'is-visible');
+    loginOutput.textContent = '';
+    return;
+  }
+
+  loginOutput.classList.remove('is-entering');
+  loginOutput.classList.add('is-hiding');
+
+  loginOutputHideAnimationTimer = setTimeout(() => {
+    loginOutput.classList.remove('is-hiding', 'is-visible');
+    loginOutput.textContent = '';
+    loginOutputHideAnimationTimer = null;
+  }, 220);
+}
+
+function showLoginOutput(
+  message,
+  {
+    color = 'var(--wolf-red)',
+    html = false,
+    autoHide = true,
+    duration = 5000,
+    animate = true,
+  } = {},
+) {
+  const loginOutput = document.getElementById('loginOutput');
+  if (!loginOutput) return;
+
+  if (loginOutputHideTimer) {
+    clearTimeout(loginOutputHideTimer);
+    loginOutputHideTimer = null;
+  }
+  if (loginOutputHideAnimationTimer) {
+    clearTimeout(loginOutputHideAnimationTimer);
+    loginOutputHideAnimationTimer = null;
+  }
+
+  loginOutput.style.color = color;
+  loginOutput.classList.remove('is-hiding');
+  if (html) {
+    loginOutput.innerHTML = message;
+  } else {
+    loginOutput.textContent = message;
+  }
+
+  if (animate) {
+    loginOutput.classList.remove('is-visible', 'is-entering');
+    void loginOutput.offsetWidth;
+    loginOutput.classList.add('is-visible', 'is-entering');
+    setTimeout(() => {
+      loginOutput.classList.remove('is-entering');
+    }, 260);
+  } else {
+    loginOutput.classList.remove('is-entering');
+    loginOutput.classList.add('is-visible');
+  }
+
+  if (autoHide) {
+    loginOutputHideTimer = setTimeout(() => {
+      hideLoginOutput(false);
+      loginOutputHideTimer = null;
+    }, duration);
+  }
+}
+
+function getResetOutputElement(preferredElement = null) {
+  if (preferredElement) return preferredElement;
+
+  const step1Output = document.querySelector('#recoveryStep1 #resetOutput');
+  const step2Output = document.querySelector('#recoveryStep2 #resetOutput');
+
+  if (step2Output && step2Output.offsetParent !== null) return step2Output;
+  if (step1Output) return step1Output;
+  if (step2Output) return step2Output;
+
+  return document.getElementById('resetOutput');
+}
+
+function clearResetOutputTimers(outputEl) {
+  const hideTimer = resetOutputHideTimers.get(outputEl);
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    resetOutputHideTimers.delete(outputEl);
+  }
+
+  const animTimer = resetOutputHideAnimationTimers.get(outputEl);
+  if (animTimer) {
+    clearTimeout(animTimer);
+    resetOutputHideAnimationTimers.delete(outputEl);
+  }
+}
+
+function hideResetOutput({ immediate = false, targetEl = null } = {}) {
+  const outputEl = getResetOutputElement(targetEl);
+  if (!outputEl) return;
+
+  clearResetOutputTimers(outputEl);
+
+  if (immediate) {
+    outputEl.classList.remove('is-entering', 'is-hiding', 'is-visible');
+    outputEl.textContent = '';
+    return;
+  }
+
+  outputEl.classList.remove('is-entering');
+  outputEl.classList.add('is-hiding');
+
+  const animTimer = setTimeout(() => {
+    outputEl.classList.remove('is-hiding', 'is-visible');
+    outputEl.textContent = '';
+    resetOutputHideAnimationTimers.delete(outputEl);
+  }, 220);
+  resetOutputHideAnimationTimers.set(outputEl, animTimer);
+}
+
+function showResetOutput(
+  message,
+  {
+    color = 'var(--wolf-red)',
+    autoHide = false,
+    duration = 5000,
+    animate = true,
+    targetEl = null,
+  } = {},
+) {
+  const outputEl = getResetOutputElement(targetEl);
+  if (!outputEl) return;
+
+  clearResetOutputTimers(outputEl);
+
+  outputEl.style.color = color;
+  outputEl.classList.remove('is-hiding');
+  outputEl.textContent = message;
+
+  if (animate) {
+    outputEl.classList.remove('is-visible', 'is-entering');
+    void outputEl.offsetWidth;
+    outputEl.classList.add('is-visible', 'is-entering');
+    const animTimer = setTimeout(() => {
+      outputEl.classList.remove('is-entering');
+      resetOutputHideAnimationTimers.delete(outputEl);
+    }, 260);
+    resetOutputHideAnimationTimers.set(outputEl, animTimer);
+  } else {
+    outputEl.classList.remove('is-entering');
+    outputEl.classList.add('is-visible');
+  }
+
+  if (autoHide) {
+    const hideTimer = setTimeout(() => {
+      hideResetOutput({ immediate: false, targetEl: outputEl });
+      resetOutputHideTimers.delete(outputEl);
+    }, duration);
+    resetOutputHideTimers.set(outputEl, hideTimer);
+  }
+}
+
 function startLoginCountdown(seconds) {
   if (loginTimerInterval) clearInterval(loginTimerInterval);
   const loginBtn = document.getElementById('loginBtn');
-  const loginOutput = document.getElementById('loginOutput');
 
   const updateUI = (secs) => {
     if (secs <= 0) {
       loginBtn.disabled = false;
       loginBtn.textContent = 'AUTHORIZE ACCESS';
-      loginOutput.textContent = '';
+      hideLoginOutput(true);
       clearInterval(loginTimerInterval);
       return;
     }
@@ -126,8 +304,11 @@ function startLoginCountdown(seconds) {
     const mins = Math.floor(secs / 60);
     const remainingSecs = secs % 60;
     loginBtn.textContent = `LOCKED: ${mins}m ${remainingSecs}s`;
-    loginOutput.style.color = 'var(--wolf-red)';
-    loginOutput.textContent = `[ERR_403] Security protocol active. Terminal locked.`;
+    showLoginOutput('[ERR_403] Security protocol active. Terminal locked.', {
+      color: 'var(--wolf-red)',
+      autoHide: false,
+      animate: false,
+    });
   };
 
   let timeLeft = seconds;
@@ -172,21 +353,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await ensureSupabaseClient();
   } catch (err) {
-    const loginOutput = document.getElementById('loginOutput');
-    if (loginOutput) {
-      loginOutput.style.color = 'var(--wolf-red)';
-      loginOutput.textContent =
-        '[ERR_503] Secure database handshake failed. Try again later.';
-    }
+    showLoginOutput('[ERR_503] Secure database handshake failed. Try again later.');
     return;
   }
 
   const inner = document.getElementById('flipCardInner');
   const recoveryContainer = document.getElementById('recoveryContainer');
   const exitModal = document.getElementById('confirmExitModal');
-  const resetOutput = document.getElementById('resetOutput');
   const container = document.querySelector('.auth-split-container');
   let otpTimerInterval = null;
+  let otpCooldownEndsAt = 0;
+  let otpRapidClickTimestamps = [];
+  let quickLoginPollTimer = null;
+  let quickLoginClockTimer = null;
+  let quickLoginActiveRequest = null;
+  let quickLoginIsRequesting = false;
+
+  const quickLoginModal = document.getElementById('quickLoginModal');
+  const quickLoginLaunchBtn = document.getElementById('quickLoginLaunch');
+  const quickLoginCloseBtn = document.getElementById('quickLoginClose');
+  const quickLoginBackdrop = document.getElementById('quickLoginBackdrop');
+  const quickLoginRefreshBtn = document.getElementById('quickLoginRefresh');
+  const quickLoginStatusEl = document.getElementById('quickLoginStatus');
+  const quickLoginRefEl = document.getElementById('quickLoginRef');
+  const quickLoginTimerEl = document.getElementById('quickLoginTimer');
+  const quickLoginCanvas = document.getElementById('quickLoginQrCanvas');
 
   // --- DYNAMIC STAR GENERATOR ---
 
@@ -199,22 +390,358 @@ document.addEventListener('DOMContentLoaded', async () => {
   //createStars();
   typeCarousel();
 
+  async function runAdminBootSequence() {
+    const card = document.querySelector('.flip-card');
+
+    // ------------------------------------------
+    // PHASE 1: IDENTITY HANDSHAKE (Intro Anim)
+    // ------------------------------------------
+    container.classList.add('auth-verifying');
+    showLoginOutput(
+      safeHTML(
+        "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCCESSFUL. INITIATING SYSTEM...",
+      ),
+      {
+        color: 'var(--wolf-blue)',
+        html: true,
+        autoHide: false,
+      },
+    );
+
+    if (window.wolfAudio) window.wolfAudio.play('notif');
+
+    setTimeout(async () => {
+      // ------------------------------------------
+      // PHASE 2: TERMINAL EXIT (Outro Anim + Canvas Warp)
+      // ------------------------------------------
+      window.WOLF_IS_ANIMATING_OUT = true;
+
+      // Clear lockout record
+      const userIP = await getClientIP();
+      await supabaseClient.from('login_attempts').delete().eq('ip_address', userIP);
+
+      if (window.wolfAudio) {
+        wolfAudio.play('woosh');
+        wolfAudio.play('success');
+      }
+
+      // Add outro classes for flip-card and container
+      if (container) container.classList.add('outro');
+      if (card) card.classList.add('outro');
+
+      showLoginOutput(
+        safeHTML("<i class='bx bx-check-shield'></i> ACCESS GRANTED. BOOTING SYSTEM..."),
+        {
+          color: '#4ade80',
+          html: true,
+          autoHide: false,
+        },
+      );
+
+      // --- TRIGGER CANVAS STAR WARP ---
+      if (window.triggerStarWarp) {
+        window.triggerStarWarp();
+      }
+
+      // Final Redirect
+      setTimeout(() => {
+        window.location.replace('/pages/main.html');
+      }, 5000);
+    }, 1200);
+  }
+
+  function setQuickLoginStatus(message, tone = 'info') {
+    if (!quickLoginStatusEl) return;
+    quickLoginStatusEl.textContent = message;
+    quickLoginStatusEl.classList.remove('is-error', 'is-success');
+    if (tone === 'error') quickLoginStatusEl.classList.add('is-error');
+    if (tone === 'success') quickLoginStatusEl.classList.add('is-success');
+  }
+
+  function clearQuickLoginTimers() {
+    if (quickLoginPollTimer) {
+      clearInterval(quickLoginPollTimer);
+      quickLoginPollTimer = null;
+    }
+    if (quickLoginClockTimer) {
+      clearInterval(quickLoginClockTimer);
+      quickLoginClockTimer = null;
+    }
+  }
+
+  function updateQuickLoginTimer(expiryIso) {
+    const fallbackMs = Date.now() + QUICK_LOGIN_EXPIRE_FALLBACK_SECONDS * 1000;
+    const expiryMs = expiryIso ? new Date(expiryIso).getTime() : fallbackMs;
+
+    const render = () => {
+      const remain = Math.max(0, Math.ceil((expiryMs - Date.now()) / 1000));
+      if (quickLoginTimerEl) quickLoginTimerEl.textContent = `${remain}s`;
+
+      if (remain <= 0) {
+        clearQuickLoginTimers();
+        setQuickLoginStatus('QR session expired. Regenerate to continue.', 'error');
+      }
+    };
+
+    render();
+    quickLoginClockTimer = setInterval(render, 1000);
+  }
+
+  async function renderQuickLoginQr(qrValue) {
+    if (!quickLoginCanvas) return;
+    quickLoginCanvas.classList.remove('is-ready');
+
+    if (window.QRCode?.toCanvas) {
+      await window.QRCode.toCanvas(quickLoginCanvas, qrValue, {
+        width: 220,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: {
+          dark: '#0f1012',
+          light: '#ffffff',
+        },
+      });
+
+      quickLoginCanvas.classList.add('is-ready');
+      return;
+    }
+
+    if (typeof window.qrcode !== 'function') {
+      throw new Error('QR renderer is not available. Reload and try again.');
+    }
+
+    const qr = window.qrcode(0, 'M');
+    qr.addData(String(qrValue || ''));
+    qr.make();
+
+    const ctx = quickLoginCanvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('QR canvas context is unavailable');
+    }
+
+    const canvasSize = 220;
+    const margin = 8;
+    const moduleCount = qr.getModuleCount();
+    const innerSize = canvasSize - margin * 2;
+
+    quickLoginCanvas.width = canvasSize;
+    quickLoginCanvas.height = canvasSize;
+
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    ctx.fillStyle = '#0f1012';
+
+    for (let row = 0; row < moduleCount; row++) {
+      for (let col = 0; col < moduleCount; col++) {
+        if (!qr.isDark(row, col)) continue;
+        const x = margin + Math.floor((col * innerSize) / moduleCount);
+        const y = margin + Math.floor((row * innerSize) / moduleCount);
+        const w =
+          Math.ceil(((col + 1) * innerSize) / moduleCount) -
+          Math.floor((col * innerSize) / moduleCount);
+        const h =
+          Math.ceil(((row + 1) * innerSize) / moduleCount) -
+          Math.floor((row * innerSize) / moduleCount);
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+
+    quickLoginCanvas.classList.add('is-ready');
+  }
+
+  async function createQuickLoginRequest() {
+    if (!quickLoginModal || quickLoginIsRequesting) return;
+    quickLoginIsRequesting = true;
+
+    try {
+      setQuickLoginStatus('Generating one-time QR session...', 'info');
+      clearQuickLoginTimers();
+
+      const res = await fetch('/.netlify/functions/quick-login-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      let payload = {};
+      try {
+        payload = await res.json();
+      } catch (_) {
+        payload = {};
+      }
+
+      if (!res.ok) {
+        throw new Error(payload.error || 'Unable to create quick login request');
+      }
+
+      quickLoginActiveRequest = payload;
+      if (quickLoginRefEl) {
+        quickLoginRefEl.textContent = String(payload.requestId || '---')
+          .slice(0, 8)
+          .toUpperCase();
+      }
+
+      await renderQuickLoginQr(payload.qrValue);
+      updateQuickLoginTimer(payload.expiresAt);
+      setQuickLoginStatus('Waiting for secure approval from trusted device...');
+      startQuickLoginPolling();
+    } catch (err) {
+      setQuickLoginStatus(`[ERR_QL1] ${err.message}`, 'error');
+      if (quickLoginRefEl) quickLoginRefEl.textContent = '---';
+      if (quickLoginTimerEl) quickLoginTimerEl.textContent = '--s';
+    } finally {
+      quickLoginIsRequesting = false;
+    }
+  }
+
+  async function pollQuickLoginStatus() {
+    if (!quickLoginActiveRequest || quickLoginIsRequesting) return;
+
+    try {
+      const res = await fetch('/.netlify/functions/quick-login-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: quickLoginActiveRequest.requestId,
+          requestSecret: quickLoginActiveRequest.requestSecret,
+          consume: true,
+        }),
+      });
+
+      let payload = {};
+      try {
+        payload = await res.json();
+      } catch (_) {
+        payload = {};
+      }
+
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 410) {
+          clearQuickLoginTimers();
+          setQuickLoginStatus('Quick-login request expired. Regenerate QR.', 'error');
+          return;
+        }
+        throw new Error(payload.error || 'Failed to verify quick-login status');
+      }
+
+      if (payload.status === 'pending') {
+        return;
+      }
+
+      if (
+        payload.status === 'expired' ||
+        payload.status === 'rejected' ||
+        payload.status === 'consumed'
+      ) {
+        clearQuickLoginTimers();
+        setQuickLoginStatus(
+          payload.status === 'consumed'
+            ? 'Quick-login code already used. Regenerate QR.'
+            : 'Quick-login request was not approved.',
+          'error',
+        );
+        return;
+      }
+
+      if (payload.status !== 'approved') {
+        return;
+      }
+
+      clearQuickLoginTimers();
+      setQuickLoginStatus('Approval received. Synchronizing secure session...', 'success');
+
+      const { data: sessionData, error: sessionErr } =
+        await supabaseClient.auth.setSession({
+          access_token: payload.accessToken,
+          refresh_token: payload.refreshToken,
+        });
+
+      if (sessionErr) {
+        throw new Error(sessionErr.message || 'Unable to restore quick-login session');
+      }
+
+      const user = sessionData?.user;
+      if (!user || user.user_metadata?.role !== 'admin') {
+        await supabaseClient.auth.signOut();
+        throw new Error('Quick-login approved by a non-admin account');
+      }
+
+      if (window.wolfAudio) window.wolfAudio.play('success');
+      setTimeout(() => {
+        if (quickLoginModal) {
+          quickLoginModal.classList.remove('is-open');
+          quickLoginModal.setAttribute('aria-hidden', 'true');
+        }
+        runAdminBootSequence();
+      }, 550);
+    } catch (err) {
+      setQuickLoginStatus(`[ERR_QL2] ${err.message}`, 'error');
+    }
+  }
+
+  function startQuickLoginPolling() {
+    if (quickLoginPollTimer) clearInterval(quickLoginPollTimer);
+    quickLoginPollTimer = setInterval(pollQuickLoginStatus, QUICK_LOGIN_POLL_MS);
+    pollQuickLoginStatus();
+  }
+
+  function closeQuickLoginModal() {
+    if (!quickLoginModal) return;
+    quickLoginModal.classList.remove('is-open');
+    quickLoginModal.setAttribute('aria-hidden', 'true');
+    clearQuickLoginTimers();
+    quickLoginActiveRequest = null;
+    if (quickLoginCanvas) quickLoginCanvas.classList.remove('is-ready');
+    if (quickLoginRefEl) quickLoginRefEl.textContent = '---';
+    if (quickLoginTimerEl) quickLoginTimerEl.textContent = '--s';
+    setQuickLoginStatus('Initializing secure QR channel...');
+  }
+
+  function openQuickLoginModal() {
+    if (!quickLoginModal) return;
+    quickLoginModal.classList.add('is-open');
+    quickLoginModal.setAttribute('aria-hidden', 'false');
+    createQuickLoginRequest();
+  }
+
+  function initQuickLoginFlow() {
+    if (!quickLoginModal || !quickLoginLaunchBtn) return;
+
+    quickLoginLaunchBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openQuickLoginModal();
+    });
+
+    quickLoginCloseBtn?.addEventListener('click', closeQuickLoginModal);
+    quickLoginBackdrop?.addEventListener('click', closeQuickLoginModal);
+
+    quickLoginRefreshBtn?.addEventListener('click', async () => {
+      await createQuickLoginRequest();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && quickLoginModal.classList.contains('is-open')) {
+        closeQuickLoginModal();
+      }
+    });
+  }
+
   // --- LOGIN HANDLER WITH OUTRO ANIMATION ---
   async function handleLogin() {
     const loginBtn = document.getElementById('loginBtn');
-    const loginOutput = document.getElementById('loginOutput');
     const loginAgreement = document.getElementById('loginAgreement');
 
     if (loginBtn.disabled) return;
     loginBtn.disabled = true;
     loginBtn.textContent = 'AUTHORIZING...';
-    loginOutput.textContent = '';
+    hideLoginOutput(true);
 
     try {
       if (loginAgreement && !loginAgreement.checked) {
-        loginOutput.style.color = 'var(--wolf-red)';
-        loginOutput.textContent =
-          '[ERR_105] Please agree to the data security policy to continue.';
+        showLoginOutput(
+          '[ERR_105] Please agree to the data security policy to continue.',
+          { color: 'var(--wolf-red)' },
+        );
         if (window.wolfAudio) window.wolfAudio.play('denied');
         loginBtn.disabled = false;
         loginBtn.textContent = 'AUTHORIZE ACCESS';
@@ -259,73 +786,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (newCount >= MAX_ATTEMPTS) {
           startLoginCountdown(LOGIN_LOCKOUT_MINUTES * 60);
         } else {
-          loginOutput.style.color = 'var(--wolf-red)';
-          loginOutput.textContent = `[ERR_101] Access denied. ${MAX_ATTEMPTS - newCount} attempts left.`;
+          showLoginOutput(
+            `[ERR_101] Access denied. ${MAX_ATTEMPTS - newCount} attempts left.`,
+            { color: 'var(--wolf-red)' },
+          );
           document.getElementById('password').value = '';
           loginBtn.disabled = false;
           loginBtn.textContent = 'AUTHORIZE ACCESS';
         }
       } else if (data.user.user_metadata.role === 'admin') {
-        const container = document.querySelector('.auth-split-container');
-        const card = document.querySelector('.flip-card');
-
-        // ------------------------------------------
-        // PHASE 1: IDENTITY HANDSHAKE (Intro Anim)
-        // ------------------------------------------
-        container.classList.add('auth-verifying');
-        loginOutput.style.color = 'var(--wolf-blue)';
-        loginOutput.innerHTML = safeHTML(
-          "<i class='bx bx-loader-alt bx-spin'></i> LOGIN SUCCESSFUL. INITIATING SYSTEM...",
-        );
-
-        if (window.wolfAudio) window.wolfAudio.play('notif');
-
-        setTimeout(async () => {
-          // ------------------------------------------
-          // PHASE 2: TERMINAL EXIT (Outro Anim + Canvas Warp)
-          // ------------------------------------------
-          window.WOLF_IS_ANIMATING_OUT = true;
-
-          // Clear lockout record
-          const userIP = await getClientIP();
-          await supabaseClient
-            .from('login_attempts')
-            .delete()
-            .eq('ip_address', userIP);
-
-          if (window.wolfAudio) {
-            wolfAudio.play('woosh');
-            wolfAudio.play('success');
-          }
-
-          // Add outro classes for flip-card and container
-          if (container) container.classList.add('outro');
-          if (card) card.classList.add('outro');
-
-          loginOutput.style.color = '#4ade80';
-          loginOutput.innerHTML = safeHTML(
-            "<i class='bx bx-check-shield'></i> ACCESS GRANTED. BOOTING SYSTEM...",
-          );
-
-          // --- TRIGGER CANVAS STAR WARP ---
-          if (window.triggerStarWarp) {
-            window.triggerStarWarp(); // this should be your canvas warp function
-          }
-
-          // Final Redirect
-          setTimeout(() => {
-            window.location.replace('/pages/main.html');
-          }, 5000);
-        }, 1200);
+        await runAdminBootSequence();
       } else {
         wolfAudio.play('error');
-        loginOutput.textContent = '[ERR_102] Unauthorized role.';
+        showLoginOutput('[ERR_102] Unauthorized role.');
         await supabaseClient.auth.signOut();
         loginBtn.disabled = false;
         loginBtn.textContent = 'AUTHORIZE ACCESS';
       }
     } catch (err) {
-      loginOutput.textContent = '[ERR_500] System Fault.';
+      showLoginOutput('[ERR_500] System Fault.');
 
       if (window.wolfAudio) window.wolfAudio.play('error');
       window.Swal.fire({
@@ -347,33 +826,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   checkLoginLockoutStatus();
+  initQuickLoginFlow();
 
   const loginAgreement = document.getElementById('loginAgreement');
   if (loginAgreement) {
     loginAgreement.addEventListener('change', () => {
       if (loginAgreement.checked) {
-        const loginOutput = document.getElementById('loginOutput');
-        if (
-          loginOutput &&
-          loginOutput.textContent.includes(
-            'Please agree to the data security policy',
-          )
-        ) {
-          loginOutput.textContent = '';
+        const loginOutputText =
+          document.getElementById('loginOutput')?.textContent || '';
+        if (loginOutputText.includes('Please agree to the data security policy')) {
+          hideLoginOutput(true);
         }
       }
     });
   }
 
   // --- UTILS: START COOLDOWN TIMER ---
+  function getRemainingOtpCooldownSeconds() {
+    if (!otpCooldownEndsAt) return 0;
+    return Math.max(0, Math.ceil((otpCooldownEndsAt - Date.now()) / 1000));
+  }
+
   function startOtpCountdown(seconds) {
     if (otpTimerInterval) clearInterval(otpTimerInterval);
+    const safeSeconds = Math.max(0, Number(seconds || 0));
+    otpCooldownEndsAt = safeSeconds > 0 ? Date.now() + safeSeconds * 1000 : 0;
 
     const updateUI = (secs) => {
       const sendBtn = document.getElementById('sendOtpBtn');
       const resendBtn = document.getElementById('resendOtpBtn');
-      const text =
-        secs > 0 ? `OTP SENT! WAIT ANOTHER ${secs}s TO SEND AGAIN` : null;
+      const text = secs > 0 ? `Wait for ${secs} to resend code` : null;
 
       if (sendBtn) {
         sendBtn.disabled = secs > 0;
@@ -384,9 +866,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         resendBtn.style.opacity = secs > 0 ? '0.5' : '1';
         resendBtn.textContent = text || 'RESEND SECURITY CODE';
       }
+
+      if (secs <= 0) otpCooldownEndsAt = 0;
     };
 
-    let timeLeft = seconds;
+    let timeLeft = safeSeconds;
     updateUI(timeLeft);
 
     otpTimerInterval = setInterval(() => {
@@ -398,24 +882,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- UTILS: CHECK SUPABASE COOLDOWN ---
   async function checkExistingCooldown() {
-    const userIP = await getClientIP();
-    const { data } = await supabaseClient
-      .from('otp_cooldowns')
-      .select('last_sent_at')
-      .eq('ip_address', userIP)
-      .maybeSingle();
+    try {
+      const res = await fetch('/.netlify/functions/check-otp-cooldown', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return 0;
 
-    if (data) {
-      const diff = (Date.now() - new Date(data.last_sent_at).getTime()) / 1000;
-      if (diff < OTP_COOLDOWN_SECONDS) {
-        return Math.ceil(OTP_COOLDOWN_SECONDS - diff);
+      const data = await res.json();
+      if (data?.canSend === false) {
+        return Number(data.remainingTime || 0);
       }
+      return 0;
+    } catch {
+      return 0;
     }
-    return 0;
   }
 
   // --- UTILS: AJAX LOAD & TRANSITION ---
-  async function loadVerifyFragment() {
+  async function loadVerifyFragment(preferredCooldownSeconds = 0) {
     try {
       const res = await fetch('pages/verifyotp.html');
 
@@ -456,12 +941,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           initOtpFields();
           initVerifyForm();
 
-          const remaining = await checkExistingCooldown();
+          const localRemaining = getRemainingOtpCooldownSeconds();
+          let serverRemaining = 0;
+          if (localRemaining <= 0) {
+            serverRemaining = await checkExistingCooldown();
+          }
+          const remaining = Math.max(
+            Number(preferredCooldownSeconds || 0),
+            localRemaining,
+            serverRemaining,
+          );
           if (remaining > 0) startOtpCountdown(remaining);
         }, 50);
       }
     } catch (err) {
-      resetOutput.textContent = '[ERR_500] Failed to load verification module.';
+      showResetOutput('[ERR_500] Failed to load verification module.');
     }
   }
 
@@ -471,16 +965,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 2. Update your handleOtpRequest function
   async function handleOtpRequest() {
-    if (isProcessingOtp) return; // Prevent spamming
+    const clickNowMs = Date.now();
+    otpRapidClickTimestamps = otpRapidClickTimestamps.filter(
+      (ts) => clickNowMs - ts <= OTP_CLICK_SPAM_WINDOW_MS,
+    );
+    otpRapidClickTimestamps.push(clickNowMs);
 
-    const resetOutput = document.getElementById('resetOutput');
+    if (otpRapidClickTimestamps.length >= OTP_CLICK_SPAM_THRESHOLD) {
+      otpRapidClickTimestamps = [];
+      startOtpCountdown(OTP_CLICK_SPAM_LOCK_SECONDS);
+      showResetOutput(
+        `[ERR_429] Wait for ${OTP_CLICK_SPAM_LOCK_SECONDS} to resend code.`,
+        {
+          color: 'var(--wolf-red)',
+          autoHide: false,
+        },
+      );
+      isProcessingOtp = false;
+      return;
+    }
+
+    if (isProcessingOtp) return; // Prevent overlapping requests
+
     const sendBtn = document.getElementById('sendOtpBtn');
     const resendBtn = document.getElementById('resendOtpBtn');
 
     // --- 1. INSTANT FEEDBACK ---
     isProcessingOtp = true;
-    resetOutput.style.color = '#888';
-    resetOutput.textContent = 'Establishing connection to server...'; // Status message
+    showResetOutput('Establishing connection to server...', {
+      color: '#888',
+      autoHide: false,
+    }); // Status message
 
     if (sendBtn) {
       sendBtn.disabled = true;
@@ -495,18 +1010,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     const email = document.getElementById('forgotEmail')?.value || '';
 
     try {
+      // Local guard so newly inserted Step 2 resend link cannot bypass cooldown.
+      const localRemaining = getRemainingOtpCooldownSeconds();
+      if (localRemaining > 0) {
+        startOtpCountdown(localRemaining);
+        showResetOutput(
+          `[ERR_429] Wait for ${localRemaining} to resend code.`,
+          {
+            color: 'var(--wolf-red)',
+            autoHide: false,
+          },
+        );
+        isProcessingOtp = false;
+        return;
+      }
+
       // Check cooldown in DB first
       const remaining = await checkExistingCooldown();
       if (remaining > 0) {
         startOtpCountdown(remaining);
-        resetOutput.style.color = 'var(--wolf-red)';
-        resetOutput.textContent = `[ERR_429] Security protocol active. Cooldown in progress.`;
+        showResetOutput(
+          `[ERR_429] Wait for ${remaining} to resend code.`,
+          {
+            color: 'var(--wolf-red)',
+            autoHide: false,
+          },
+        );
         isProcessingOtp = false;
         return;
       }
 
       // --- 2. TRANSMISSION STATUS ---
-      resetOutput.textContent = 'Checking existing email...';
+      showResetOutput('Checking existing email...', {
+        color: '#888',
+        autoHide: false,
+      });
 
       const res = await fetch('/.netlify/functions/request-otp', {
         method: 'POST',
@@ -515,40 +1053,85 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (res.ok) {
-        await supabaseClient.from('otp_cooldowns').upsert({
-          ip_address: await getClientIP(),
-          last_sent_at: new Date().toISOString(),
-        });
+        let okData = {};
+        try {
+          okData = await res.json();
+        } catch (_) {
+          okData = {};
+        }
 
-        startOtpCountdown(60);
+        const serverCooldown = Number(okData?.remainingTime || 0);
+        const cooldownNow =
+          Number.isFinite(serverCooldown) && serverCooldown > 0
+            ? serverCooldown
+            : 60;
+        startOtpCountdown(cooldownNow);
 
         // --- 3. SUCCESS STATUS ---
         wolfAudio.play('notif');
-        resetOutput.style.color = '#4ade80';
-        resetOutput.textContent = 'Your OTP key has been sent to your email.';
+        showResetOutput('Your OTP key has been sent to your email.', {
+          color: '#4ade80',
+          autoHide: false,
+        });
 
         if (!document.getElementById('recoveryStep2')) {
-          await loadVerifyFragment();
+          await loadVerifyFragment(cooldownNow);
         }
       } else {
+        let serverMsg = '';
+        let waitSecs = 0;
+        try {
+          const errJson = await res.json();
+          serverMsg = errJson?.error || '';
+          waitSecs = Number(errJson?.remainingTime || 0);
+        } catch (_) {
+          // ignore parse failures
+        }
+
         // --- 4. ERROR STATUS ---
         wolfAudio.play('error');
-        resetOutput.style.color = 'var(--wolf-red)';
-        resetOutput.textContent =
-          '[ERR_401] Identification failed. Email unauthorized.';
+        if (res.status === 404) {
+          if (waitSecs > 0) startOtpCountdown(waitSecs);
+          showResetOutput('[ERR_401] Identification failed. Email unauthorized.');
+        } else if (res.status === 429) {
+          if (waitSecs > 0) startOtpCountdown(waitSecs);
+          const isAntiSpam = String(serverMsg || '').includes('OTP cooldown active');
+          const fallbackWait = isAntiSpam ? 30 : 60;
+          showResetOutput(
+            `[ERR_429] Wait for ${waitSecs || fallbackWait} to resend code.`,
+            { color: 'var(--wolf-red)', autoHide: false },
+          );
+        } else if (res.status === 400) {
+          showResetOutput(`[ERR_400] ${serverMsg || 'Invalid request.'}`);
+        } else {
+          showResetOutput(
+            `[ERR_500] ${serverMsg || 'Server error while requesting OTP.'}`,
+          );
+        }
         isProcessingOtp = false;
-        if (sendBtn) {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'SEND SECURITY OTP';
+        if (res.status !== 429 && waitSecs <= 0) {
+          if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'SEND SECURITY OTP';
+          }
+          if (resendBtn) {
+            resendBtn.style.pointerEvents = 'auto';
+            resendBtn.style.opacity = '1';
+            resendBtn.textContent = 'RESEND SECURITY CODE';
+          }
         }
       }
     } catch (err) {
-      resetOutput.style.color = 'var(--wolf-red)';
-      resetOutput.textContent = '[ERR_503] Gateway timeout. Terminal offline.';
+      showResetOutput('[ERR_503] Gateway timeout. Terminal offline.');
       isProcessingOtp = false;
       if (sendBtn) {
         sendBtn.disabled = false;
         sendBtn.textContent = 'SEND SECURITY OTP';
+      }
+      if (resendBtn) {
+        resendBtn.style.pointerEvents = 'auto';
+        resendBtn.style.opacity = '1';
+        resendBtn.textContent = 'RESEND SECURITY CODE';
       }
     } finally {
       setTimeout(() => {
@@ -573,8 +1156,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 1. INSTANT FEEDBACK
       resetBtn.disabled = true;
       resetBtn.textContent = 'RECONFIGURING...';
-      localOutput.style.color = '#888';
-      localOutput.textContent = 'Verifying OTP Code Credential...';
+      showResetOutput('Verifying OTP Code Credential...', {
+        color: '#888',
+        autoHide: false,
+        targetEl: localOutput,
+      });
 
       const email = document.getElementById('forgotEmail').value;
       const newPassword = document.getElementById('newPassword').value;
@@ -591,8 +1177,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (res.ok) {
           wolfAudio.play('success');
-          localOutput.style.color = '#4ade80';
-          localOutput.textContent = 'Protocol success. Password updated.';
+          showResetOutput('Protocol success. Password updated.', {
+            color: '#4ade80',
+            autoHide: false,
+            targetEl: localOutput,
+          });
           if (window.wolfAudio) window.wolfAudio.play('success');
           window.Swal.fire({
             title: 'SUCCESS',
@@ -611,19 +1200,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
           });
         } else {
-          const data = await res.json();
+          await res.json();
           wolfAudio.play('denied');
-          localOutput.style.color = 'var(--wolf-red)';
-          localOutput.textContent =
-            '[ERR_602] Security key invalid or expired.';
+          showResetOutput('[ERR_602] Security key invalid or expired.', {
+            targetEl: localOutput,
+          });
           resetBtn.disabled = false;
           resetBtn.textContent = 'RESTORE SYSTEM ACCESS';
         }
       } catch (err) {
         wolfAudio.play('error');
         resetBtn.disabled = false;
-        localOutput.style.color = 'var(--wolf-red)';
-        localOutput.textContent = '[ERR_500] Database synchronization fault.';
+        showResetOutput('[ERR_500] Database synchronization fault.', {
+          targetEl: localOutput,
+        });
       }
     };
   }
@@ -643,14 +1233,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     handleOtpRequest('sendOtpBtn');
   };
-
-  // Handle resend OTP button
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'resendOtpBtn') {
-      e.preventDefault();
-      handleOtpRequest('resendOtpBtn');
-    }
-  });
 
   document.getElementById('forgotLink').onclick = (e) => {
     e.preventDefault();

@@ -322,7 +322,7 @@
   #lookup-input {
     font-weight: 700 !important;
     letter-spacing: 0.5px;
-    text-transform: uppercase;
+    text-transform: none;
     font-size: 13px;
   }
 
@@ -792,39 +792,89 @@
           <!-- RIGHT: IMAGE + BARCODE -->
           <div class="terminal-right">
             <div class="image-panel">
-              <!-- Lookup -->
-              <div class="terminal-section">
-                <label class="field-label">Lookup Product</label>
-                <div class="id-wrapper-group">
-                  <span class="id-prefix">ID:</span>
-                  <input
-                    type="text"
-                    id="lookup-input"
-                    placeholder="TYPE NAME OR BARCODE"
-                    maxlength="50"
-                    autocomplete="off"
-                  />
-                  <button
-                    type="button"
-                    id="lookupBtn"
-                    class="terminal-icon-btn"
-                    title="Lookup by name or barcode"
-                  >
-                    <i class="bx bx-search"></i>
-                  </button>
+              <div class="image-panel-tabs" role="tablist" aria-label="Image source">
+                <button
+                  type="button"
+                  id="image-tab-web"
+                  class="image-panel-tab is-active"
+                  data-image-tab="web"
+                >
+                  IMAGE PANEL
+                </button>
+                <button
+                  type="button"
+                  id="image-tab-upload"
+                  class="image-panel-tab"
+                  data-image-tab="upload"
+                >
+                  ATTACH FILE
+                </button>
+              </div>
+
+              <div
+                id="image-web-panel"
+                class="image-panel-content is-active"
+                role="tabpanel"
+                aria-labelledby="image-tab-web"
+              >
+                <div class="terminal-section">
+                  <label class="field-label">Lookup Product</label>
+                  <div class="id-wrapper-group">
+                    <span class="id-prefix">ID:</span>
+                    <input
+                      type="text"
+                      id="lookup-input"
+                      placeholder="TYPE NAME / BARCODE / HTTPS IMAGE LINK"
+                      maxlength="512"
+                      autocomplete="off"
+                    />
+                    <button
+                      type="button"
+                      id="lookupBtn"
+                      class="terminal-icon-btn"
+                      title="Lookup by name or barcode"
+                    >
+                      <i class="bx bx-search"></i>
+                    </button>
+                  </div>
                 </div>
+
+                <div class="image-panel-header">
+                  <span class="image-panel-title">IMAGE PICKER</span>
+                  <span class="image-panel-badge">WEB / BARCODE</span>
+                </div>
+                <p class="image-panel-subtitle">
+                  Choose one image to attach as the product thumbnail.
+                </p>
+                <div class="image-box" id="imageContainer"></div>
               </div>
 
-              <div class="image-panel-header">
-                <span class="image-panel-title">IMAGE PICKER</span>
-                <span class="image-panel-badge">WEB / BARCODE</span>
+              <div
+                id="image-upload-panel"
+                class="image-panel-content"
+                role="tabpanel"
+                aria-labelledby="image-tab-upload"
+              >
+                <div
+                  id="upload-image-trigger"
+                  class="upload-image-trigger"
+                  tabindex="0"
+                  role="button"
+                  aria-label="Choose an image file from your device"
+                >
+                  <i class="bx bx-cloud-upload"></i>
+                  <strong id="upload-image-action">Attach Image File</strong>
+                  <span id="upload-image-name">No file selected</span>
+                </div>
+                <input
+                  type="file"
+                  id="upload-image-input"
+                  accept="image/*"
+                  hidden
+                />
+                <div class="image-box image-box-upload" id="uploadImageContainer"></div>
               </div>
-              <p class="image-panel-subtitle">
-                Choose one image to attach as the product thumbnail.
-              </p>
 
-              <!-- 2x2 grid for images -->
-              <div class="image-box" id="imageContainer"></div>
               <div class="status" id="status"></div>
 
               <!-- Barcode -->

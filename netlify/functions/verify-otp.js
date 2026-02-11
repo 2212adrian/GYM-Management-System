@@ -12,27 +12,76 @@ function hashOtp(userId, otp, secret) {
 }
 
 export async function handler(event, context) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   try {
+    if (event.httpMethod === 'OPTIONS') {
+      return { statusCode: 200, headers, body: '' };
+    }
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers,
+        body: JSON.stringify({ error: 'Method not allowed' }),
+      };
+    }
+
     if (!supabaseUrl || !serviceRoleKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Missing Supabase server env vars' }) };
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Missing Supabase server env vars' }),
+      };
     }
 
     const otpHashSecret = process.env.OTP_HASH_SECRET || serviceRoleKey;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { email, otp, newPassword } = JSON.parse(event.body);
+    let payload;
+    try {
+      payload =
+        typeof event.body === 'string' && event.body.length > 0
+          ? JSON.parse(event.body)
+          : event.body || {};
+    } catch (_) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid request body JSON' }),
+      };
+    }
+
+    const email = String(payload.email || '')
+      .trim()
+      .toLowerCase();
+    const otp = String(payload.otp || '').trim();
+    const newPassword = String(payload.newPassword || '');
     if (!email || !otp || !newPassword) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Email, OTP, and new password required" }) };
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Email, OTP, and new password required' }),
+      };
     }
 
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
     if (error) {
-      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: error.message }),
+      };
     }
 
     const user = users.find(u => u.email === email);
     if (!user) {
-      return { statusCode: 404, body: JSON.stringify({ error: "User not found" }) };
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'User not found' }),
+      };
     }
 
     const otpHash = hashOtp(user.id, otp, otpHashSecret);
@@ -41,19 +90,28 @@ export async function handler(event, context) {
       .from('password_reset_otp')
       .select('*')
       .eq('user_id', user.id)
-      .eq('otp_code', otpHash)
+      // Temporary compatibility for legacy plaintext OTP rows.
+      .or(`otp_code.eq.${otpHash},otp_code.eq.${otp}`)
       .gte('expires_at', new Date().toISOString())
       .maybeSingle();
 
     if (!otpRecord) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Invalid or expired OTP" }) };
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid or expired OTP' }),
+      };
     }
 
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       password: newPassword
     });
     if (updateError) {
-      return { statusCode: 500, body: JSON.stringify({ error: updateError.message }) };
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: updateError.message }),
+      };
     }
 
     // Invalidate the used OTP and clear any leftover OTP rows for the same user.
@@ -62,11 +120,23 @@ export async function handler(event, context) {
       .delete()
       .eq('user_id', user.id);
     if (deleteOtpError) {
-      return { statusCode: 500, body: JSON.stringify({ error: deleteOtpError.message }) };
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: deleteOtpError.message }),
+      };
     }
 
-    return { statusCode: 200, body: JSON.stringify({ message: "Password reset successfully!" }) };
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ message: 'Password reset successfully!' }),
+    };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: err.message }),
+    };
   }
 }

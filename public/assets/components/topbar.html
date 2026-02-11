@@ -2,7 +2,7 @@
   /* Breadcrumb hover effect */
   .breadcrumb-link:hover {
     opacity: 1 !important;
-    color: #3498db; /* Optional: turn blue on hover to match the arrow */
+    color: var(--wolf-blue);
   }
 
   /* Ensure the brand-name container doesn't wrap on PC */
@@ -37,26 +37,23 @@
     left: 0;
     right: 0;
     z-index: 1000;
-    border-bottom: 1px solid #e0e0e0;
-    background: var(--card-bg); /* Uses variable */
+    background: var(--shell-topbar-bg);
     background-image: url('/assets/images/textures/grid-me.png');
-    background-blend-mode: color-burn;
+    background-blend-mode: var(--shell-topbar-blend);
     background-size: auto;
     background-repeat: repeat;
     border-bottom: 1px solid var(--border-color);
     transition: background 0.3s ease;
+    box-shadow: var(--shadow-soft);
   }
   .brand-name {
     font-weight: 800;
-    color: var(--wolf-blue);
+    color: var(--text-main);
     font-size: 1.2rem;
     letter-spacing: 1px;
   }
-  body.light-theme .brand-name {
-    color: #1a237e;
-  }
   .brand-name span {
-    color: #a63429;
+    color: var(--accent-red);
   }
 
   #themeToggleBtn {
@@ -115,7 +112,7 @@
   #themeToggleBtn:hover {
     border-color: var(--accent-red);
     color: var(--text-main);
-    background: var(--card-bg);
+    background: var(--surface-elevated);
   }
 
   #muteToggleBtn {
@@ -173,7 +170,7 @@
   #muteToggleBtn:hover {
     border-color: var(--accent-red);
     color: var(--text-main);
-    background: var(--card-bg);
+    background: var(--surface-elevated);
   }
 </style>
 

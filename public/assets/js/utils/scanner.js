@@ -140,6 +140,153 @@ window.wolfScanner = {
     await this.launchCamera(nextCamId);
   },
 
+  isQuickLoginPayload(rawText) {
+    return typeof rawText === 'string' && rawText.startsWith('WOLFQL1.');
+  },
+
+  decodeQuickLoginPayload(rawText) {
+    if (!this.isQuickLoginPayload(rawText)) return null;
+
+    try {
+      const encoded = rawText.slice('WOLFQL1.'.length).trim();
+      const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+      const decoded = atob(base64 + padding);
+      const data = JSON.parse(decoded);
+
+      if (!data?.requestId || !data?.requestSecret) return null;
+      return {
+        requestId: String(data.requestId),
+        requestSecret: String(data.requestSecret),
+      };
+    } catch (_) {
+      return null;
+    }
+  },
+
+  async handleQuickLoginApproval(rawText) {
+    const payload = this.decodeQuickLoginPayload(rawText);
+    if (!payload) throw new Error('Malformed quick-login code');
+
+    const previewRes = await fetch('/.netlify/functions/quick-login-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: payload.requestId,
+        requestSecret: payload.requestSecret,
+        consume: false,
+      }),
+    });
+
+    let previewData = {};
+    try {
+      previewData = await previewRes.json();
+    } catch (_) {
+      previewData = {};
+    }
+
+    if (!previewRes.ok) {
+      throw new Error(previewData.error || 'Unable to preview quick-login request');
+    }
+
+    if (previewData.status !== 'pending') {
+      throw new Error('Quick-login session is no longer pending');
+    }
+
+    const location = previewData.location || {};
+    const locationLine = [
+      location.city,
+      location.region,
+      location.country,
+    ]
+      .filter(Boolean)
+      .join(', ') || 'Unknown location';
+
+    const ipLine = location.ip || 'Unknown IP';
+
+    let isConfirmed = false;
+    if (window.Swal) {
+      const result = await window.Swal.fire({
+        title: 'APPROVE QUICK LOGIN?',
+        html: `
+          <div style="text-align:left; font-size:13px; color:#aab3c2; line-height:1.6;">
+            <div style="margin-bottom:8px;">
+              <strong style="color:#e7eefc;">Request IP:</strong><br>${ipLine}
+            </div>
+            <div style="margin-bottom:8px;">
+              <strong style="color:#e7eefc;">Location:</strong><br>${locationLine}
+            </div>
+            <div>
+              <strong style="color:#e7eefc;">Session Ref:</strong><br>${String(payload.requestId).slice(0, 10).toUpperCase()}
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'CONFIRM LOGIN',
+        cancelButtonText: 'CANCEL',
+        reverseButtons: true,
+        background: '#111',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'wolf-swal-popup wolf-border-orange',
+          title: 'wolf-swal-title',
+          confirmButton: 'btn-wolf-red',
+          cancelButton: 'btn-wolf-secondary',
+        },
+      });
+      isConfirmed = Boolean(result.isConfirmed);
+    } else {
+      isConfirmed = window.confirm(
+        `Approve quick login?\nIP: ${ipLine}\nLocation: ${locationLine}`,
+      );
+    }
+
+    if (!isConfirmed) return;
+
+    const sessionResult = await window.supabaseClient?.auth?.getSession?.();
+    const currentSession = sessionResult?.data?.session || null;
+
+    if (!currentSession?.access_token || !currentSession?.refresh_token) {
+      throw new Error('No active authenticated session found for approval');
+    }
+
+    const approveRes = await fetch('/.netlify/functions/quick-login-approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: payload.requestId,
+        requestSecret: payload.requestSecret,
+        accessToken: currentSession.access_token,
+        refreshToken: currentSession.refresh_token,
+      }),
+    });
+
+    let approveData = {};
+    try {
+      approveData = await approveRes.json();
+    } catch (_) {
+      approveData = {};
+    }
+
+    if (!approveRes.ok) {
+      throw new Error(approveData.error || 'Failed to approve quick-login request');
+    }
+
+    if (window.wolfAudio) window.wolfAudio.play('success');
+    if (window.Toastify) {
+      window.Toastify({
+        text: 'Quick login approved successfully.',
+        duration: 2800,
+        gravity: 'bottom',
+        position: 'right',
+        style: {
+          background: 'linear-gradient(90deg, #1e734a, #2ea35f)',
+          color: '#f6fff9',
+        },
+      }).showToast();
+    }
+  },
+
   /**
    * Handle Scanned or Manually Entered Data
    */
@@ -152,36 +299,62 @@ window.wolfScanner = {
     if (this.isProcessingResult) return;
     this.isProcessingResult = true;
 
-    // Haptic/Audio Feedback
-    if (navigator.vibrate) navigator.vibrate(80);
-    if (window.wolfAudio) window.wolfAudio.play('success');
+    try {
+      // Haptic/Audio Feedback
+      if (navigator.vibrate) navigator.vibrate(80);
+      if (window.wolfAudio) window.wolfAudio.play('success');
 
-    const quickAuth = document.getElementById('quickAuthToggle')?.checked;
+      const quickAuth = document.getElementById('quickAuthToggle')?.checked;
+      const rawText = String(text || '').trim();
 
-    // Normalize: uppercase + remove spaces
-    const normalized = String(text || '')
-      .toUpperCase()
-      .replace(/\s+/g, '');
-
-    // Stop camera and hide scanner
-    await this.stop();
-
-    // ROUTING LOGIC
-    if (this.activeCallback) {
-      // Use case: Scanner opened by a specific function to get a string
-      this.activeCallback(normalized);
-    } else if (window.salesManager) {
-      // Use case: Global POS usage
-      if (quickAuth) {
-        // Instant process (SKIPS MODAL)
-        await window.salesManager.processQuickSale(normalized);
-      } else {
-        // Open Modal with Pre-filled SKU
-        await window.salesManager.openSaleTerminal(normalized);
+      // Dedicated secure flow for quick-login QR payloads
+      if (this.isQuickLoginPayload(rawText)) {
+        await this.stop();
+        await this.handleQuickLoginApproval(rawText);
+        return;
       }
-    }
 
-    this.isProcessingResult = false;
+      // Normalize: uppercase + remove spaces
+      const normalized = rawText.toUpperCase().replace(/\s+/g, '');
+
+      // Stop camera and hide scanner
+      await this.stop();
+
+      // ROUTING LOGIC
+      if (this.activeCallback) {
+        // Use case: Scanner opened by a specific function to get a string
+        this.activeCallback(normalized);
+      } else if (window.salesManager) {
+        // Use case: Global POS usage
+        if (quickAuth) {
+          // Instant process (SKIPS MODAL)
+          await window.salesManager.processQuickSale(normalized);
+        } else {
+          // Open Modal with Pre-filled SKU
+          await window.salesManager.openSaleTerminal(normalized);
+        }
+      }
+    } catch (err) {
+      if (window.wolfAudio) window.wolfAudio.play('error');
+      if (window.Swal) {
+        window.Swal.fire({
+          title: 'QUICK LOGIN REJECTED',
+          text: err.message || 'Failed to process QR payload.',
+          background: '#111',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'wolf-swal-popup wolf-border-red',
+            title: 'wolf-swal-title',
+            confirmButton: 'btn-wolf-red',
+          },
+          confirmButtonText: 'OK',
+        });
+      } else {
+        alert(err.message || 'Failed to process QR payload.');
+      }
+    } finally {
+      this.isProcessingResult = false;
+    }
   },
 
   /**
