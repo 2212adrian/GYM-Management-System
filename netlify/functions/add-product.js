@@ -24,6 +24,16 @@ function hashWithSecret(parts, secret) {
   return crypto.createHash('sha256').update(parts.join('|')).digest('hex');
 }
 
+function isMissingIntegrityColumnError(error) {
+  return (
+    error &&
+    (error.code === 'PGRST204' ||
+      (typeof error.message === 'string' &&
+        (/column .* does not exist/i.test(error.message) ||
+          /could not find the .* column/i.test(error.message))))
+  );
+}
+
 async function insertProductWithIntegrityHash(supabase, payload, hashSecret) {
   const productIntegrityHash = hashWithSecret(
     [
@@ -50,16 +60,57 @@ async function insertProductWithIntegrityHash(supabase, payload, hashSecret) {
     .single();
 
   const columnMissing =
-    error &&
-    (error.code === 'PGRST204' ||
-      (typeof error.message === 'string' &&
-        (/column .* does not exist/i.test(error.message) ||
-          /could not find the .* column/i.test(error.message))));
+    isMissingIntegrityColumnError(error);
 
   if (columnMissing) {
     ({ data, error } = await supabase
       .from('products')
       .insert(payload)
+      .select()
+      .single());
+  }
+
+  if (error) throw error;
+
+  return { row: data, integrityHash: productIntegrityHash };
+}
+
+async function updateProductWithIntegrityHash(
+  supabase,
+  productId,
+  payload,
+  hashSecret,
+) {
+  const productIntegrityHash = hashWithSecret(
+    [
+      payload.sku || '',
+      payload.name || '',
+      payload.description || '',
+      payload.brand || '',
+      String(payload.price ?? ''),
+      String(payload.qty ?? ''),
+      payload.image_url || '',
+    ],
+    hashSecret,
+  );
+
+  const updateWithIntegrityHash = {
+    ...payload,
+    integrity_hash: productIntegrityHash,
+  };
+
+  let { data, error } = await supabase
+    .from('products')
+    .update(updateWithIntegrityHash)
+    .eq('productid', productId)
+    .select()
+    .single();
+
+  if (isMissingIntegrityColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('products')
+      .update(payload)
+      .eq('productid', productId)
       .select()
       .single());
   }
@@ -113,6 +164,8 @@ exports.handler = async (event) => {
     }
 
     const productId = toOptionalText(payload.productId, 80);
+    const createSale =
+      payload.createSale === true || String(payload.createSale) === 'true';
     const sku = toOptionalText(payload.sku, 120);
     const name = toOptionalText(payload.name, 200);
     const description = toOptionalText(payload.description, 5000);
@@ -148,6 +201,8 @@ exports.handler = async (event) => {
     let finalProductId = productId;
     let productRow = null;
     let productIntegrityHash = null;
+    let didCreateProduct = false;
+    let didUpdateProduct = false;
 
     if (!finalProductId) {
       const baseProductPayload = {
@@ -169,6 +224,7 @@ exports.handler = async (event) => {
       productRow = inserted.row;
       finalProductId = inserted.row.productid;
       productIntegrityHash = inserted.integrityHash;
+      didCreateProduct = true;
     } else {
       const { data: existing, error: existingErr } = await supabase
         .from('products')
@@ -185,53 +241,89 @@ exports.handler = async (event) => {
         };
       }
 
-      productRow = existing;
-      productIntegrityHash = hashWithSecret(
+      if (createSale) {
+        productRow = existing;
+        productIntegrityHash = hashWithSecret(
+          [
+            existing.sku || '',
+            existing.name || '',
+            existing.description || '',
+            existing.brand || '',
+            String(existing.price ?? ''),
+            String(existing.qty ?? ''),
+            existing.image_url || '',
+          ],
+          hashSecret,
+        );
+      } else {
+        const updatePayload = {
+          sku,
+          name,
+          description,
+          brand,
+          price,
+          qty,
+          image_url: imageUrl,
+          is_active: true,
+        };
+        const updated = await updateProductWithIntegrityHash(
+          supabase,
+          finalProductId,
+          updatePayload,
+          hashSecret,
+        );
+        productRow = updated.row;
+        productIntegrityHash = updated.integrityHash;
+        didUpdateProduct = true;
+      }
+    }
+
+    let sale = null;
+    let saleIntegrityHash = null;
+
+    if (createSale) {
+      const { data: saleRow, error: saleErr } = await supabase
+        .from('sales')
+        .insert({
+          product_id: finalProductId,
+          qty,
+          unit_price: price,
+        })
+        .select()
+        .single();
+
+      if (saleErr) throw saleErr;
+      sale = saleRow;
+
+      // Keep a hashed audit trail without exposing raw details.
+      saleIntegrityHash = hashWithSecret(
         [
-          existing.sku || '',
-          existing.name || '',
-          existing.description || '',
-          existing.brand || '',
-          String(existing.price ?? ''),
-          String(existing.qty ?? ''),
-          existing.image_url || '',
+          sale.id || '',
+          finalProductId,
+          String(qty),
+          String(price),
+          String(sale.created_at || ''),
         ],
         hashSecret,
       );
     }
 
-    const { data: sale, error: saleErr } = await supabase
-      .from('sales')
-      .insert({
-        product_id: finalProductId,
-        qty,
-        unit_price: price,
-      })
-      .select()
-      .single();
-
-    if (saleErr) throw saleErr;
-
-    // Keep a hashed audit trail without exposing raw details.
-    const saleIntegrityHash = hashWithSecret(
-      [
-        sale.id || '',
-        finalProductId,
-        String(qty),
-        String(price),
-        String(sale.created_at || ''),
-      ],
-      hashSecret,
-    );
+    const changePayload = {
+      product_integrity_hash: productIntegrityHash,
+    };
+    if (saleIntegrityHash) {
+      changePayload.sale_integrity_hash = saleIntegrityHash;
+    }
 
     const { error: auditErr } = await supabase.from('audit_log').insert({
       table_name: 'products',
-      operation: 'SECURE_ADD',
+      operation: createSale
+        ? 'SECURE_ADD_TO_SALES'
+        : didUpdateProduct
+          ? 'SECURE_UPDATE_PRODUCT'
+          : 'SECURE_ADD_PRODUCT',
       record_id: String(finalProductId),
-      change_payload: {
-        product_integrity_hash: productIntegrityHash,
-        sale_integrity_hash: saleIntegrityHash,
-      },
+      change_payload: changePayload,
     });
 
     if (auditErr) {
@@ -242,7 +334,13 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        message: 'Product write secured',
+        message: createSale
+          ? 'Product and sale write secured'
+          : didUpdateProduct
+            ? 'Product update secured'
+            : didCreateProduct
+              ? 'Product write secured'
+              : 'Product request secured',
         product: productRow,
         sale,
       }),

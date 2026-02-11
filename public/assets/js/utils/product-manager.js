@@ -42,6 +42,58 @@ function ensureSkuPrefix(value) {
   return code ? `PR-${code}` : '';
 }
 
+function setProductModalMode(mode = 'product') {
+  const normalizedMode = mode === 'sale' ? 'sale' : 'product';
+  const form = document.getElementById('master-product-form');
+  const submitBtn = form?.querySelector('.btn-terminal-commit');
+  const titleSpan = document.querySelector('.terminal-title span');
+  const protocolText = document.querySelector('.terminal-protocol');
+
+  if (form) {
+    form.dataset.submitMode = normalizedMode;
+  }
+
+  if (submitBtn) {
+    submitBtn.textContent =
+      normalizedMode === 'sale' ? 'ADD TO SALES' : 'ADD PRODUCT';
+  }
+
+  if (titleSpan) {
+    titleSpan.textContent = normalizedMode === 'sale' ? 'SALES' : 'PRODUCT';
+  }
+
+  if (protocolText) {
+    protocolText.textContent =
+      normalizedMode === 'sale'
+        ? 'QUICK SALES ENTRY - RECORDS TRANSACTION ONLY'
+        : 'MANUAL PRODUCT ENTRY - ADDS TO INVENTORY ONLY';
+  }
+}
+
+function setProductModalEditState(isEditing = false) {
+  const form = document.getElementById('master-product-form');
+  const submitBtn = form?.querySelector('.btn-terminal-commit');
+  const protocolText = document.querySelector('.terminal-protocol');
+  const titleSpan = document.querySelector('.terminal-title span');
+
+  if (form) {
+    form.dataset.editMode = isEditing ? 'true' : 'false';
+  }
+
+  if (isEditing) {
+    if (submitBtn) submitBtn.textContent = 'SAVE CHANGES';
+    if (titleSpan) titleSpan.textContent = 'PRODUCT';
+    if (protocolText) {
+      protocolText.textContent =
+        'EDIT PRODUCT ENTRY - UPDATES INVENTORY RECORD';
+    }
+  } else {
+    const currentMode =
+      form?.dataset.submitMode === 'sale' ? 'sale' : 'product';
+    setProductModalMode(currentMode);
+  }
+}
+
 /* ========= MODAL OPEN/CLOSE WITH ANIMATION ========= */
 function openProductModal() {
   const overlay = document.getElementById('product-modal-overlay');
@@ -69,6 +121,13 @@ function openProductModal() {
   container.classList.add('modal-open');
 
   window.isProductModalOpen = true;
+  setProductModalMode('product');
+  setProductModalEditState(false);
+  const form = document.getElementById('master-product-form');
+  if (form) {
+    form.dataset.selectedImageUrl = '';
+    form.dataset.modalAction = 'create';
+  }
   generateBarcodeId();
 }
 
@@ -121,7 +180,15 @@ function closeProductModal() {
   if (statusEl) statusEl.textContent = '';
   // Reset dataset so next open re-prefills
   const form = document.getElementById('master-product-form');
-  if (form) form.dataset.productId = '';
+  if (form) {
+    form.dataset.productId = '';
+    form.dataset.submitMode = 'product';
+    form.dataset.editMode = 'false';
+    form.dataset.selectedImageUrl = '';
+    form.dataset.modalAction = 'create';
+  }
+  setProductModalMode('product');
+  setProductModalEditState(false);
 
   // Outro animation
   container.classList.remove('modal-open');
@@ -226,6 +293,7 @@ document.addEventListener('click', (e) => {
 /* ========= PRODUCT MANAGER ========= */
 const ProductManager = {
   allProducts: [],
+  trashData: [],
 
   async init() {
     console.log('Wolf OS: Product Manager Initializing...');
@@ -289,9 +357,25 @@ const ProductManager = {
     const uploadTrigger = document.getElementById('upload-image-trigger');
     const uploadImageAction = document.getElementById('upload-image-action');
     const uploadImageName = document.getElementById('upload-image-name');
+    const submitBtn = form.querySelector('.btn-terminal-commit');
     const PIXABAY_KEY = '54360015-81e98130630ae3ed1faf5a9b9';
     const MAX_IMAGE_DATA_URL_LENGTH = 500000;
     let selectedImageUrl = null;
+
+    if (!form.dataset.submitMode) {
+      form.dataset.submitMode = 'product';
+    }
+    if (!form.dataset.editMode) {
+      form.dataset.editMode = 'false';
+    }
+    if (!form.dataset.modalAction) {
+      form.dataset.modalAction = 'create';
+    }
+    setProductModalMode(form.dataset.submitMode);
+    setProductModalEditState(form.dataset.editMode === 'true');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+    }
 
     if (uploadInput) {
       uploadInput.setAttribute('accept', 'image/*');
@@ -322,6 +406,7 @@ const ProductManager = {
       img.classList.add('selected');
       img.dataset.selected = 'true';
       selectedImageUrl = img.src;
+      form.dataset.selectedImageUrl = selectedImageUrl || '';
     }
 
     function activateImageTab(tabName) {
@@ -355,19 +440,23 @@ const ProductManager = {
 
     function setUploadStateIdle() {
       if (uploadTrigger) uploadTrigger.classList.remove('is-selected');
-      if (uploadImageAction) uploadImageAction.textContent = 'Attach Image File';
+      if (uploadImageAction)
+        uploadImageAction.textContent = 'Attach Image File';
       if (uploadImageName) uploadImageName.textContent = 'No file selected';
       if (uploadInput) uploadInput.value = '';
     }
 
     function setUploadStateSelected(fileName) {
       if (uploadTrigger) uploadTrigger.classList.add('is-selected');
-      if (uploadImageAction) uploadImageAction.textContent = 'Change Image File';
-      if (uploadImageName) uploadImageName.textContent = fileName || 'Selected file';
+      if (uploadImageAction)
+        uploadImageAction.textContent = 'Change Image File';
+      if (uploadImageName)
+        uploadImageName.textContent = fileName || 'Selected file';
     }
 
     function resetImageState() {
       selectedImageUrl = null;
+      form.dataset.selectedImageUrl = '';
       clearContainer(imgBox);
       clearContainer(uploadImgBox);
       setUploadStateIdle();
@@ -383,7 +472,8 @@ const ProductManager = {
       const rawDataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Unable to read selected file.'));
+        reader.onerror = () =>
+          reject(new Error('Unable to read selected file.'));
         reader.readAsDataURL(file);
       });
 
@@ -511,7 +601,9 @@ const ProductManager = {
       selectedImageUrl = null;
       activateImageTab('web');
 
-      const img = appendImage(imgBox, url, 'Linked image', { autoSelect: true });
+      const img = appendImage(imgBox, url, 'Linked image', {
+        autoSelect: true,
+      });
       if (!img) {
         setStatus('Unable to attach image link.');
         return;
@@ -660,10 +752,21 @@ const ProductManager = {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      if (submitBtn?.disabled) return;
+
       if (!validateProductForm()) return;
 
       const skuCode = stripSkuPrefix(skuInput?.value || '');
       const sku = ensureSkuPrefix(skuCode);
+      const submitMode =
+        form.dataset.submitMode === 'sale' ? 'sale' : 'product';
+      const shouldCreateSale = submitMode === 'sale';
+      const productIdFromForm = form.dataset.productId || null;
+      const selectedImageFromForm = form.dataset.selectedImageUrl || '';
+      const isEditMode =
+        submitMode === 'product' &&
+        form.dataset.editMode === 'true' &&
+        Boolean(productIdFromForm);
       const name = (nameInput?.value || '').trim();
       const price = Number.parseFloat(priceInput?.value || '0');
       const qty = unlimitedCheckbox?.checked
@@ -689,7 +792,15 @@ const ProductManager = {
       }
 
       try {
-        const productIdFromForm = form.dataset.productId || null;
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = shouldCreateSale
+            ? 'ADDING TO SALES...'
+            : isEditMode
+              ? 'SAVING CHANGES...'
+              : 'ADDING PRODUCT...';
+        }
+
         const res = await fetch('/.netlify/functions/add-product', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -701,7 +812,8 @@ const ProductManager = {
             brand,
             price,
             qty,
-            imageUrl: selectedImageUrl || null,
+            imageUrl: selectedImageUrl || selectedImageFromForm || null,
+            createSale: shouldCreateSale,
           }),
         });
 
@@ -713,17 +825,23 @@ const ProductManager = {
         }
 
         if (!res.ok) {
-          throw new Error(result?.error || 'Failed to add product/sale.');
+          throw new Error(
+            result?.error ||
+              (shouldCreateSale
+                ? 'Failed to add sale from selected product.'
+                : 'Failed to add product.'),
+          );
         }
 
-        const sale = result?.sale;
-        if (!sale) throw new Error('Missing sale response from server.');
-
-        if (
-          window.wolfData &&
-          typeof window.wolfData.addSaleRow === 'function'
-        ) {
-          window.wolfData.addSaleRow(sale);
+        if (shouldCreateSale) {
+          const sale = result?.sale;
+          if (!sale) throw new Error('Missing sale response from server.');
+          if (
+            window.wolfData &&
+            typeof window.wolfData.addSaleRow === 'function'
+          ) {
+            window.wolfData.addSaleRow(sale);
+          }
         }
 
         if (typeof ProductManager.fetchProducts === 'function') {
@@ -732,7 +850,11 @@ const ProductManager = {
 
         const qtyLabel = unlimitedCheckbox?.checked ? 'UNLIMITED' : qty;
         Toastify({
-          text: `PRODUCT ADDED: ${name.toUpperCase()} x${qtyLabel}`,
+          text: shouldCreateSale
+            ? `ADDED TO SALES: ${name.toUpperCase()} x${qtyLabel}`
+            : isEditMode
+              ? `PRODUCT UPDATED: ${name.toUpperCase()}`
+              : `PRODUCT ADDED: ${name.toUpperCase()}`,
           duration: 2500,
           gravity: 'top',
           position: 'right',
@@ -749,9 +871,9 @@ const ProductManager = {
         resetImageState();
         closeProductModal();
       } catch (err) {
-        console.error('Add to sale error:', err);
+        console.error('Product modal submit error:', err);
         Toastify({
-          text: `Error adding sale: ${err.message || JSON.stringify(err)}`,
+          text: `${err.message || 'Submission failed.'}`,
           duration: 4000,
           gravity: 'top',
           position: 'right',
@@ -764,7 +886,17 @@ const ProductManager = {
             color: '#fff',
           },
         }).showToast();
-        setStatus('Error adding product/sale.');
+        setStatus(
+          shouldCreateSale
+            ? 'Error adding to sales.'
+            : isEditMode
+              ? 'Error saving product changes.'
+              : 'Error adding product.',
+        );
+      } finally {
+        setProductModalMode(form.dataset.submitMode || 'product');
+        setProductModalEditState(form.dataset.editMode === 'true');
+        if (submitBtn) submitBtn.disabled = false;
       }
     });
   },
@@ -805,10 +937,12 @@ const ProductManager = {
 
   injectStyles() {
     const styleId = 'wolf-product-styles';
-    if (document.getElementById(styleId)) return;
-
-    const style = document.createElement('style');
-    style.id = styleId;
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
     style.innerHTML = `
   /* ===== LAYOUT ===== */
   #product-main-view {
@@ -824,7 +958,7 @@ const ProductManager = {
   .search-engine-wrapper.active .search-inner {
     background: rgba(20, 20, 20, 0.7) !important;
     backdrop-filter: blur(14px);
-    border: 1px solid rgba(166, 52, 41, 0.35) !important;
+    border: 1px solid rgba(var(--wolf-red-rgb), 0.35) !important;
     border-radius: 16px;
     padding: 10px 18px;
     box-shadow: 0 12px 30px rgba(0,0,0,0.6);
@@ -839,7 +973,7 @@ const ProductManager = {
     font-weight: 600;
   }
   .search-inner i {
-    color: rgba(166, 52, 41, 0.9) !important;
+    color: rgba(var(--wolf-red-rgb), 0.9) !important;
     transition: transform 0.25s ease, color 0.25s ease;
   }
   .search-inner:focus-within i {
@@ -849,12 +983,17 @@ const ProductManager = {
 
   /* ===== PRODUCT CARD SCENE / CARD ===== */
   .product-card-scene {
-    perspective: 1200px;
+    width: 100%;
+    height: 380px;
+    perspective: 1500px;
   }
 
   .product-card {
+    width: 100%;
+    height: 100%;
     position: relative;
     transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
     border-radius: 24px;
     overflow: hidden;
     background: radial-gradient(circle at top left, #262626, #050505);
@@ -878,26 +1017,114 @@ const ProductManager = {
     border-color: rgba(255,255,255,0.14);
   }
 
-  .product-card.is-flipped {
+  .product-card-rotor {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .product-card.is-flipped .product-card-rotor {
     transform: rotateY(180deg);
   }
 
-  .card-face {
-    position: relative;
+  .product-card .card-face {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     backface-visibility: hidden;
-    min-height: 320px;
+    -webkit-backface-visibility: hidden;
     padding: 18px 18px 16px;
     display: flex;
     flex-direction: column;
   }
 
-  .card-face.card-back {
+  .product-card .card-face.card-front {
+    transform: rotateY(0deg);
+  }
+
+  .product-card .card-face.card-back {
     transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg);
     background: radial-gradient(circle at bottom right, #161616, #000);
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  .product-card .card-face.card-back > * {
+    transform: translateZ(2px);
+  }
+
+  .product-card .back-header {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    color: #d4d4d4;
+    opacity: 0.95;
+  }
+
+  .product-card .back-footer {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: var(--wolf-red);
+    text-transform: uppercase;
+    opacity: 0.95;
+  }
+
+  .product-card .product-back-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .product-card .back-action-btn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(
+      145deg,
+      rgba(24, 24, 24, 0.95),
+      rgba(7, 7, 7, 0.95)
+    );
+    color: #f4f4f4;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      color 0.2s ease;
+    cursor: pointer;
+  }
+
+  .product-card .back-action-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--wolf-red-rgb), 0.9);
+    color: #fff;
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.55);
+  }
+
+  .product-card .back-action-btn.danger:hover {
+    border-color: rgba(255, 99, 99, 0.9);
+    color: #ff8686;
   }
 
   /* ===== CARD ACTION BUTTONS ===== */
-  .card-actions-top {
+  .product-card .card-actions-top {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -906,7 +1133,7 @@ const ProductManager = {
     z-index: 20;
   }
 
-  .card-actions-top button {
+  .product-card .card-actions-top button {
     background: radial-gradient(circle at top left, #222, #000);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: #eee;
@@ -926,21 +1153,21 @@ const ProductManager = {
       color 0.22s ease;
   }
 
-  .card-actions-top button:hover {
-    background: radial-gradient(circle at top left, #a63429, #420f0a);
+  .product-card .card-actions-top button:hover {
+    background: radial-gradient(circle at top left, var(--wolf-red), #420f0a);
     border-color: #ff7b6a;
     color: #fff;
     transform: translateY(-2px) scale(1.08);
     box-shadow: 0 10px 20px rgba(0,0,0,0.85);
   }
 
-  .card-actions-top button:active {
+  .product-card .card-actions-top button:active {
     transform: translateY(0) scale(0.97);
     box-shadow: 0 3px 8px rgba(0,0,0,0.7);
   }
 
   /* ===== STOCK BADGE ===== */
-  .stock-badge {
+  .product-card .stock-badge {
     position: absolute;
     top: 12px;
     left: 12px;
@@ -959,7 +1186,7 @@ const ProductManager = {
     gap: 6px;
   }
 
-  .stock-badge::before {
+  .product-card .stock-badge::before {
     content: '';
     width: 7px;
     height: 7px;
@@ -969,16 +1196,16 @@ const ProductManager = {
     animation: stockPulse 1.5s infinite;
   }
 
-  .status-critical {
+  .product-card .status-critical {
     color: #ff6b6b;
     background: linear-gradient(
       135deg,
-      rgba(166, 52, 41, 0.7),
+      rgba(var(--wolf-red-rgb), 0.7),
       rgba(30, 0, 0, 0.8)
     );
   }
 
-  .status-good {
+  .product-card .status-good {
     color: #4ade80;
     background: linear-gradient(
       135deg,
@@ -1048,14 +1275,14 @@ const ProductManager = {
   }
 
   /* ===== INFO SECTION ===== */
-  .info-section {
+  .product-card .info-section {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
 
-  .info-group label {
-    color: #a63429;
+  .product-card .info-group label {
+    color: var(--wolf-red);
     font-size: 9px;
     font-weight: 900;
     letter-spacing: 1.4px;
@@ -1063,14 +1290,14 @@ const ProductManager = {
     opacity: 0.85;
   }
 
-  .info-group .value {
+  .product-card .info-group .value {
     color: #fff;
     font-size: 15px;
     font-weight: 800;
     font-style: italic;
   }
 
-  .price-tag {
+  .product-card .price-tag {
     font-size: 1.9rem;
     font-weight: 900;
     color: #fff;
@@ -1087,11 +1314,11 @@ const ProductManager = {
   }
 
   /* ===== CARD FOOTER ===== */
-  .card-footer {
+  .product-card .card-footer {
     margin-top: auto;
   }
 
-  .card-footer-inner {
+  .product-card .card-footer-inner {
     border-top: 1px solid rgba(255,255,255,0.06);
     padding-top: 10px;
     display: flex;
@@ -1103,7 +1330,7 @@ const ProductManager = {
     text-transform: uppercase;
   }
 
-  .card-footer-inner span:last-child {
+  .product-card .card-footer-inner span:last-child {
     opacity: 0.7;
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
@@ -1259,7 +1486,7 @@ const ProductManager = {
     height: 7px;
     background: var(--wolf-red);
     border-radius: 50%;
-    box-shadow: 0 0 12px rgba(166,52,41,0.9);
+    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb),0.9);
     animation: protocolPulse 2s infinite ease-in-out;
   }
 
@@ -1314,7 +1541,7 @@ const ProductManager = {
   .id-wrapper-group:focus-within {
     border-color: var(--wolf-red) !important;
     background: #000 !important;
-    box-shadow: 0 0 18px rgba(166, 52, 41, 0.35);
+    box-shadow: 0 0 18px rgba(var(--wolf-red-rgb), 0.35);
   }
 
   .id-wrapper-group {
@@ -1384,7 +1611,7 @@ const ProductManager = {
   .cyber-checkbox input:checked + .check-mark {
     background: var(--wolf-red);
     border-color: var(--wolf-red);
-    box-shadow: 0 0 12px rgba(166,52,41,0.7);
+    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb),0.7);
     transform: translateY(-1px);
   }
 
@@ -1434,10 +1661,10 @@ const ProductManager = {
   }
 
   .cyber-checkbox-symbol input:checked + .symbol-box {
-    background: radial-gradient(circle at top left, rgba(166,52,41,0.2), #050505);
+    background: radial-gradient(circle at top left, rgba(var(--wolf-red-rgb),0.2), #050505);
     border-color: var(--wolf-red);
     color: var(--wolf-red);
-    box-shadow: 0 0 18px rgba(166, 52, 41, 0.4);
+    box-shadow: 0 0 18px rgba(var(--wolf-red-rgb), 0.4);
     transform: translateY(-1px);
   }
 
@@ -1467,12 +1694,12 @@ const ProductManager = {
     color: #fff;
     transform: rotate(90deg) scale(1.05);
     border-color: var(--wolf-red);
-    box-shadow: 0 0 18px rgba(166, 52, 41, 0.7);
+    box-shadow: 0 0 18px rgba(var(--wolf-red-rgb), 0.7);
   }
 
   .terminal-close-btn:active {
     transform: rotate(90deg) scale(0.95);
-    box-shadow: 0 0 8px rgba(166, 52, 41, 0.4);
+    box-shadow: 0 0 8px rgba(var(--wolf-red-rgb), 0.4);
   }
 
   /* ===== GRID / RESPONSIVE ===== */
@@ -1534,7 +1761,7 @@ const ProductManager = {
     font-style: italic;
     cursor: pointer;
     box-shadow:
-      0 16px 36px rgba(166, 52, 41, 0.5),
+      0 16px 36px rgba(var(--wolf-red-rgb), 0.5),
       0 0 0 1px rgba(255,255,255,0.06);
     transition:
       transform 0.2s ease,
@@ -1546,14 +1773,14 @@ const ProductManager = {
     filter: brightness(1.12);
     transform: translateY(-2px);
     box-shadow:
-      0 20px 40px rgba(166, 52, 41, 0.7),
+      0 20px 40px rgba(var(--wolf-red-rgb), 0.7),
       0 0 0 1px rgba(255,255,255,0.12);
   }
 
   .btn-terminal-commit:active {
     transform: translateY(1px) scale(0.98);
     box-shadow:
-      0 10px 20px rgba(166, 52, 41, 0.5),
+      0 10px 20px rgba(var(--wolf-red-rgb), 0.5),
       0 0 0 1px rgba(255,255,255,0.08);
   }
 
@@ -1601,7 +1828,7 @@ const ProductManager = {
     opacity: 1;
     transform: translateY(-2px) scale(1.05);
     border-color: var(--wolf-red);
-    box-shadow: 0 0 16px rgba(166, 52, 41, 0.7);
+    box-shadow: 0 0 16px rgba(var(--wolf-red-rgb), 0.7);
   }
 
   .status {
@@ -1610,8 +1837,6 @@ const ProductManager = {
     margin-top: 4px;
   }
 `;
-
-    document.head.appendChild(style);
   },
 
   getSkeleton() {
@@ -1629,6 +1854,47 @@ const ProductManager = {
     `,
       )
       .join('');
+  },
+
+  getTrashSkeleton() {
+    return Array(5)
+      .fill(0)
+      .map(
+        () => `
+      <div class="wolf-skel-pill" style="display:flex; align-items:center; gap:15px; padding:12px; margin-bottom:10px; background:var(--surface-elevated); border-radius:12px; border:1px dashed var(--border-color);">
+        <div style="width:40px; height:40px; background:var(--skeleton-base); border-radius:10px;"></div>
+        <div style="width:150px; height:12px; background:var(--skeleton-mid); border-radius:4px;"></div>
+      </div>
+    `,
+      )
+      .join('');
+  },
+
+  async fetchTrashData() {
+    const container = document.getElementById('trash-list');
+    if (container) container.innerHTML = this.getTrashSkeleton();
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('trash_bin')
+        .select('*')
+        .eq('table_name', 'products')
+        .order('deleted_at', { ascending: false });
+
+      if (error) throw error;
+
+      this.trashData = data || [];
+
+      const trashCountEl =
+        document.getElementById('trash-count') ||
+        document.getElementById('archived-products-count');
+      if (trashCountEl) trashCountEl.innerText = this.trashData.length;
+
+      setTimeout(() => this.renderTrash(), 220);
+      this.renderTrash();
+    } catch (err) {
+      console.error('Product Trash Sync Error:', err);
+    }
   },
 
   async fetchProducts() {
@@ -1694,7 +1960,7 @@ const ProductManager = {
                  style="animation-delay: ${index * 0.05}s">
              <div class="product-card-scene">
                 <div class="product-card" id="prod-${p.productid}" data-product-id="${p.productid}">
-                 
+                  <div class="product-card-rotor">
                 <div class="card-face card-front">
                   <div class="stock-badge ${stockStatus}">${stockLabel}</div>
 
@@ -1704,12 +1970,6 @@ const ProductManager = {
                     </button>
                     <button class="btn-delete-product" data-product-id="${p.productid}" title="Archive">
                       <i class="bx bx-trash"></i>
-                    </button>
-                    <button
-                      class="btn-add-sale"
-                      data-product-id="${p.productid}"
-                      title="Add to Sales">
-                      <i class="bx bx-cart-add"></i>
                     </button>
                   </div>
 
@@ -1752,9 +2012,23 @@ const ProductManager = {
 
                 <div class="card-face card-back">
                   <div class="back-header">MANAGEMENT - ${p.sku || ''}</div>
-                  <div class="back-footer">REVERSE_INTERFACE_EXIT</div>
+                  <div class="product-back-actions">
+                    <button class="back-action-btn btn-add-sale" data-product-id="${p.productid}" title="Add to Sales">
+                      <i class="bx bx-cart-add"></i> Add to Sales
+                    </button>
+                    <button class="back-action-btn btn-edit-product" data-product-id="${p.productid}" title="Edit Product">
+                      <i class="bx bx-edit-alt"></i> Edit Product
+                    </button>
+                    <button class="back-action-btn danger btn-delete-product" data-product-id="${p.productid}" title="Archive Product">
+                      <i class="bx bx-trash"></i> Archive
+                    </button>
+                    <button class="back-action-btn btn-flip-back" data-product-id="${p.productid}" title="Flip Back">
+                      <i class="bx bx-undo"></i> Flip Back
+                    </button>
+                  </div>
+                  <div class="back-footer">&lt; &lt; &lt; CLICK ME TO FLIP BACK &gt; &gt; &gt;</div>
                 </div>
-
+                  </div>
               </div>
             </div>
           </div>
@@ -1849,9 +2123,265 @@ const ProductManager = {
     });
   },
 
+  renderTrash() {
+    const container = document.getElementById('trash-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.style.display = 'block';
+    container.style.opacity = '1';
+    container.style.visibility = 'visible';
+
+    if (!this.trashData || this.trashData.length === 0) {
+      container.innerHTML =
+        '<div class="text-center py-5 opacity-50">PRODUCT_RECOVERY_BIN_EMPTY</div>';
+      return;
+    }
+
+    const sanitizeText = (value) => {
+      const raw = String(value ?? '');
+      if (typeof WOLF_PURIFIER === 'function') return WOLF_PURIFIER(raw);
+      return raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
+    try {
+      container.innerHTML = this.trashData
+        .map((item, index) => {
+          const p =
+            item && typeof item.deleted_data === 'object' && item.deleted_data
+              ? item.deleted_data
+              : {};
+          const productName = sanitizeText(p.name || 'UNKNOWN_PRODUCT');
+          const sku = sanitizeText(p.sku || 'N/A');
+          const qty = Number(p.qty);
+          const stockText =
+            Number.isFinite(qty) && qty >= 999999
+              ? 'UNLIMITED'
+              : Number.isFinite(qty)
+                ? `${qty}`
+                : '0';
+          const price = Number(p.price || 0);
+          const priceText = Number.isFinite(price)
+            ? price.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            : '0.00';
+
+          return `
+          <div class="trash-pill-card animate__animated animate__fadeInRight" style="animation-delay: ${index * 0.05}s;">
+            <div class="trash-avatar-node"><i class="bx bx-package"></i></div>
+            <div class="trash-details">
+              <h6 style="color:white !important; opacity:1 !important;">${productName}</h6>
+              <p>SKU: ${sku} | STOCK: ${stockText} | PRICE: P${priceText}</p>
+            </div>
+            <div class="trash-action-group">
+              <button class="btn-trash-action restore" onclick="ProductManager.restoreFromTrash('${item.id}')" title="Restore product">
+                <i class="bx bx-undo"></i>
+              </button>
+              <button class="btn-trash-action purge" onclick="ProductManager.wipePermanent('${item.id}')" title="Delete permanently">
+                <i class="bx bx-shield-x"></i>
+              </button>
+            </div>
+          </div>`;
+        })
+        .join('');
+    } catch (err) {
+      console.error('Product trash render error:', err);
+      container.innerHTML =
+        '<div class="text-center py-4 text-danger">FAILED_TO_RENDER_TRASH_ITEMS</div>';
+    }
+  },
+
+  async switchToTrash() {
+    const mainWrapper = document.getElementById('product-main-view');
+    const mainContent = document.getElementById('main-content');
+    if (!mainWrapper || !mainContent) return;
+
+    if (window.wolfAudio) window.wolfAudio.play('woosh');
+
+    mainWrapper.classList.remove('stage-center');
+    mainWrapper.classList.add('stage-left');
+
+    try {
+      const response = await fetch(
+        '/pages/management/product-trash-container.html',
+      );
+      const html = await response.text();
+
+      setTimeout(() => {
+        mainContent.innerHTML = html;
+        const trashWrapper = document.getElementById('product-trash-view');
+        if (!trashWrapper) return;
+
+        trashWrapper.classList.add('stage-right');
+        void trashWrapper.offsetWidth;
+        trashWrapper.classList.remove('stage-right');
+        trashWrapper.classList.add('stage-center');
+
+        this.initTrashView();
+      }, 500);
+    } catch (err) {
+      console.error('Product trash view load error:', err);
+      mainWrapper.classList.remove('stage-left');
+      mainWrapper.classList.add('stage-center');
+    }
+  },
+
+  async initTrashView() {
+    const backBtn = document.getElementById('btn-trash-back');
+    if (!backBtn) return;
+
+    backBtn.onclick = async () => {
+      const trashWrapper = document.getElementById('product-trash-view');
+      const mainContent = document.getElementById('main-content');
+      if (!trashWrapper || !mainContent) return;
+
+      if (window.wolfAudio) window.wolfAudio.play('woosh');
+
+      trashWrapper.classList.remove('stage-center');
+      trashWrapper.classList.add('stage-right');
+
+      setTimeout(async () => {
+        const response = await fetch('/pages/management/products.html');
+        const mainHtml = await response.text();
+        mainContent.innerHTML = mainHtml;
+
+        const mainWrapper = document.getElementById('product-main-view');
+        if (!mainWrapper) return;
+        mainWrapper.classList.add('stage-left');
+        void mainWrapper.offsetWidth;
+        mainWrapper.classList.remove('stage-left');
+        mainWrapper.classList.add('stage-center');
+
+        this.init();
+      }, 500);
+    };
+
+    await this.fetchTrashData();
+  },
+
+  async restoreFromTrash(trashId) {
+    const item = this.trashData.find((t) => t.id === trashId);
+    if (!item) return;
+
+    const originalId = String(
+      item.original_id || item.deleted_data?.productid || '',
+    );
+    if (!originalId) {
+      Toastify({
+        text: 'Invalid archive payload',
+        duration: 3000,
+        backgroundColor: '#e74c3c',
+      }).showToast();
+      return;
+    }
+
+    try {
+      const payload = {
+        ...(item.deleted_data || {}),
+        productid: originalId,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: existing, error: existingErr } = await window.supabaseClient
+        .from('products')
+        .select('productid')
+        .eq('productid', originalId)
+        .maybeSingle();
+      if (existingErr) throw existingErr;
+
+      if (existing?.productid) {
+        const { error: updateErr } = await window.supabaseClient
+          .from('products')
+          .update(payload)
+          .eq('productid', originalId);
+        if (updateErr) throw updateErr;
+      } else {
+        const { error: insertErr } = await window.supabaseClient
+          .from('products')
+          .insert(payload);
+        if (insertErr) throw insertErr;
+      }
+
+      const { error: trashErr } = await window.supabaseClient
+        .from('trash_bin')
+        .delete()
+        .eq('id', trashId);
+      if (trashErr) throw trashErr;
+
+      if (window.wolfAudio) window.wolfAudio.play('success');
+      Toastify({
+        text: 'Product restored',
+        duration: 2500,
+        backgroundColor: '#2ecc71',
+      }).showToast();
+      await this.fetchTrashData();
+    } catch (err) {
+      console.error('Product restore error:', err);
+      Toastify({
+        text: `Restore failed: ${err.message || 'Unknown error'}`,
+        duration: 3500,
+        backgroundColor: '#e74c3c',
+      }).showToast();
+    }
+  },
+
+  async wipePermanent(trashId) {
+    const item = this.trashData.find((t) => t.id === trashId);
+    if (!item) return;
+
+    const { isConfirmed } = await Swal.fire({
+      title: 'PURGE PRODUCT PERMANENTLY?',
+      text: 'This will remove the archived copy and delete the product record.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      background: '#0a0a0a',
+      color: '#fff',
+      confirmButtonText: 'PURGE',
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      const originalId = String(
+        item.original_id || item.deleted_data?.productid || '',
+      );
+      if (originalId) {
+        const { error: productErr } = await window.supabaseClient
+          .from('products')
+          .delete()
+          .eq('productid', originalId);
+        if (productErr) throw productErr;
+      }
+
+      const { error: trashErr } = await window.supabaseClient
+        .from('trash_bin')
+        .delete()
+        .eq('id', trashId);
+      if (trashErr) throw trashErr;
+
+      Toastify({
+        text: 'Product purged permanently',
+        duration: 2600,
+        backgroundColor: '#e74c3c',
+      }).showToast();
+      await this.fetchTrashData();
+    } catch (err) {
+      console.error('Product purge error:', err);
+      Swal.fire('ERROR', err.message || 'Purge failed.', 'error');
+    }
+  },
+
   edit(productId) {
-    console.log('Edit product', productId);
-    // TODO: open edit modal / reuse same modal in edit mode
+    this.openAddToSalesModal(productId, 'edit');
   },
 
   delete(productId) {
@@ -1864,7 +2394,9 @@ const ProductManager = {
         duration: 2500,
         backgroundColor: '#f39c12',
       }).showToast();
-      this.allProducts = this.allProducts.filter((p) => p.productid !== productId);
+      this.allProducts = this.allProducts.filter(
+        (p) => p.productid !== productId,
+      );
       this.render(this.allProducts);
       return;
     }
@@ -1874,13 +2406,14 @@ const ProductManager = {
     (async () => {
       try {
         // 1) prevent duplicate trash rows for the same product
-        const { data: existingTrash, error: existingTrashErr } = await window.supabaseClient
-          .from('trash_bin')
-          .select('id')
-          .eq('table_name', 'products')
-          .eq('original_id', String(product.productid))
-          .limit(1)
-          .maybeSingle();
+        const { data: existingTrash, error: existingTrashErr } =
+          await window.supabaseClient
+            .from('trash_bin')
+            .select('id')
+            .eq('table_name', 'products')
+            .eq('original_id', String(product.productid))
+            .limit(1)
+            .maybeSingle();
         if (existingTrashErr) throw existingTrashErr;
 
         // 2) insert into trash_bin only when no prior archived copy exists
@@ -1896,12 +2429,13 @@ const ProductManager = {
         }
 
         // 3) mark product inactive once (idempotent)
-        const { data: archivedRows, error: delErr } = await window.supabaseClient
-          .from('products')
-          .update({ is_active: false })
-          .eq('productid', product.productid)
-          .eq('is_active', true)
-          .select('productid');
+        const { data: archivedRows, error: delErr } =
+          await window.supabaseClient
+            .from('products')
+            .update({ is_active: false })
+            .eq('productid', product.productid)
+            .eq('is_active', true)
+            .select('productid');
         if (delErr) throw delErr;
 
         if (!archivedRows?.length) {
@@ -1939,17 +2473,18 @@ const ProductManager = {
     })();
   },
 
-  openAddToSalesModal(productId) {
+  openAddToSalesModal(productId, action = 'sale') {
     const product = this.allProducts.find((p) => p.productid === productId);
     if (!product) return;
+    const targetAction = action === 'edit' ? 'edit' : 'sale';
+    const targetMode = targetAction === 'sale' ? 'sale' : 'product';
+    const isEditAction = targetAction === 'edit';
 
     // If modal is already open, do not re-inject HTML (prevents input wipe)
     if (window.isProductModalOpen) {
       const form = document.getElementById('master-product-form');
       if (form && form.dataset.productId !== product.productid) {
         form.dataset.productId = ''; // force refresh for different product
-      } else {
-        return;
       }
     }
 
@@ -1981,6 +2516,7 @@ const ProductManager = {
     const nameInput = document.getElementById('master-name');
     const priceInput = document.getElementById('master-price');
     const qtyInput = document.getElementById('master-qty');
+    const unlimitedCheckbox = document.getElementById('master-unlimited');
     const brandInput = document.getElementById('master-brand');
     const descInput = document.getElementById('master-desc');
     const imgBox = document.getElementById('imageContainer');
@@ -1989,8 +2525,10 @@ const ProductManager = {
     if (!skuInput || !nameInput || !priceInput || !qtyInput) return;
 
     const lastId = form.dataset.productId;
+    const lastAction = form.dataset.modalAction || '';
     const needsPrefill =
       lastId !== product.productid ||
+      lastAction !== targetAction ||
       !nameInput.value ||
       !skuInput.value ||
       !priceInput.value;
@@ -2000,7 +2538,27 @@ const ProductManager = {
       skuInput.value = stripSkuPrefix(product.sku || '');
       nameInput.value = product.name || '';
       priceInput.value = product.price || 0;
-      qtyInput.value = 1;
+      if (targetMode === 'sale') {
+        if (unlimitedCheckbox) unlimitedCheckbox.checked = false;
+        qtyInput.value = 1;
+        qtyInput.disabled = false;
+        qtyInput.required = true;
+        qtyInput.placeholder = '0';
+      } else {
+        const isUnlimited = Number(product.qty) >= 999999;
+        if (unlimitedCheckbox) unlimitedCheckbox.checked = isUnlimited;
+        if (isUnlimited) {
+          qtyInput.value = '';
+          qtyInput.disabled = true;
+          qtyInput.required = false;
+          qtyInput.placeholder = 'UNLIMITED';
+        } else {
+          qtyInput.value = Number(product.qty || 0);
+          qtyInput.disabled = false;
+          qtyInput.required = true;
+          qtyInput.placeholder = '0';
+        }
+      }
       if (brandInput) brandInput.value = product.brand || '';
       if (descInput) descInput.value = product.description || '';
 
@@ -2013,8 +2571,10 @@ const ProductManager = {
           img.classList.add('selected');
           img.dataset.selected = 'true';
           imgBox.appendChild(img);
+          form.dataset.selectedImageUrl = product.image_url;
           if (statusEl) statusEl.textContent = 'Using saved product image.';
         } else if (statusEl) {
+          form.dataset.selectedImageUrl = '';
           statusEl.textContent = '';
         }
       }
@@ -2022,6 +2582,11 @@ const ProductManager = {
 
     // Track current product id
     form.dataset.productId = product.productid;
+    form.dataset.submitMode = targetMode;
+    form.dataset.editMode = isEditAction ? 'true' : 'false';
+    form.dataset.modalAction = targetAction;
+    setProductModalMode(targetMode);
+    setProductModalEditState(isEditAction);
 
     // Match openProductModal behaviour
     if (skuInput) {
@@ -2047,8 +2612,10 @@ const ProductManager = {
   },
 
   setupUIListeners() {
+    const root = document.getElementById('product-main-view') || document;
+
     // 1) Card actions inside products grid
-    const container = document.getElementById('products-list');
+    const container = root.querySelector('#products-list');
     if (container) {
       container.addEventListener('click', (e) => {
         const card = e.target.closest('.product-card');
@@ -2081,19 +2648,20 @@ const ProductManager = {
     }
 
     // 2) Search bar logic (Products page)
-    const searchBtn = document.getElementById('toggle-search-btn');
-    const searchContainer =
-      document.getElementsByClassName('search-collapsible');
-    const searchInput = document.getElementById('product-main-search');
-    const clearBtn = document.getElementById('search-clear-btn');
-    const trashBtn = document.getElementById('btn-view-trash');
+    const searchBtn = root.querySelector('#toggle-search-btn');
+    const searchContainer = root.querySelector('#ledger-search-container');
+    const searchInput = root.querySelector('#product-main-search');
+    const clearBtn = root.querySelector('#search-clear-btn');
+    const trashBtn = root.querySelector('#btn-view-trash');
 
     if (trashBtn) {
       trashBtn.onclick = () => this.switchToTrash?.();
     }
 
     if (searchBtn && searchContainer && searchInput) {
-      searchBtn.onclick = () => {
+      searchBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         searchBtn.classList.toggle('active');
         searchContainer.classList.toggle('active');
         if (searchContainer.classList.contains('active')) {

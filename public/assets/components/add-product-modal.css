@@ -1,5 +1,5 @@
 :root {
-  --wolf-red: #a63429;
+  --wolf-red: var(--primary-color, #a63429);
   --wolf-secondary: #1abc9c;
   --wolf-bg: #050505;
 }
@@ -39,8 +39,7 @@
 
 /* ========= PRODUCT OVERLAY (just overrides) ========= */
 #product-modal-overlay {
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 9999;
+  background: rgba(0, 0, 0, 0.8);
 }
 
 /* ========= MODAL CONTAINER ========= */
@@ -214,7 +213,7 @@
   color: #fff;
   transform: rotate(90deg);
   border-color: var(--wolf-red);
-  box-shadow: 0 0 15px rgba(166, 52, 41, 0.4);
+  box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4);
 }
 
 /* ========= FORM LAYOUT ========= */
@@ -295,7 +294,7 @@
 .id-wrapper-group:focus-within {
   border-color: var(--wolf-red) !important;
   background: #000 !important;
-  box-shadow: 0 0 14px rgba(166, 52, 41, 0.16);
+  box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.16);
 }
 
 /* Lookup row */
@@ -432,10 +431,10 @@ input[type='number']::-webkit-outer-spin-button {
 }
 
 .cyber-checkbox-symbol input:checked + .symbol-box {
-  background: rgba(166, 52, 41, 0.18);
+  background: rgba(var(--wolf-red-rgb), 0.18);
   border-color: var(--wolf-red);
   color: var(--wolf-red);
-  box-shadow: 0 0 14px rgba(166, 52, 41, 0.35);
+  box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.35);
   transform: translateY(-1px);
 }
 
@@ -573,10 +572,10 @@ input[type='number']::-webkit-outer-spin-button {
 
 .image-panel-tab.is-active {
   color: #fff;
-  border-color: rgba(166, 52, 41, 0.75);
-  background: linear-gradient(160deg, rgba(166, 52, 41, 0.28), #141414);
+  border-color: rgba(var(--wolf-red-rgb), 0.75);
+  background: linear-gradient(160deg, rgba(var(--wolf-red-rgb), 0.28), #141414);
   box-shadow:
-    0 0 0 1px rgba(166, 52, 41, 0.35),
+    0 0 0 1px rgba(var(--wolf-red-rgb), 0.35),
     0 10px 22px rgba(0, 0, 0, 0.5);
 }
 
@@ -664,9 +663,9 @@ input[type='number']::-webkit-outer-spin-button {
 .upload-image-trigger:hover,
 .upload-image-trigger:focus-visible {
   color: #f5f5f5;
-  border-color: rgba(166, 52, 41, 0.75);
+  border-color: rgba(var(--wolf-red-rgb), 0.75);
   box-shadow:
-    0 0 0 1px rgba(166, 52, 41, 0.3),
+    0 0 0 1px rgba(var(--wolf-red-rgb), 0.3),
     0 10px 20px rgba(0, 0, 0, 0.45);
   transform: translateY(-1px);
   outline: none;
@@ -719,7 +718,7 @@ input[type='number']::-webkit-outer-spin-button {
   opacity: 1;
   transform: translateY(-2px) scale(1.05);
   border-color: var(--wolf-red);
-  box-shadow: 0 0 16px rgba(166, 52, 41, 0.7);
+  box-shadow: 0 0 16px rgba(var(--wolf-red-rgb), 0.7);
 }
 
 #imageContainer {
@@ -756,7 +755,7 @@ input[type='number']::-webkit-outer-spin-button {
   font-weight: 900;
   font-style: italic;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(166, 52, 41, 0.3);
+  box-shadow: 0 10px 30px rgba(var(--wolf-red-rgb), 0.3);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -767,12 +766,12 @@ input[type='number']::-webkit-outer-spin-button {
 .btn-terminal-commit:hover {
   filter: brightness(1.2);
   transform: translateY(-2px);
-  box-shadow: 0 14px 34px rgba(166, 52, 41, 0.4);
+  box-shadow: 0 14px 34px rgba(var(--wolf-red-rgb), 0.4);
 }
 
 .btn-terminal-commit:active {
   transform: translateY(0) scale(0.97);
-  box-shadow: 0 8px 18px rgba(166, 52, 41, 0.35);
+  box-shadow: 0 8px 18px rgba(var(--wolf-red-rgb), 0.35);
 }
 
 /* ========= VALIDATION: ERROR HIGHLIGHT + SHAKE ========= */

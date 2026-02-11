@@ -24,10 +24,22 @@ const wolfData = {
   lastTotal: 0,
   activeAF: null, // store active auto-filter
   lastTraffic: 0,
+  summaryHUDReady: false,
+  currencySymbol: '₱',
+  defaultWalkInFee: 80,
   goalTargets: {
     DAILY: 0,
     WEEKLY: 0,
     MONTHLY: 0,
+  },
+  formatCurrency(value = 0) {
+    return `${this.currencySymbol}${Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  },
+  isMoneyMode() {
+    return this.activeMode === 'sales' || this.activeMode === 'logbook';
   },
 
   // --- NAVIGATION SYNC ENGINE ---
@@ -61,7 +73,7 @@ const wolfData = {
     }
 
     let startTimestamp = null;
-    const isSales = this.activeMode === 'sales';
+    const isMoneyMode = this.isMoneyMode();
 
     const step = (timestamp) => {
       if (!startTimestamp) startTimestamp = timestamp;
@@ -69,11 +81,8 @@ const wolfData = {
       const val = progress * (end - start) + start;
 
       // Update Text
-      if (isSales) {
-        el.textContent = `₱${val.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`;
+      if (isMoneyMode) {
+        el.textContent = this.formatCurrency(val);
       } else {
         el.textContent = Math.floor(val);
       }
@@ -107,13 +116,13 @@ const wolfData = {
             0,
           );
 
-    // B. First load check
-    if (this.lastTotal === 0 && targetValue !== 0) {
+    // B. First render for this page mode: set baseline without animation.
+    if (!this.summaryHUDReady) {
       this.lastTotal = targetValue;
-      el.textContent =
-        this.activeMode === 'sales'
-          ? `₱${targetValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-          : targetValue;
+      el.textContent = this.isMoneyMode()
+        ? this.formatCurrency(targetValue)
+        : targetValue;
+      this.summaryHUDReady = true;
       return;
     }
 
@@ -319,7 +328,7 @@ const wolfData = {
     // 2. Identify if it's the first load (to avoid 0 to Total animation on refresh)
     if (this.currentTotal === 0 && newTotal !== 0) {
       this.currentTotal = newTotal;
-      revenueEl.textContent = `₱${newTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      revenueEl.textContent = this.formatCurrency(newTotal);
       return;
     }
 
@@ -399,6 +408,8 @@ const wolfData = {
   // Inside your wolfData object in data-loader.js
   async initLedger(mode) {
     this.activeMode = mode;
+    this.lastTotal = 0;
+    this.summaryHUDReady = false;
 
     // AWAIT the sync so we don't proceed with null dates
     await this.syncTime();
@@ -413,7 +424,7 @@ const wolfData = {
         label.innerText = 'Daily Income Summary';
       } else {
         title.innerText = 'LOGBOOK';
-        label.innerText = 'Total Floor Traffic';
+        label.innerText = 'Floor Income Summary';
       }
     }
 
@@ -588,6 +599,54 @@ const wolfData = {
   currentSalesDay: new Date().getDay(),
   realToday: new Date().getDay(),
   salesDataCache: [], // Cache used for instant searching without re-fetching from DB
+  sanitizePlain(value) {
+    const raw = String(value ?? '');
+    if (window.DOMPurify) {
+      return window.DOMPurify.sanitize(raw, {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+      });
+    }
+    return raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  },
+  parseLogNotes(notes = '') {
+    const raw = String(notes || '');
+    const membershipMatch = raw.match(/\|MEMBERSHIP:([^|]+)/i);
+    const paidMatch = raw.match(/\|PAID:([0-9]+(?:\.[0-9]+)?)/i);
+    const walkInMatch = raw.match(/^WALK-IN:\s*([^|]+)/i);
+    const memberMatch = raw.match(/^MEMBER_ENTRY:\s*([^|]+)/i);
+
+    const baseNote = raw
+      .replace(/\|MEMBERSHIP:[^|]*/gi, '')
+      .replace(/\|PAID:[^|]*/gi, '')
+      .trim();
+
+    return {
+      raw,
+      baseNote,
+      membershipLabel: membershipMatch?.[1]?.trim() || '',
+      isPaidFromNote: Boolean(paidMatch),
+      paidAmountFromNote: paidMatch ? Number(paidMatch[1]) : null,
+      walkInName: walkInMatch?.[1]?.trim() || '',
+      memberToken: memberMatch?.[1]?.trim() || '',
+    };
+  },
+  buildLogNotes(baseNote, membershipLabel, isPaid, paidAmount) {
+    const noteHead = String(baseNote || '').trim() || 'WALK-IN: GUEST';
+    const chunks = [noteHead];
+    if (membershipLabel) {
+      chunks.push(`MEMBERSHIP:${String(membershipLabel).trim().toUpperCase()}`);
+    }
+    if (isPaid) {
+      chunks.push(`PAID:${Number(paidAmount || 0).toFixed(2)}`);
+    }
+    return chunks.join('|');
+  },
 
   // ==========================================
   // 1. LOGBOOK ENGINE (FIXED)
@@ -606,31 +665,119 @@ const wolfData = {
     try {
       const { data, error } = await supabaseClient
         .from('check_in_logs')
-        .select('*, profiles(full_name)')
+        .select('*')
         .gte('time_in', `${localDay}T00:00:00+08:00`)
         .lte('time_in', `${localDay}T23:59:59+08:00`)
         .order('time_in', { ascending: false });
 
       if (error) throw error;
 
-      let filtered = (data || []).map((log) => {
+      const logs = data || [];
+      const profileIds = [
+        ...new Set(logs.map((log) => log.profile_id).filter(Boolean)),
+      ];
+
+      let memberMap = new Map();
+      if (profileIds.length > 0) {
+        const { data: members, error: memberErr } = await supabaseClient
+          .from('members')
+          .select('profile_id, full_name, member_code')
+          .in('profile_id', profileIds);
+
+        if (!memberErr && members) {
+          memberMap = new Map(members.map((row) => [row.profile_id, row]));
+        }
+      }
+
+      let filtered = logs.map((log) => {
+        const parsedNotes = this.parseLogNotes(log.notes);
+        const member = log.profile_id ? memberMap.get(log.profile_id) : null;
+        const tokenCode =
+          parsedNotes.memberToken.match(/ME-[A-Z0-9]{2,}/i)?.[0] || '';
+        const tokenName = parsedNotes.memberToken
+          .replace(/ME-[A-Z0-9]{2,}/gi, '')
+          .trim();
+        const isMemberLike = Boolean(member || tokenCode || log.profile_id);
+
         const rawName =
-          log.profiles?.full_name ||
-          log.notes?.replace('WALK-IN: ', '') ||
+          member?.full_name ||
+          parsedNotes.walkInName ||
+          tokenName ||
+          parsedNotes.memberToken ||
           'Walk-in Guest';
-        return { ...log, resolvedName: rawName.toUpperCase() };
+        const resolvedName = this.sanitizePlain(rawName).toUpperCase();
+
+        const memberCode = this.sanitizePlain(
+          String(member?.member_code || tokenCode || '').toUpperCase(),
+        );
+        const membershipLabel = this.sanitizePlain(
+          String(
+            log.membership_label ||
+              parsedNotes.membershipLabel ||
+              (isMemberLike ? 'MONTHLY MEMBERSHIP' : 'REGULAR (NON-MEMBER)'),
+          ).toUpperCase(),
+        );
+
+        const entryFee = Number(
+          log.entry_fee ??
+            parsedNotes.paidAmountFromNote ??
+            (isMemberLike ? 0 : this.defaultWalkInFee),
+        );
+        const isPaid = Boolean(
+          typeof log.is_paid === 'boolean'
+            ? log.is_paid
+            : parsedNotes.isPaidFromNote,
+        );
+        const paidAmount = Number(
+          log.paid_amount ??
+            (isPaid
+              ? (parsedNotes.paidAmountFromNote ?? entryFee)
+              : 0),
+        );
+
+        return {
+          ...log,
+          resolvedName,
+          memberCode,
+          membershipLabel,
+          entryFee,
+          isPaid,
+          paidAmount: isPaid ? paidAmount : 0,
+          noteBase: parsedNotes.baseNote,
+        };
       });
 
       const searchInp = document.getElementById('ledger-main-search');
       if (searchInp && searchInp.value) {
         const term = searchInp.value.toLowerCase();
-        filtered = filtered.filter((log) =>
-          log.resolvedName.toLowerCase().includes(term),
+        filtered = filtered.filter(
+          (log) =>
+            log.resolvedName.toLowerCase().includes(term) ||
+            log.membershipLabel.toLowerCase().includes(term) ||
+            log.memberCode.toLowerCase().includes(term),
         );
       }
 
-      // UPDATE THE TOP HUD (ANIMATED)
-      this.refreshSummaryHUD(filtered.length);
+      const labelEl = document.getElementById('ledger-summary-label');
+      const dayNames = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
+      if (labelEl) {
+        labelEl.innerText = `${dayNames[this.selectedDate.getDay()]} Floor Income`;
+      }
+
+      // UPDATE THE TOP HUD (ANIMATED: only paid logs count as income)
+      const totalIncome = filtered.reduce(
+        (sum, row) => sum + (row.isPaid ? Number(row.paidAmount || 0) : 0),
+        0,
+      );
+      this.refreshSummaryHUD(totalIncome);
 
       if (filtered.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-user-x' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
@@ -644,6 +791,23 @@ const wolfData = {
             hour: '2-digit',
             minute: '2-digit',
           });
+          const outTime = isClosed
+            ? new Date(log.time_out).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '--:--';
+          const paidBadgeClass = log.isPaid ? 'badge-paid' : 'badge-unpaid';
+          const paidBadgeText = log.isPaid ? 'PAID' : 'UNPAID';
+
+          const checkoutLabel = isClosed ? 'UNDO CHECK OUT' : 'CHECK OUT';
+          const checkoutClass = isClosed ? 'btn-logbook-neutral' : 'btn-logbook-danger';
+
+          const paidLabel = log.isPaid
+            ? 'UNDO PAID'
+            : `COLLECT ${this.formatCurrency(log.entryFee)}`;
+          const paidClass = log.isPaid ? 'btn-logbook-neutral' : 'btn-logbook-success';
+          const actionDisabled = this.isReadOnly ? 'disabled' : '';
 
           return `
           <div class="list-item-card" id="row-${log.id}" style="animation-delay: ${index * 0.04}s;">
@@ -653,11 +817,27 @@ const wolfData = {
               </div>
               <div class="item-info">
                 <h4 style="font-size:13px; font-weight:800;">${log.resolvedName}</h4>
+                <div class="sub" style="font-size:11px;">${log.membershipLabel}${log.memberCode ? ` • ${log.memberCode}` : ''}</div>
                 <div class="time" style="font-size:10px; color:#555;">IN: ${time}</div>
               </div>
               <div class="card-actions">
-                ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
+                <span class="${paidBadgeClass}">${paidBadgeText}</span>
+                ${!this.isReadOnly ? `<i class='bx bx-trash action-small' style="cursor:pointer;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
               </div>
+            </div>
+            <div class="card-details logbook-details">
+              <div class="detail-group">
+                <label>ENTRY FEE</label>
+                <div class="val">${this.formatCurrency(log.entryFee)}</div>
+              </div>
+              <div class="detail-group" style="text-align:right;">
+                <label>SESSION END</label>
+                <div class="val" style="font-size:1rem;">${outTime}</div>
+              </div>
+            </div>
+            <div class="logbook-action-row">
+              <button class="logbook-action-btn ${checkoutClass}" ${actionDisabled} onclick="wolfData.toggleLogCheckout('${log.id}', ${isClosed})">${checkoutLabel}</button>
+              <button class="logbook-action-btn ${paidClass}" ${actionDisabled} onclick="wolfData.toggleLogPaid('${log.id}', ${log.isPaid}, ${log.entryFee})">${paidLabel}</button>
             </div>
           </div>`;
         })
@@ -768,7 +948,7 @@ const wolfData = {
             </div>
             <div class="card-actions" style="text-align:right;">
               <div style="color: var(--wolf-red); font-weight: 900; font-family: 'JetBrains Mono'; font-size:14px;">
-                ₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                ${this.formatCurrency(amount)}
               </div>
               ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
             </div>
@@ -848,6 +1028,101 @@ const wolfData = {
 
     // This class will be checked during item card generation
     this.isReadOnly = isReadOnly;
+  },
+  async toggleLogCheckout(id, currentlyClosed) {
+    if (this.isReadOnly) return;
+
+    try {
+      const nextTimeOut = currentlyClosed ? null : new Date().toISOString();
+      const { error } = await supabaseClient
+        .from('check_in_logs')
+        .update({ time_out: nextTimeOut })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+      await this.loadLogbook();
+    } catch (err) {
+      console.error('Wolf OS Checkout Toggle Fault:', err);
+      if (window.wolfAudio) window.wolfAudio.play('error');
+    }
+  },
+
+  async toggleLogPaid(id, currentlyPaid, fallbackFee = 0) {
+    if (this.isReadOnly) return;
+
+    try {
+      const { data: logRow, error: fetchErr } = await supabaseClient
+        .from('check_in_logs')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchErr || !logRow) throw fetchErr || new Error('Log row not found');
+
+      const parsed = this.parseLogNotes(logRow.notes);
+      const membershipLabel = String(
+        logRow.membership_label ||
+          parsed.membershipLabel ||
+          (logRow.profile_id ? 'MONTHLY MEMBERSHIP' : 'REGULAR (NON-MEMBER)'),
+      )
+        .trim()
+        .toUpperCase();
+
+      const entryFee = Number(
+        logRow.entry_fee ??
+          parsed.paidAmountFromNote ??
+          fallbackFee ??
+          (logRow.profile_id ? 0 : this.defaultWalkInFee),
+      );
+
+      const nextPaid = !currentlyPaid;
+      const nextPaidAmount = nextPaid ? entryFee : 0;
+      const nextPaidAt = nextPaid ? new Date().toISOString() : null;
+      const nextNotes = this.buildLogNotes(
+        parsed.baseNote,
+        membershipLabel,
+        nextPaid,
+        nextPaidAmount,
+      );
+
+      const fullPayload = {
+        notes: nextNotes,
+        membership_label: membershipLabel,
+        entry_fee: entryFee,
+        is_paid: nextPaid,
+        paid_amount: nextPaidAmount,
+        paid_at: nextPaidAt,
+      };
+
+      let { error } = await supabaseClient
+        .from('check_in_logs')
+        .update(fullPayload)
+        .eq('id', id);
+
+      // Backward compatibility if the new columns are not yet migrated.
+      if (
+        error &&
+        /column .* does not exist|schema cache|invalid input syntax/i.test(
+          String(error.message || ''),
+        )
+      ) {
+        const legacy = await supabaseClient
+          .from('check_in_logs')
+          .update({ notes: nextNotes })
+          .eq('id', id);
+        error = legacy.error;
+      }
+
+      if (error) throw error;
+
+      if (window.wolfAudio) window.wolfAudio.play('success');
+      await this.loadLogbook();
+    } catch (err) {
+      console.error('Wolf OS Payment Toggle Fault:', err);
+      if (window.wolfAudio) window.wolfAudio.play('error');
+    }
   },
 
   // Inside wolfData object in data-loader.js
@@ -1022,6 +1297,18 @@ const wolfData = {
       .eq('id', id);
     this.loadLogbook(this.currentLogDay);
   },
+
+  addLogbookRow() {
+    this.loadLogbook();
+  },
+
+  updateLogbookRow() {
+    this.loadLogbook();
+  },
+
+  removeLogbookRow() {
+    this.loadLogbook();
+  },
 };
 
 window.wolfData = wolfData;
@@ -1188,7 +1475,7 @@ wolfData.initRealtime = async function () {
 
   if (error) {
     Toastify({
-      text: 'Realtime subscription failed ❌',
+      text: 'Realtime subscription failed',
       duration: 5000,
       gravity: 'top',
       position: 'right',
@@ -1211,10 +1498,7 @@ wolfData.updateLedgerRevenue = function () {
     0,
   );
 
-  revenueEl.textContent = `₱${total.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  revenueEl.textContent = this.formatCurrency(total);
 };
 // UI Feedback Helper
 wolfData.showRealtimeToast = function () {
@@ -1282,26 +1566,35 @@ document.addEventListener('click', async (e) => {
 
   const searchToggle = e.target.closest('#toggle-search-btn');
   if (searchToggle) {
-    e.preventDefault();
-    e.stopPropagation();
+    const scope =
+      searchToggle.closest(
+        '#sales-main-view, #logbook-main-view, #main-content, .ledger-page-wrapper',
+      ) || document;
+    const searchContainer = scope.querySelector('#ledger-search-container');
+    const input = scope.querySelector('#ledger-main-search');
 
-    try {
-      const input = document.getElementById('ledger-main-search');
-      document.getElementById('search-collapse-btn').classList.toggle('active');
+    // Only this handler controls Sales/Logbook search.
+    // Member/Product pages use their own scoped managers.
+    if (searchContainer && input) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isActive = searchContainer.classList.toggle('active');
+      searchToggle.classList.toggle('active', isActive);
+
       if (isActive) {
         setTimeout(() => {
-          if (input) input.focus();
-        }, 300);
+          input.focus();
+        }, 180);
         if (window.wolfAudio) window.wolfAudio.play('notif');
       } else {
-        if (input) input.value = '';
-        const clearBtn = document.getElementById('search-clear-btn');
+        input.value = '';
+        const clearBtn = scope.querySelector('#search-clear-btn');
         if (clearBtn) clearBtn.style.display = 'none';
         wolfRefreshView();
       }
-      return; // Stop processing other clicks
-    } catch (err) {
-      console.error('Wolf OS: Search Toggle Fault:', err);
+
+      return;
     }
   }
 
@@ -1472,3 +1765,4 @@ window.addEventListener('load', () => {
     }, 500);
   }
 });
+

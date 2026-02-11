@@ -1,29 +1,35 @@
 <style>
   .wolf-close-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #666;
-    padding: 8px 12px;
-    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #8e95a5;
+    padding: 10px 14px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
     font-size: 10px;
     font-weight: 900;
-    transition: 0.3s;
+    letter-spacing: 0.8px;
+    transition: 0.25s ease;
   }
+
+  .wolf-close-btn i {
+    font-size: 14px;
+  }
+
   .wolf-close-btn:hover {
     background: var(--wolf-red);
     color: #fff;
     border-color: var(--wolf-red);
+    box-shadow: 0 8px 24px rgba(var(--wolf-red-rgb), 0.34);
   }
 </style>
-<!-- WOLF OS - LOGBOOK ENTRY TERMINAL -->
+
 <div id="logbook-modal-overlay" class="wolf-modal-overlay">
   <div class="wolf-modal-card logbook-card">
-    <!-- HEADER -->
     <header class="modal-header">
       <div class="protocol-header">
         <div class="protocol-dot pulse"></div>
@@ -35,36 +41,78 @@
       </button>
     </header>
 
-    <!-- MAIN BODY -->
     <form id="record-logbook-form" class="modal-form">
-      <!-- GUEST INPUT SECTION -->
       <div class="input-section">
         <label class="wolf-label">IDENTIFY CUSTOMER</label>
         <div class="search-wrapper" id="logbookSearchWrapper">
-          <i class="bx bx-user-pin search-icon"></i>
+          <span class="search-icon-wrap">
+            <i class="bx bx-id-card search-icon"></i>
+          </span>
           <input
             type="text"
             id="log-guest-search"
-            placeholder="ENTER MEMBER NAME OR WALK-IN GUEST..."
+            placeholder="SEARCH MEMBER OR TYPE WALK-IN NAME..."
             autocomplete="off"
             required
           />
         </div>
+        <div id="log-member-search-results" class="member-search-dropdown"></div>
+        <div class="input-hint">
+          <i class="bx bx-info-circle"></i>
+          <span>If no member is found, continue as walk-in.</span>
+        </div>
       </div>
 
-      <!-- TECHNICAL INFO (GLASS BOX) -->
+      <div class="input-section">
+        <label class="wolf-label">ENTRY TYPE</label>
+        <div class="entry-type-grid">
+          <button
+            type="button"
+            class="entry-type-btn is-active"
+            data-entry-tier="regular"
+          >
+            <i class="bx bx-user"></i>
+            <span class="tier-name">REGULAR</span>
+            <span class="tier-fee">&#8369;80</span>
+          </button>
+          <button type="button" class="entry-type-btn" data-entry-tier="student">
+            <i class="bx bx-book-reader"></i>
+            <span class="tier-name">STUDENT</span>
+            <span class="tier-fee">&#8369;50</span>
+          </button>
+          <button type="button" class="entry-type-btn" data-entry-tier="member">
+            <i class="bx bx-badge-check"></i>
+            <span class="tier-name">MEMBER</span>
+            <span class="tier-fee">&#8369;0</span>
+          </button>
+        </div>
+        <label class="paid-switch-row">
+          <input type="checkbox" id="log-paid-toggle" />
+          <span class="paid-switch-slider"></span>
+          <span class="paid-switch-text">
+            <i class="bx bx-wallet"></i>
+            <span>PAID ALREADY</span>
+          </span>
+        </label>
+      </div>
+
       <div class="tech-info-grid">
         <div class="tech-node">
-          <span class="node-label">ENTRY_TIMESTAMP</span>
+          <span class="node-label">
+            <i class="bx bx-time-five"></i>
+            ENTRY_TIMESTAMP
+          </span>
           <div class="node-value" id="log-current-time">00:00:00</div>
         </div>
         <div class="tech-node">
-          <span class="node-label">PROTOCOL_STATUS</span>
+          <span class="node-label">
+            <i class="bx bx-shield-quarter"></i>
+            PROTOCOL_STATUS
+          </span>
           <div class="node-value status-ready">AWAITING_AUTH</div>
         </div>
       </div>
 
-      <!-- ACTION FOOTER -->
       <footer class="modal-footer">
         <div class="entry-summary">
           <span class="summary-label">LOGBOOK_RECORD</span>
@@ -80,11 +128,10 @@
 </div>
 
 <style>
-  /* --- LOGBOOK TERMINAL SPECIFIC STYLES --- */
   .wolf-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.86);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
@@ -92,21 +139,39 @@
     z-index: 10000;
     padding: 20px;
   }
+
   .wolf-modal-overlay.closing {
     opacity: 0;
     transition: opacity 0.25s ease;
   }
 
   .wolf-modal-card {
-    background: rgba(15, 15, 15, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 28px;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(var(--wolf-red-rgb), 0.12), transparent 42%),
+      radial-gradient(circle at 100% 100%, rgba(44, 130, 255, 0.09), transparent 44%),
+      rgba(15, 15, 16, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 30px;
     width: 100%;
-    max-width: 450px;
-    padding: 30px;
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
-    animation: wolfModalEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 560px;
+    max-height: calc(100vh - 30px);
+    overflow-y: auto;
+    padding: 34px;
+    box-shadow:
+      0 40px 100px rgba(0, 0, 0, 0.82),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    animation: wolfModalEntry 0.42s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
+  .wolf-modal-card::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .wolf-modal-card::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+  }
+
   .wolf-modal-card.closing {
     opacity: 0;
     transform: translateY(18px) scale(0.98);
@@ -130,16 +195,23 @@
     }
   }
 
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
   .protocol-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 25px;
   }
 
   .protocol-dot.pulse {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     background: #4ade80;
     border-radius: 50%;
     box-shadow: 0 0 12px #4ade80;
@@ -148,88 +220,327 @@
 
   .protocol-title {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
-    color: #555;
-    letter-spacing: 2px;
+    color: #5f6678;
+    letter-spacing: 2.1px;
   }
 
   .wolf-label {
     display: block;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 900;
-    color: #444;
+    color: #62697b;
     margin-bottom: 10px;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
+  }
+
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
   }
 
   .search-wrapper {
     position: relative;
-    background: #111;
-    border: 1px solid #1a1a1a;
+    background: rgba(11, 11, 13, 0.92);
+    border: 1px solid #22252f;
     border-radius: 16px;
-    padding: 15px;
+    padding: 14px;
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: 0.3s;
+    transition: 0.25s ease;
   }
 
   .search-wrapper:focus-within {
     border-color: var(--wolf-red);
-    background: #141414;
+    background: rgba(17, 17, 19, 0.95);
+    box-shadow: 0 0 0 3px rgba(var(--wolf-red-rgb), 0.15);
+  }
+
+  .search-icon-wrap {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
 
   .search-icon {
-    font-size: 1.4rem;
-    color: #333;
+    font-size: 16px;
+    color: #788093;
   }
 
   #log-guest-search {
     background: none;
     border: none;
-    color: #fff;
+    color: #f2f5ff;
     width: 100%;
     outline: none;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   #log-guest-search::placeholder {
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
+    color: #80899e;
   }
 
-  /* TECH INFO BOX */
+  .member-search-dropdown {
+    width: 100%;
+    margin-top: 8px;
+    background: #101115;
+    border: 1px solid #252a36;
+    border-radius: 12px;
+    overflow: hidden;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  .member-search-dropdown.active {
+    display: block;
+  }
+
+  .member-search-item {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: #dce4ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 12px;
+    cursor: pointer;
+    transition: 0.18s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: left;
+  }
+
+  .member-search-item:last-child {
+    border-bottom: none;
+  }
+
+  .member-search-item:hover {
+    background: rgba(var(--wolf-red-rgb), 0.13);
+  }
+
+  .member-search-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .member-search-main i {
+    font-size: 15px;
+    color: #5e98ff;
+    flex-shrink: 0;
+  }
+
+  .member-search-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: #f0f4ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .member-search-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    color: #ef645a;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .input-hint {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #677085;
+  }
+
+  .input-hint i {
+    color: #8b95ad;
+    font-size: 13px;
+  }
+
+  .entry-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .entry-type-btn {
+    background: rgba(14, 14, 16, 0.95);
+    border: 1px solid #2a2d38;
+    border-radius: 14px;
+    padding: 11px 9px;
+    color: #9ea7ba;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: 0.22s ease;
+  }
+
+  .entry-type-btn i {
+    font-size: 15px;
+    color: #8f97a8;
+    margin-bottom: 2px;
+    transition: 0.22s ease;
+  }
+
+  .entry-type-btn .tier-name {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+  }
+
+  .entry-type-btn .tier-fee {
+    font-size: 15px;
+    font-weight: 900;
+    color: #f5f7fc;
+  }
+
+  .entry-type-btn:hover:not(:disabled) {
+    border-color: #be4c41;
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  .entry-type-btn:hover:not(:disabled) i {
+    color: #ffd8d3;
+  }
+
+  .entry-type-btn.is-active {
+    border-color: var(--wolf-red);
+    box-shadow:
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.24),
+      0 12px 28px rgba(var(--wolf-red-rgb), 0.15);
+    color: #fff;
+  }
+
+  .entry-type-btn.is-active i {
+    color: #ffd8d3;
+  }
+
+  .entry-type-btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  .paid-switch-row {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  #log-paid-toggle {
+    display: none;
+  }
+
+  .paid-switch-slider {
+    width: 38px;
+    height: 22px;
+    background: #2a2d32;
+    border: 1px solid #3b404a;
+    border-radius: 999px;
+    position: relative;
+    transition: 0.2s ease;
+  }
+
+  .paid-switch-slider::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    top: 3px;
+    left: 3px;
+    border-radius: 50%;
+    background: #8b92a0;
+    transition: 0.2s ease;
+  }
+
+  #log-paid-toggle:checked + .paid-switch-slider {
+    background: rgba(22, 163, 74, 0.25);
+    border-color: #16a34a;
+  }
+
+  #log-paid-toggle:checked + .paid-switch-slider::after {
+    transform: translateX(16px);
+    background: #3ef58a;
+  }
+
+  .paid-switch-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    color: #767f94;
+  }
+
+  .paid-switch-text i {
+    font-size: 14px;
+  }
+
+  #log-paid-toggle:checked + .paid-switch-slider + .paid-switch-text {
+    color: #4ade80;
+  }
+
   .tech-info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin: 25px 0;
+    gap: 12px;
+    margin: 8px 0 0;
   }
 
   .tech-node {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px;
     border-radius: 16px;
   }
 
   .node-label {
-    display: block;
-    font-size: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8.5px;
     font-weight: 900;
-    color: #444;
-    margin-bottom: 5px;
+    color: #5c6477;
+    margin-bottom: 6px;
     letter-spacing: 1px;
   }
 
-  .node-value {
-    color: #fff;
-    font-family: 'JetBrains Mono', monospace;
+  .node-label i {
     font-size: 13px;
+  }
+
+  .node-value {
+    color: #eef3ff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
     font-weight: 700;
   }
 
@@ -237,70 +548,342 @@
     color: #4ade80;
   }
 
-  /* FOOTER & BUTTON */
+  .status-member {
+    color: #67a7ff;
+  }
+
+  .status-warn {
+    color: #f59e0b;
+  }
+
   .modal-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #1a1a1a;
-    padding-top: 25px;
-    margin-top: 10px;
+    gap: 16px;
+    border-top: 1px solid #21242f;
+    padding-top: 22px;
+    margin-top: 4px;
   }
 
   .entry-summary .summary-val {
-    font-size: 18px;
+    font-size: 29px;
     font-weight: 900;
-    color: #fff;
+    color: #f7f8ff;
     font-style: italic;
+    letter-spacing: 0.4px;
+    line-height: 1.04;
   }
 
   .summary-label {
-    font-size: 8px;
+    font-size: 8.8px;
     font-weight: 900;
-    color: #444;
-    letter-spacing: 1px;
+    color: #5d6579;
+    letter-spacing: 1.2px;
   }
 
   .btn-authorize {
-    background: var(--wolf-red);
+    background: linear-gradient(180deg, #bb4438, #972b22);
     color: #fff;
     border: none;
-    padding: 15px 25px;
+    padding: 16px 24px;
     border-radius: 16px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.24s ease;
   }
 
   .btn-authorize span {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 900;
+    letter-spacing: 0.8px;
   }
+
   .btn-authorize i {
-    font-size: 1.2rem;
+    font-size: 20px;
   }
 
   .btn-authorize:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 20px rgba(166, 52, 41, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 26px rgba(var(--wolf-red-rgb), 0.35);
   }
 
-  .close-modal-btn {
-    position: absolute;
-    top: 25px;
-    right: 25px;
-    background: none;
-    border: none;
-    color: #333;
-    font-size: 1.5rem;
-    cursor: pointer;
-    transition: 0.3s;
+  .btn-authorize:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 
-  .close-modal-btn:hover {
-    color: #fff;
-    transform: rotate(90deg);
+  @media (max-width: 700px) {
+    .wolf-modal-overlay {
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+
+    .wolf-modal-card {
+      width: min(100%, 460px);
+      padding: 16px;
+      border-radius: 20px;
+      max-height: calc(100vh - 28px);
+    }
+
+    .modal-header {
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .protocol-title {
+      font-size: 9px;
+      letter-spacing: 1.35px;
+    }
+
+    .wolf-close-btn {
+      padding: 8px 10px;
+      font-size: 9px;
+    }
+
+    .modal-form {
+      gap: 12px;
+    }
+
+    .search-wrapper {
+      padding: 10px;
+    }
+
+    #log-guest-search {
+      font-size: 13px;
+    }
+
+    .entry-type-btn {
+      padding: 8px 5px;
+      border-radius: 12px;
+    }
+
+    .entry-type-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .entry-type-btn i {
+      font-size: 13px;
+      margin-bottom: 1px;
+    }
+
+    .entry-type-btn .tier-name {
+      font-size: 9px;
+      letter-spacing: 0.35px;
+    }
+
+    .entry-type-btn .tier-fee {
+      font-size: 13px;
+    }
+
+    .paid-switch-row {
+      margin-top: 10px;
+    }
+
+    .tech-info-grid {
+      gap: 8px;
+    }
+
+    .tech-node {
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .node-value {
+      font-size: 12px;
+    }
+
+    .entry-summary .summary-val {
+      font-size: 19px;
+      line-height: 1.1;
+    }
+
+    .modal-footer {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding-top: 14px;
+    }
+
+    .btn-authorize {
+      justify-content: center;
+      width: 100%;
+      padding: 13px 18px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .wolf-modal-overlay {
+      padding: 10px;
+    }
+
+    .wolf-modal-card {
+      width: min(100%, 430px);
+      max-height: calc(100vh - 20px);
+    }
+
+    .tech-info-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  body.light-theme .wolf-modal-overlay {
+    background: rgba(120, 116, 109, 0.32);
+  }
+
+  body.light-theme .wolf-modal-card {
+    background:
+      radial-gradient(circle at 12% 0%, rgba(188, 108, 84, 0.2), transparent 44%),
+      radial-gradient(circle at 100% 100%, rgba(121, 141, 181, 0.18), transparent 46%),
+      #f3efe8;
+    border-color: #d6cec2;
+    box-shadow:
+      0 24px 60px rgba(62, 58, 50, 0.22),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+  }
+
+  body.light-theme .protocol-title {
+    color: #6f665b;
+  }
+
+  body.light-theme .wolf-label,
+  body.light-theme .summary-label,
+  body.light-theme .node-label {
+    color: #71695f;
+  }
+
+  body.light-theme .wolf-close-btn {
+    background: linear-gradient(180deg, rgba(58, 57, 52, 0.05), rgba(58, 57, 52, 0.02));
+    border-color: #cec5b9;
+    color: #5f5960;
+  }
+
+  body.light-theme .search-wrapper {
+    background: #ece7df;
+    border-color: #d2c8bb;
+  }
+
+  body.light-theme .search-wrapper:focus-within {
+    background: #f2ede6;
+    box-shadow: 0 0 0 3px rgba(var(--wolf-red-rgb), 0.12);
+  }
+
+  body.light-theme .search-icon-wrap {
+    background: rgba(73, 76, 88, 0.08);
+  }
+
+  body.light-theme .search-icon {
+    color: #6f7280;
+  }
+
+  body.light-theme #log-guest-search {
+    color: #2f3642;
+  }
+
+  body.light-theme #log-guest-search::placeholder {
+    color: #6f7584;
+  }
+
+  body.light-theme .member-search-dropdown {
+    background: #f3eee7;
+    border-color: #d3cabe;
+  }
+
+  body.light-theme .member-search-item {
+    color: #2f3642;
+    border-bottom-color: rgba(48, 50, 56, 0.07);
+  }
+
+  body.light-theme .member-search-item:hover {
+    background: rgba(var(--wolf-red-rgb), 0.12);
+  }
+
+  body.light-theme .member-search-name {
+    color: #27303d;
+  }
+
+  body.light-theme .member-search-main i {
+    color: #456ca9;
+  }
+
+  body.light-theme .input-hint {
+    color: #6f7583;
+  }
+
+  body.light-theme .input-hint i {
+    color: #787f90;
+  }
+
+  body.light-theme .entry-type-btn {
+    background: #f1ece4;
+    border-color: #d5cbbf;
+    color: #655f66;
+  }
+
+  body.light-theme .entry-type-btn i {
+    color: #6c7081;
+  }
+
+  body.light-theme .entry-type-btn .tier-fee {
+    color: #242a33;
+  }
+
+  body.light-theme .entry-type-btn:hover:not(:disabled) {
+    border-color: #be4c41;
+    color: #2d303b;
+  }
+
+  body.light-theme .entry-type-btn.is-active {
+    box-shadow:
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.3),
+      0 8px 18px rgba(var(--wolf-red-rgb), 0.18);
+  }
+
+  body.light-theme .paid-switch-slider {
+    background: #d6cfc3;
+    border-color: #c1b7a9;
+  }
+
+  body.light-theme .paid-switch-slider::after {
+    background: #8f8880;
+  }
+
+  body.light-theme .paid-switch-text {
+    color: #67616b;
+  }
+
+  body.light-theme .tech-node {
+    background: #eee9e1;
+    border-color: #d4cbc0;
+  }
+
+  body.light-theme .node-value {
+    color: #252c37;
+  }
+
+  body.light-theme .status-ready {
+    color: #188f4b;
+  }
+
+  body.light-theme .status-member {
+    color: #2f67bf;
+  }
+
+  body.light-theme .status-warn {
+    color: #b67b12;
+  }
+
+  body.light-theme .modal-footer {
+    border-top-color: #d3cabe;
+  }
+
+  body.light-theme .entry-summary .summary-val {
+    color: #20252e;
   }
 </style>

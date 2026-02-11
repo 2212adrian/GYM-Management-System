@@ -1,0 +1,157 @@
+├── .env
+├── .env.example
+├── .gitignore
+├── .hintrc
+├── .netlify
+│  ├── blobs-serve
+│  ├── functions-internal
+│  │  └── emails
+│  │    └── index.js
+│  ├── plugins
+│  │  ├── package-lock.json
+│  │  └── package.json
+│  └── v1
+│    └── functions
+├── deno.lock
+├── docs
+│  └── sql
+│    ├── otp_cooldowns_rate_limit.sql
+│    ├── password_reset_otp_rls.sql
+│    ├── products_hash_columns.sql
+│    └── quick_login_requests.sql
+├── netlify
+│  └── functions
+│    ├── add-product.js
+│    ├── auth-login.js
+│    ├── check-otp-cooldown.js
+│    ├── quick-login-approve.js
+│    ├── quick-login-create.js
+│    ├── quick-login-status.js
+│    ├── request-otp.js
+│    ├── supabase-config.js
+│    ├── update-otp-cooldown.js
+│    └── verify-otp.js
+├── netlify.toml
+├── package-lock.json
+├── package.json
+├── public
+│  ├── .prettierrc
+│  ├── 404.html
+│  ├── assets
+│  │  ├── components
+│  │  │  ├── add-product-modal.css
+│  │  │  ├── add-product-modal.html
+│  │  │  ├── floating-nav.html
+│  │  │  ├── record-logbook-modal.html
+│  │  │  ├── record-sale-modal.html
+│  │  │  ├── scanner-modal.html
+│  │  │  ├── sidebar.html
+│  │  │  ├── topbar.html
+│  │  │  ├── trash-modal.html
+│  │  │  └── wolf-modal.html
+│  │  ├── css
+│  │  │  ├── auth.css
+│  │  │  └── main.css
+│  │  ├── images
+│  │  │  ├── 1-carousel.jpg
+│  │  │  ├── 2-carousel.jpg
+│  │  │  ├── 3-carousel.jpg
+│  │  │  ├── 4-carousel.jpg
+│  │  │  ├── 5-carousel.jpg
+│  │  │  ├── 6-carousel.jpg
+│  │  │  ├── favicon.ico
+│  │  │  ├── Full Emoji List, v17.0_files
+│  │  │  │  ├── 986df696-a484-42dc-a3ed-0466520e31dc
+│  │  │  │  ├── aac-some-sponsors.gif
+│  │  │  │  ├── analytics.js.download
+│  │  │  │  ├── c8d3a069-77c7-41b6-927e-06a4c17fac35
+│  │  │  │  ├── emoji-list.css
+│  │  │  │  ├── js
+│  │  │  │  ├── logo60s2.gif
+│  │  │  │  └── standard_styles.css
+│  │  │  ├── Full Emoji List, v17.0.html
+│  │  │  ├── logo.jpg
+│  │  │  ├── placeholder.png
+│  │  │  └── textures
+│  │  │    ├── always-grey.png
+│  │  │    ├── axiom-pattern.png
+│  │  │    ├── black-thread-light.png
+│  │  │    ├── black-twill.png
+│  │  │    ├── cartographer.png
+│  │  │    ├── checkered-pattern.png
+│  │  │    ├── crisp-paper-ruffles.png
+│  │  │    ├── crissxcross.png
+│  │  │    ├── cubes.png
+│  │  │    ├── cutcube.png
+│  │  │    ├── dark-brick-wall.png
+│  │  │    ├── dark-leather.png
+│  │  │    ├── dark-mosaic.png
+│  │  │    ├── diagmonds-light.png
+│  │  │    ├── diagmonds.png
+│  │  │    ├── diagonal-striped-brick.png
+│  │  │    ├── diamond-upholstery.png
+│  │  │    ├── elastoplast.png
+│  │  │    ├── food.png
+│  │  │    ├── grid-me.png
+│  │  │    ├── light-wool.png
+│  │  │    ├── padded.png
+│  │  │    ├── pineapple-cut.png
+│  │  │    ├── pinstripe-dark.png
+│  │  │    ├── shattered-dark.png
+│  │  │    └── shattered.png
+│  │  ├── js
+│  │  │  ├── auth.js
+│  │  │  ├── libraries
+│  │  │  │  ├── purify.js
+│  │  │  │  ├── purify.min.js
+│  │  │  │  ├── qrcode-generator.min.js
+│  │  │  │  └── sweetalert2.all.js
+│  │  │  └── utils
+│  │  │    ├── audio-engine.js
+│  │  │    ├── auth-guard.js
+│  │  │    ├── data-loader.js
+│  │  │    ├── gatekeeper.js
+│  │  │    ├── logbook-manager.js
+│  │  │    ├── member-manager.js
+│  │  │    ├── product-manager.js
+│  │  │    ├── sales-manager.js
+│  │  │    ├── scanner.js
+│  │  │    ├── stars-canvas.js
+│  │  │    ├── supabase-init.js
+│  │  │    ├── system-config.js
+│  │  │    ├── theme-manager.js
+│  │  │    ├── ui-loader.js
+│  │  │    └── wolf-router.js
+│  │  ├── sounds
+│  │  │  ├── error.mp3
+│  │  │  ├── intro.mp3
+│  │  │  ├── log-off.mp3
+│  │  │  ├── notif.mp3
+│  │  │  ├── rejected.wav
+│  │  │  ├── success.mp3
+│  │  │  ├── swipe.mp3
+│  │  │  └── woosh-large-sub.mp3
+│  │  └── views
+│  │    └── daily-ledger.html
+│  ├── index.html
+│  ├── no-connection.html
+│  └── pages
+│    ├── audit.html
+│    ├── dashboard.html
+│    ├── equipments.html
+│    ├── feedback.html
+│    ├── goal-center.html
+│    ├── hub.html
+│    ├── id-maker.html
+│    ├── logbook.html
+│    ├── main.html
+│    ├── management
+│    │  ├── member-trash-container.html
+│    │  ├── members.html
+│    │  ├── product-trash-container.html
+│    │  └── products.html
+│    ├── sales.html
+│    ├── settings.html
+│    ├── unauthorized.html
+│    └── verifyotp.html
+└── README.md

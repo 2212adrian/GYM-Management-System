@@ -39,11 +39,18 @@ window.wolfScanner = {
     const ready = await this.init();
     if (!ready) return;
 
-    this.activeCallback = callback;
-    this.onCloseCallback = onClose;
-
     const overlay = document.getElementById('wolf-scanner-overlay');
+    if (!overlay) return;
+
+    // Always reset stale runtime state before a new scanner session.
+    this.activeCallback = callback;
+    this.onCloseCallback = typeof onClose === 'function' ? onClose : null;
+    this.isProcessingResult = false;
+    this.isSwitchingCamera = false;
+
     overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
 
     // --- 1. UX: AUTO-FOCUS MANUAL INPUT ---
     const manualInput = document.getElementById('manualCodeInput');
@@ -366,6 +373,35 @@ window.wolfScanner = {
 
       // Normalize: uppercase + remove spaces
       const normalized = rawText.toUpperCase().replace(/\s+/g, '');
+      const isMemberCode = /^ME-[A-Z0-9]{2,}$/.test(normalized);
+
+      // Member scanner route:
+      // - quick auth ON  -> instant logbook insert (unpaid, not checked-out)
+      // - quick auth OFF -> open check-in protocol UI
+      if (!this.activeCallback && isMemberCode) {
+        await this.stop();
+        if (
+          window.logbookManager &&
+          quickAuth &&
+          typeof window.logbookManager.processCheckIn === 'function'
+        ) {
+          await window.logbookManager.processCheckIn(normalized, {
+            entryType: 'member',
+            isPaid: false,
+          });
+        } else if (
+          window.logbookManager &&
+          typeof window.logbookManager.openLogbookTerminal === 'function'
+        ) {
+          await window.logbookManager.openLogbookTerminal(normalized);
+        } else if (window.salesManager) {
+          window.salesManager.showSystemAlert(
+            'LOGBOOK_MODULE_NOT_READY',
+            'error',
+          );
+        }
+        return;
+      }
 
       // Stop camera and hide scanner
       await this.stop();
@@ -410,7 +446,9 @@ window.wolfScanner = {
   /**
    * Shutdown Scanner & Reset UI
    */
-  async stop() {
+  async stop(options = {}) {
+    const { skipOnClose = false } = options;
+
     if (html5QrCode) {
       try {
         await html5QrCode.stop();
@@ -419,7 +457,12 @@ window.wolfScanner = {
       html5QrCode = null;
     }
 
-    document.getElementById('wolf-scanner-overlay').style.display = 'none';
+    const overlay = document.getElementById('wolf-scanner-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    }
 
     // Reset Manual Input UI
     const input = document.getElementById('manualCodeInput');
@@ -427,9 +470,18 @@ window.wolfScanner = {
     if (input) input.value = '';
     if (group) group.classList.remove('has-content');
 
-    if (this.onCloseCallback) {
-      this.onCloseCallback();
-      this.onCloseCallback = null;
+    const closeCb = this.onCloseCallback;
+    this.onCloseCallback = null;
+    this.activeCallback = null;
+    this.isProcessingResult = false;
+    this.isSwitchingCamera = false;
+
+    if (!skipOnClose && closeCb) {
+      try {
+        closeCb();
+      } catch (err) {
+        console.warn('Wolf OS: Scanner close callback failed.', err);
+      }
     }
   },
 
@@ -464,16 +516,57 @@ window.wolfScanner = {
 
         searchTimer = setTimeout(async () => {
           let data = [];
+          const sanitizeText = (value) => {
+            const raw = String(value ?? '');
+            if (window.DOMPurify) {
+              return window.DOMPurify.sanitize(raw, {
+                ALLOWED_TAGS: [],
+                ALLOWED_ATTR: [],
+              });
+            }
+            return raw
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+          };
 
           if (window.supabaseClient) {
             const res = await window.supabaseClient
               .from('products')
-              .select('name, sku')
+              .select('name, sku, is_active')
+              .eq('is_active', true)
               .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
               .order('name', { ascending: true })
               .limit(6);
 
-            if (!res.error) data = res.data || [];
+            if (!res.error) {
+              data = (res.data || []).filter((p) => p.is_active !== false);
+            }
+
+            const memberRes = await window.supabaseClient
+              .from('members')
+              .select('full_name, member_code, sku')
+              .or(`full_name.ilike.%${query}%,member_code.ilike.%${query}%,sku.ilike.%${query}%`)
+              .order('full_name', { ascending: true })
+              .limit(4);
+
+            if (!memberRes.error && memberRes.data?.length) {
+              const memberRows = memberRes.data
+                .filter(
+                  (m) =>
+                    String(m.member_code || m.sku || '').trim().length > 0,
+                )
+                .map((m) => ({
+                  name: m.full_name || 'Member',
+                  sku: String(m.member_code || m.sku || '').toUpperCase(),
+                  type: 'MEMBER',
+                }));
+              data = [...memberRows, ...data.map((p) => ({ ...p, type: 'PRODUCT' }))];
+            } else {
+              data = data.map((p) => ({ ...p, type: 'PRODUCT' }));
+            }
           }
 
           // Fallback to in-memory products if available
@@ -482,11 +575,11 @@ window.wolfScanner = {
             data = window.ProductManager.allProducts
               .filter(
                 (p) =>
-                  (p.name && p.name.toLowerCase().includes(q)) ||
-                  (p.sku && p.sku.toLowerCase().includes(q)),
+                (p.name && p.name.toLowerCase().includes(q)) ||
+                (p.sku && p.sku.toLowerCase().includes(q)),
               )
               .slice(0, 6)
-              .map((p) => ({ name: p.name, sku: p.sku }));
+              .map((p) => ({ name: p.name, sku: p.sku, type: 'PRODUCT' }));
           }
 
           if (!results) return;
@@ -498,14 +591,25 @@ window.wolfScanner = {
           }
 
           results.innerHTML = data
-            .map(
-              (p) => `
-              <div class="dropdown-item" data-sku="${p.sku || ''}">
-                <span>${(p.name || '').toUpperCase()}</span>
-                <span class="sku">PR-${(p.sku || '').toUpperCase()}</span>
+            .map((p) => {
+              const kind = String(p.type || 'PRODUCT').toUpperCase();
+              const safeName = sanitizeText(String(p.name || '').toUpperCase());
+              const rawCode = String(p.sku || '').toUpperCase();
+              const productCode = rawCode.startsWith('PR-')
+                ? rawCode
+                : `PR-${rawCode}`;
+              const safeCode = sanitizeText(
+                kind === 'MEMBER' ? rawCode : productCode,
+              );
+              const safeValue = sanitizeText(rawCode);
+
+              return `
+              <div class="dropdown-item" data-sku="${safeValue}" data-kind="${kind}">
+                <span>${safeName}</span>
+                <span class="sku">${safeCode}</span>
               </div>
-            `,
-            )
+            `;
+            })
             .join('');
           results.classList.add('active');
         }, 250);
@@ -535,13 +639,14 @@ window.wolfScanner = {
         const item = e.target.closest('.dropdown-item');
         if (!item) return;
         const sku = item.getAttribute('data-sku') || '';
+        const kind = item.getAttribute('data-kind') || 'PRODUCT';
         if (!sku) return;
 
         if (input) input.value = sku.toUpperCase();
         results.classList.remove('active');
         results.innerHTML = '';
         if (group) group.classList.add('has-content');
-        this.processResult(sku, 'MANUAL_PICK');
+        this.processResult(sku, kind === 'MEMBER' ? 'MANUAL_MEMBER_PICK' : 'MANUAL_PICK');
       });
     }
 

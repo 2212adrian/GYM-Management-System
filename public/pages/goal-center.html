@@ -70,7 +70,7 @@
 
   .goal-card .goal-status {
     font-size: 9px;
-    color: #2b3674;
+    color: var(--wolf-blue);
     text-transform: uppercase;
     letter-spacing: 1px;
     font-weight: 800;
@@ -82,7 +82,7 @@
     font-style: italic;
     color: #fff;
     text-shadow:
-      0 0 15px rgba(166, 52, 41, 0.35),
+      0 0 15px rgba(var(--wolf-red-rgb), 0.35),
       2px 2px 0px rgba(0, 0, 0, 0.8);
   }
 
@@ -107,7 +107,7 @@
 
   .goal-input:focus {
     border-color: var(--wolf-red);
-    box-shadow: 0 0 12px rgba(166, 52, 41, 0.2);
+    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb), 0.2);
   }
 
   .goal-btn {
@@ -144,8 +144,8 @@
   .goal-progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #a63429, #ff6b5f);
-    box-shadow: 0 0 12px rgba(166, 52, 41, 0.5);
+    background: linear-gradient(90deg, var(--wolf-red), #ff6b5f);
+    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb), 0.5);
   }
 
   .goal-footnote {

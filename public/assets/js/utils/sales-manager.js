@@ -68,6 +68,11 @@ window.salesManager = {
 
   showTopInstruction(show = true) {
     let banner = document.getElementById('wolf-system-instruction');
+    if (!show) {
+      if (banner) banner.remove();
+      return;
+    }
+
     if (!banner) {
       document.body.insertAdjacentHTML(
         'beforeend',
@@ -160,6 +165,9 @@ window.salesManager = {
   closeSaleTerminal() {
     const modal = document.getElementById('sale-terminal-overlay');
     if (!modal) return;
+
+    // Ensure the helper banner is fully removed before modal/style cleanup.
+    this.showTopInstruction(false);
 
     const container = modal.querySelector('.master-terminal-container');
     modal.classList.remove('is-open');

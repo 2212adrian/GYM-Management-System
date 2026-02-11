@@ -6,6 +6,25 @@
 const MemberManager = {
   allMembers: [],
   trashData: [],
+  getAccentColor() {
+    return (
+      getComputedStyle(document.body).getPropertyValue('--wolf-red').trim() ||
+      '#a63429'
+    );
+  },
+
+  getMemberCode(member) {
+    const existing = String(member?.sku || member?.member_code || '')
+      .trim()
+      .toUpperCase();
+    if (existing) return existing.startsWith('ME-') ? existing : `ME-${existing}`;
+
+    const fallback = String(member?.member_id || member?.id || '')
+      .replace(/[^A-Z0-9]/gi, '')
+      .toUpperCase()
+      .slice(0, 4);
+    return `ME-${fallback.padEnd(4, '0')}`;
+  },
 
   // Add these inside the MemberManager object
   viewProfile(id) {
@@ -18,12 +37,13 @@ const MemberManager = {
     console.log('Protocol: Opening Plan Manager for', id);
   },
   deactivate(id) {
+    const accent = this.getAccentColor();
     Swal.fire({
       title: 'DEACTIVATE MEMBER?',
       text: 'They will lose access to the gym immediately.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#a63429',
+      confirmButtonColor: accent,
       background: '#0d0d0d',
       color: '#fff',
     }).then((result) => {
@@ -77,24 +97,40 @@ const MemberManager = {
 
     try {
       const { data, error } = await window.supabaseClient
-        .from('profiles')
+        .from('members')
         .select(
-          'id, full_name, phone, email, created_at, memberships (status, membership_plans (name))',
+          'member_id, profile_id, member_code, sku, full_name, contact_number, email_address, created_at',
         )
         .order('full_name', { ascending: true });
 
       if (error) throw error;
-      this.allMembers = data;
+      this.allMembers = (data || []).map((row) => ({
+        ...row,
+        id: row.member_id,
+        phone: row.contact_number,
+        email: row.email_address,
+        member_code: this.getMemberCode(row),
+        sku: row.sku,
+      }));
       this.render(this.allMembers);
 
       const countEl =
         document.getElementById('total-members-count') ||
         document.getElementById('active-members-count');
-      if (countEl) countEl.innerText = data.length;
+      if (countEl) countEl.innerText = this.allMembers.length;
       // Artificial delay to let skeleton be noticed (optional, 400ms is good)
       setTimeout(() => this.render(this.allMembers), 400);
     } catch (err) {
       console.error('Member Database Error:', err);
+      if (window.Swal) {
+        window.Swal.fire({
+          title: 'MEMBER ACCESS BLOCKED',
+          text: 'RLS may be blocking reads. Run docs/sql/members_rls_policy.sql in Supabase.',
+          icon: 'warning',
+          background: '#0d0d0d',
+          color: '#fff',
+        });
+      }
     }
   },
 
@@ -106,7 +142,7 @@ const MemberManager = {
       const { data, error } = await window.supabaseClient
         .from('trash_bin')
         .select('*')
-        .eq('table_name', 'profiles')
+        .in('table_name', ['members', 'profiles'])
         .order('deleted_at', { ascending: false });
 
       if (error) throw error;
@@ -142,16 +178,21 @@ const MemberManager = {
 
     container.innerHTML = list
       .map((m, index) => {
-        const shortId = m.id.split('-')[0].toUpperCase();
+        const rawMemberCode = this.getMemberCode(m);
+        const shortId = WOLF_PURIFIER(rawMemberCode);
         const delay = index * 0.05;
         const cleanName = WOLF_PURIFIER(
           m.full_name || 'UNKNOWN_USER',
         ).toUpperCase();
-        const issueDate = new Date(m.created_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        });
+        const issueDate = m.created_at
+          ? new Date(m.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
+          : 'N/A';
+        const memberCode = WOLF_PURIFIER(rawMemberCode);
+        const qrPayload = encodeURIComponent(rawMemberCode);
 
         return `
         <div class="col-12 col-md-6 col-xl-4 animate__animated animate__fadeInUp" style="animation-delay: ${delay}s">
@@ -176,13 +217,14 @@ const MemberManager = {
                 <div class="card-body-content">
                   <div class="qr-section">
                     <div class="qr-box">
-                      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${m.id}" alt="QR">
+                      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${qrPayload}" alt="QR">
                     </div>
-                    <div class="uid-text">UID: ${shortId}</div>
+                    <div class="uid-text">MEMBER: ${shortId}</div>
                   </div>
 
                   <div class="info-section">
                     <div class="info-group"><label>FULL NAME</label><div class="value">${cleanName}</div></div>
+                    <div class="info-group"><label>SKU IDENTIFIER</label><div class="value">${memberCode}</div></div>
                     <div class="info-group"><label>ISSUE DATE</label><div class="value">${issueDate}</div></div>
                     <div class="info-group"><label>CONTACT</label><div class="value">${WOLF_PURIFIER(m.phone || 'N/A')}</div></div>
                   </div>
@@ -251,9 +293,10 @@ const MemberManager = {
         container.innerHTML = this.trashData
           .map((item, index) => {
             const p = item.deleted_data || {};
-            const shortId = item.original_id
-              ? item.original_id.split('-')[0].toUpperCase()
-              : 'N/A';
+            const shortId = this.getMemberCode({
+              member_code: p.member_code,
+              member_id: p.member_id || item.original_id,
+            });
 
             return `
             <div class="trash-pill-card animate__animated animate__fadeInRight" 
@@ -281,19 +324,23 @@ const MemberManager = {
    * 3. UI INTERACTION & LISTENERS
    */
   setupUIListeners() {
-    // Search Bar Logic
-    const searchBtn = document.getElementById('toggle-search-btn');
-    const searchContainer = document.getElementById('ledger-search-container');
-    const searchInput = document.getElementById('member-main-search');
-    const clearBtn = document.getElementById('search-clear-btn');
+    const root = document.getElementById('member-main-view') || document;
 
-    const trashBtn = document.getElementById('btn-view-trash');
+    // Search Bar Logic (scoped to Members tab to avoid ID collisions)
+    const searchBtn = root.querySelector('#toggle-search-btn');
+    const searchContainer = root.querySelector('#ledger-search-container');
+    const searchInput = root.querySelector('#member-main-search');
+    const clearBtn = root.querySelector('#search-clear-btn');
+
+    const trashBtn = root.querySelector('#btn-view-trash');
     if (trashBtn) {
       trashBtn.onclick = () => this.switchToTrash();
     }
 
-    if (searchBtn) {
-      searchBtn.onclick = () => {
+    if (searchBtn && searchContainer && searchInput) {
+      searchBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         searchBtn.classList.toggle('active');
         searchContainer.classList.toggle('active');
         if (searchContainer.classList.contains('active')) searchInput.focus();
@@ -309,13 +356,17 @@ const MemberManager = {
         const filtered = this.allMembers.filter(
           (m) =>
             (m.full_name && m.full_name.toLowerCase().includes(term)) ||
-            m.id.includes(term),
+            (m.member_code && m.member_code.toLowerCase().includes(term)) ||
+            (m.sku && String(m.sku).toLowerCase().includes(term)) ||
+            (m.phone && String(m.phone).toLowerCase().includes(term)) ||
+            (m.email && String(m.email).toLowerCase().includes(term)) ||
+            (m.id && String(m.id).toLowerCase().includes(term)),
         );
         this.render(filtered);
       };
     }
 
-    if (clearBtn) {
+    if (clearBtn && searchInput) {
       clearBtn.onclick = () => {
         searchInput.value = '';
         clearBtn.style.display = 'none';
@@ -399,10 +450,12 @@ const MemberManager = {
 
   async restore(trashId) {
     const item = this.trashData.find((t) => t.id === trashId);
+    if (!item?.deleted_data) return;
+    const restoreTable = item.table_name === 'profiles' ? 'profiles' : 'members';
 
-    // 1. Insert back to profiles
+    // 1. Insert back to original table (legacy profiles rows are preserved)
     const { error: insErr } = await window.supabaseClient
-      .from('profiles')
+      .from(restoreTable)
       .insert([item.deleted_data]);
 
     if (!insErr) {
@@ -442,24 +495,25 @@ const MemberManager = {
    * 4. ACTION HANDLERS
    */
   async delete(id) {
+    const accent = this.getAccentColor();
     const result = await Swal.fire({
       title: 'MOVE TO TRASH?',
       text: 'Member will be archived and can be restored later.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'ARCHIVE',
-      confirmButtonColor: '#a63429',
+      confirmButtonColor: accent,
       background: '#0d0d0d',
       color: '#fff',
     });
 
     if (result.isConfirmed) {
       try {
-        // A. Get current profile data
-        const { data: profile, error: fetchErr } = await window.supabaseClient
-          .from('profiles')
+        // A. Get current member data
+        const { data: memberRow, error: fetchErr } = await window.supabaseClient
+          .from('members')
           .select('*')
-          .eq('id', id)
+          .eq('member_id', id)
           .single();
 
         if (fetchErr) throw fetchErr;
@@ -470,8 +524,8 @@ const MemberManager = {
           .insert([
             {
               original_id: id,
-              table_name: 'profiles',
-              deleted_data: profile,
+              table_name: 'members',
+              deleted_data: memberRow,
               deleted_by: (await window.supabaseClient.auth.getUser()).data.user
                 ?.id,
             },
@@ -480,11 +534,10 @@ const MemberManager = {
         if (trashErr) throw trashErr;
 
         // C. Remove from original table
-        // Note: This might fail if memberships/sales exist without ON DELETE CASCADE
         const { error: deleteErr } = await window.supabaseClient
-          .from('profiles')
+          .from('members')
           .delete()
-          .eq('id', id);
+          .eq('member_id', id);
 
         if (deleteErr) throw deleteErr;
 
@@ -513,7 +566,20 @@ const MemberManager = {
     console.log('Protocol: Member Check-In', id);
   },
   edit(id) {
-    console.log('Protocol: Open Edit Modal', id);
+    if (window.wolfAudio) window.wolfAudio.play('notif');
+    window.WOLF_PENDING_MEMBER_ID = id;
+
+    if (typeof navigateTo === 'function') {
+      navigateTo('id-maker');
+      return;
+    }
+
+    if (window.wolfRouter && typeof window.wolfRouter.goToMain === 'function') {
+      window.wolfRouter.goToMain('id-maker');
+      return;
+    }
+
+    window.location.href = '/pages/main.html?p=id-maker';
   },
   renew(id) {
     console.log('Protocol: Process Renewal', id);

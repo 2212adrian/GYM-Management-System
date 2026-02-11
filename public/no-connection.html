@@ -8,6 +8,11 @@
   content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
 />
     <style>
+      :root {
+        --wolf-red: #a63429;
+        --wolf-red-rgb: 166, 52, 41;
+      }
+
       /* 1. LAYOUT & BACKGROUND */
       .wolf-error-container {
         display: flex;
@@ -29,8 +34,8 @@
 
       .error-icon-wrapper i {
         font-size: 80px;
-        color: #a63429; /* Wolf Red */
-        text-shadow: 0 0 15px rgba(166, 52, 41, 0.4);
+        color: var(--wolf-red); /* Wolf Red */
+        text-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4);
         animation: glitch-pulse 2s infinite ease-in-out;
       }
 
@@ -42,7 +47,7 @@
         50% {
           transform: scale(1.1);
           opacity: 1;
-          text-shadow: 0 0 25px rgba(166, 52, 41, 0.8);
+          text-shadow: 0 0 25px rgba(var(--wolf-red-rgb), 0.8);
         }
         100% {
           transform: scale(1);
@@ -53,14 +58,14 @@
       /* 3. TYPOGRAPHY */
       .error-code {
         font-family: 'monospace';
-        background: rgba(166, 52, 41, 0.2);
+        background: rgba(var(--wolf-red-rgb), 0.2);
         color: #ff4d4d;
         padding: 5px 15px;
         border-radius: 4px;
         font-size: 14px;
         letter-spacing: 2px;
         margin-bottom: 15px;
-        border: 1px solid rgba(166, 52, 41, 0.5);
+        border: 1px solid rgba(var(--wolf-red-rgb), 0.5);
       }
 
       .error-title {
@@ -81,7 +86,7 @@
 
       /* 4. ACTION BUTTON */
       .retry-btn {
-        background: #a63429;
+        background: var(--wolf-red);
         color: white;
         border: none;
         padding: 12px 30px;
@@ -93,13 +98,13 @@
         align-items: center;
         gap: 10px;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(166, 52, 41, 0.3);
+        box-shadow: 0 4px 15px rgba(var(--wolf-red-rgb), 0.3);
       }
 
       .retry-btn:hover {
         background: #c83e32;
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(166, 52, 41, 0.5);
+        box-shadow: 0 6px 20px rgba(var(--wolf-red-rgb), 0.5);
       }
 
       .retry-btn:active {

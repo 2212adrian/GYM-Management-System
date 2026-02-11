@@ -1,6 +1,6 @@
 <style>
   :root {
-    --wolf-red: #a63429;
+    --wolf-red: var(--primary-color, #a63429);
     --wolf-secondary: #1abc9c;
     --wolf-bg: #050505;
   }
@@ -215,7 +215,7 @@
     color: #fff;
     transform: rotate(90deg);
     border-color: var(--wolf-red);
-    box-shadow: 0 0 15px rgba(166, 52, 41, 0.4);
+    box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4);
   }
 
   /* ========= FORM LAYOUT ========= */
@@ -296,7 +296,7 @@
   .id-wrapper-group:focus-within {
     border-color: var(--wolf-red) !important;
     background: #000 !important;
-    box-shadow: 0 0 14px rgba(166, 52, 41, 0.16);
+    box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.16);
   }
 
   /* Lookup row */
@@ -433,10 +433,10 @@
   }
 
   .cyber-checkbox-symbol input:checked + .symbol-box {
-    background: rgba(166, 52, 41, 0.18);
+    background: rgba(var(--wolf-red-rgb), 0.18);
     border-color: var(--wolf-red);
     color: var(--wolf-red);
-    box-shadow: 0 0 14px rgba(166, 52, 41, 0.35);
+    box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.35);
     transform: translateY(-1px);
   }
 
@@ -584,7 +584,7 @@
     opacity: 1;
     transform: translateY(-2px) scale(1.05);
     border-color: var(--wolf-red);
-    box-shadow: 0 0 16px rgba(166, 52, 41, 0.7);
+    box-shadow: 0 0 16px rgba(var(--wolf-red-rgb), 0.7);
   }
 
   #imageContainer {
@@ -621,7 +621,7 @@
     font-weight: 900;
     font-style: italic;
     cursor: pointer;
-    box-shadow: 0 10px 30px rgba(166, 52, 41, 0.3);
+    box-shadow: 0 10px 30px rgba(var(--wolf-red-rgb), 0.3);
     transition:
       transform 0.2s ease,
       box-shadow 0.2s ease,
@@ -632,12 +632,12 @@
   .btn-terminal-commit:hover {
     filter: brightness(1.2);
     transform: translateY(-2px);
-    box-shadow: 0 14px 34px rgba(166, 52, 41, 0.4);
+    box-shadow: 0 14px 34px rgba(var(--wolf-red-rgb), 0.4);
   }
 
   .btn-terminal-commit:active {
     transform: translateY(0) scale(0.97);
-    box-shadow: 0 8px 18px rgba(166, 52, 41, 0.35);
+    box-shadow: 0 8px 18px rgba(var(--wolf-red-rgb), 0.35);
   }
 
   /* ========= VALIDATION: ERROR HIGHLIGHT + SHAKE ========= */
@@ -688,7 +688,7 @@
       <div class="terminal-title-group">
         <h1 class="terminal-title">ADD <span>PRODUCT</span></h1>
         <p class="terminal-protocol">
-          MANUAL PRODUCT ENTRY - ADDS TO SALES INVENTORY
+          MANUAL PRODUCT ENTRY - ADDS TO INVENTORY ONLY
         </p>
       </div>
       <button
@@ -785,7 +785,7 @@
             </div>
 
             <button type="submit" class="btn-terminal-commit">
-              ADD TO PRODUCT
+              ADD PRODUCT
             </button>
           </div>
 

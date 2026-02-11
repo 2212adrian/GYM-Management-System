@@ -30,8 +30,8 @@ body,
 
 ::-webkit-scrollbar-thumb:hover,
 body.light-theme ::-webkit-scrollbar-thumb:hover {
-  background: #a63429; /* Wolf Red */
-  box-shadow: 0 0 8px rgba(166, 52, 41, 0.5);
+  background: var(--wolf-red);
+  box-shadow: 0 0 8px var(--wolf-red);
 }
 
 /* Handle on hover */
@@ -53,7 +53,9 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
   --surface-deep: #111316;
   --surface-soft: #20242a;
   --wolf-red: #a63429;
-  --wolf-blue: #2b3674;
+  --wolf-blue: #a63429;
+  --wolf-red-rgb: 166, 52, 41;
+  --wolf-blue-rgb: 166, 52, 41;
   --accent-red: var(--wolf-red);
   --primary-color: var(--wolf-red);
   --sidebar-width: 80px;
@@ -84,6 +86,7 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
   --gold-accent: #d2a74a;
   --skeleton-base: #242a32;
   --skeleton-mid: #313844;
+  --breadcrumb-current-color: var(--text-main);
   --font-main: 'Inter', sans-serif;
 }
 
@@ -146,6 +149,9 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
 }
 
 @media (max-width: 768px) {
+  .ledger-brand {
+    font-size: 1rem !important;
+  }
   #toast-container, /* Toastify's container */
   .toastify {
     display: none !important;
@@ -153,6 +159,11 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
 }
 /* Light Mode Overrides */
 body.light-theme {
+  --wolf-red: #2f67bf;
+  --wolf-blue: #2f67bf;
+  --wolf-red-rgb: 47, 103, 191;
+  --wolf-blue-rgb: 47, 103, 191;
+  --primary-color: var(--wolf-red);
   --bg-dark: #ebe5dd;
   --card-bg: #f2eee8;
   --surface-elevated: #ede8e0;
@@ -185,6 +196,7 @@ body.light-theme {
   --gold-accent: #b4882f;
   --skeleton-base: #ddd4c8;
   --skeleton-mid: #c9bdaf;
+  --breadcrumb-current-color: #000000;
 }
 /* Styling for the Mute Toggle state */
 #muteToggleBtn {
@@ -284,8 +296,16 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 40%, rgba(166, 52, 41, 0.32), transparent 58%),
-    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.96) 70%);
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(var(--wolf-red-rgb), 0.32),
+      transparent 58%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 0, 0, 0),
+      rgba(0, 0, 0, 0.96) 70%
+    );
   opacity: 0;
   transform: scale(1.08);
   transition:
@@ -326,10 +346,10 @@ body {
   width: 92px;
   height: 92px;
   border-radius: 50%;
-  border: 2px solid rgba(166, 52, 41, 0.5);
+  border: 2px solid rgba(var(--wolf-red-rgb), 0.5);
   box-shadow:
-    0 0 0 1px rgba(166, 52, 41, 0.2) inset,
-    0 0 30px rgba(166, 52, 41, 0.4);
+    0 0 0 1px rgba(var(--wolf-red-rgb), 0.2) inset,
+    0 0 30px rgba(var(--wolf-red-rgb), 0.4);
   animation: logoutRingPulse 1.8s ease-in-out infinite;
 }
 
@@ -407,20 +427,20 @@ body.logout-outro-final .logout-core {
   0% {
     transform: scale(0.96);
     box-shadow:
-      0 0 0 1px rgba(166, 52, 41, 0.2) inset,
-      0 0 14px rgba(166, 52, 41, 0.34);
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.2) inset,
+      0 0 14px rgba(var(--wolf-red-rgb), 0.34);
   }
   50% {
     transform: scale(1.03);
     box-shadow:
-      0 0 0 1px rgba(166, 52, 41, 0.3) inset,
-      0 0 28px rgba(166, 52, 41, 0.56);
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.3) inset,
+      0 0 28px rgba(var(--wolf-red-rgb), 0.56);
   }
   100% {
     transform: scale(0.96);
     box-shadow:
-      0 0 0 1px rgba(166, 52, 41, 0.2) inset,
-      0 0 14px rgba(166, 52, 41, 0.34);
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.2) inset,
+      0 0 14px rgba(var(--wolf-red-rgb), 0.34);
   }
 }
 
@@ -535,7 +555,7 @@ body.logout-outro-final .logout-core {
   left: 0;
   width: 100%;
   height: 10px;
-  background: rgba(166, 52, 41, 0.1);
+  background: rgba(var(--wolf-red-rgb), 0.1);
   opacity: 0.5;
   z-index: 10001;
   pointer-events: none;
@@ -599,7 +619,7 @@ body.logout-outro-final .logout-core {
   -webkit-text-fill-color: transparent;
 
   /* 2. THE GLOW */
-  filter: drop-shadow(0 0 10px rgba(166, 52, 41, 0.8));
+  filter: drop-shadow(0 0 10px rgba(var(--wolf-red-rgb), 0.8));
 
   /* 3. THE CRT FLICKER */
   animation: crt-flicker 0.15s infinite;
@@ -609,8 +629,8 @@ body.logout-outro-final .logout-core {
   /* Red stripes for the OS part */
   background: linear-gradient(
     to bottom,
-    #a63429 50%,
-    rgba(166, 52, 41, 0.3) 50%
+    var(--wolf-red) 50%,
+    rgba(var(--wolf-red-rgb), 0.3) 50%
   );
   background-size: 100% 4px;
   -webkit-background-clip: text;
@@ -658,7 +678,7 @@ body.logout-outro-final .logout-core {
   width: 60px;
   height: 60px;
   border: 2px solid rgba(255, 255, 255, 0.05);
-  border-top-color: #a63429;
+  border-top-color: var(--wolf-red);
   border-radius: 50%;
   margin: 0 auto 20px;
   animation: spin 1s linear infinite;
@@ -696,7 +716,7 @@ body.logout-outro-final .logout-core {
 .boot-metadata {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  color: #a63429; /* Red terminal text */
+  color: var(--wolf-red); /* Red terminal text */
   opacity: 0.6;
   text-transform: uppercase;
 }
@@ -950,6 +970,38 @@ body.light-theme .status-icon {
   border-color: var(--border-color) !important;
   color: var(--text-muted) !important;
 }
+
+/* Force red utility classes/states to follow accent token in light mode */
+body.light-theme .text-danger,
+body.light-theme .spinner-border.text-danger {
+  color: var(--wolf-red) !important;
+  border-color: currentColor !important;
+}
+
+body.light-theme .icon-btn.red,
+body.light-theme .icon-btn.active,
+body.light-theme .nav-item-side.active,
+body.light-theme .nav-item-side.active .nav-icon i,
+body.light-theme .nav-item-side.active .nav-text,
+body.light-theme .brand-name span,
+body.light-theme .breadcrumb-link:hover {
+  color: var(--wolf-red) !important;
+}
+
+body.light-theme .icon-btn.red,
+body.light-theme .nav-item-side.active {
+  border-color: var(--wolf-red) !important;
+}
+
+body.light-theme .icon-btn.red {
+  background: var(--wolf-red) !important;
+  color: var(--text-on-accent) !important;
+}
+
+body.light-theme .icon-btn.active,
+body.light-theme .nav-item-side.active {
+  background: rgba(var(--wolf-red-rgb), 0.12) !important;
+}
 /* --- COMPONENTS --- */
 /* CTA Card */
 .cta-card-red {
@@ -996,7 +1048,7 @@ body.light-theme .status-icon {
 .btn-error-recovery:hover {
   background: var(--accent-red);
   color: white;
-  box-shadow: 0 0 20px rgba(166, 52, 41, 0.4);
+  box-shadow: 0 0 20px rgba(var(--wolf-red-rgb), 0.4);
 }
 /* Shared UI */
 .page-top-actions {
@@ -1136,7 +1188,7 @@ body.light-theme .status-icon {
 /* 3. NEW ITEM GLOW (Optional: For rows added via POS) */
 .list-item-card.new-auth {
   border-color: var(--wolf-red) !important;
-  box-shadow: 0 0 20px rgba(166, 52, 41, 0.2);
+  box-shadow: 0 0 20px rgba(var(--wolf-red-rgb), 0.2);
 }
 
 .card-header {
@@ -1159,7 +1211,7 @@ body.light-theme .status-icon {
 }
 .status-icon.active {
   color: var(--accent-red);
-  border-color: rgba(166, 52, 41, 0.3);
+  border-color: rgba(var(--wolf-red-rgb), 0.3);
 }
 .item-info {
   flex-grow: 1;
@@ -1195,6 +1247,75 @@ body.light-theme .status-icon {
   font-weight: 900;
   padding: 4px 10px;
   border-radius: 20px;
+}
+.badge-unpaid {
+  background: #b37a16;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.logbook-details {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.logbook-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.logbook-action-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 10px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+.logbook-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.logbook-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-logbook-danger {
+  background: #b81f22;
+  color: #fff;
+}
+.btn-logbook-success {
+  background: #16a34a;
+  color: #fff;
+}
+.btn-logbook-neutral {
+  background: #1f2431;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #dce3f2;
+}
+body.light-theme .badge-unpaid {
+  background: #c0841b;
+  color: #fff;
+}
+body.light-theme .logbook-details {
+  background: rgba(56, 45, 34, 0.06);
+  border-color: rgba(56, 45, 34, 0.14);
+}
+body.light-theme .btn-logbook-neutral {
+  background: var(--surface-elevated);
+  border-color: var(--border-color);
+  color: var(--text-main);
 }
 .action-small {
   color: #444;
@@ -1509,7 +1630,7 @@ body.light-theme .status-icon {
 .cyber-modal {
   border: 1px solid var(--wolf-red) !important;
   background: rgba(15, 15, 15, 0.95) !important;
-  box-shadow: 0 0 30px rgba(166, 52, 41, 0.3) !important;
+  box-shadow: 0 0 30px rgba(var(--wolf-red-rgb), 0.3) !important;
 }
 
 .modal-actions {
@@ -1604,7 +1725,7 @@ body.light-theme .status-icon {
 
 .manual-btn-submit:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 15px rgba(166, 52, 41, 0.4);
+  box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4);
 }
 
 .btn-guest-entry {
@@ -1656,7 +1777,7 @@ body.light-theme .status-icon {
   border: 1px solid var(--wolf-red);
   border-radius: 20px;
   padding: 30px 25px;
-  box-shadow: 0 0 40px rgba(166, 52, 41, 0.2);
+  box-shadow: 0 0 40px rgba(var(--wolf-red-rgb), 0.2);
   text-align: center;
 }
 
@@ -1834,7 +1955,7 @@ body.light-theme .status-icon {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(166, 52, 41, 0.1); /* Subtle red tint */
+  background: rgba(var(--wolf-red-rgb), 0.1); /* Subtle red tint */
   border: 1px solid var(--wolf-red);
   color: var(--wolf-red);
   padding: 5px 12px;
@@ -1845,7 +1966,7 @@ body.light-theme .status-icon {
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 20px;
-  box-shadow: 0 0 15px rgba(166, 52, 41, 0.2);
+  box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.2);
   animation: archiveAlert 2s infinite ease-in-out;
   pointer-events: none;
   user-select: none;
@@ -1867,11 +1988,11 @@ body.light-theme .status-icon {
   0%,
   100% {
     border-color: var(--wolf-red);
-    box-shadow: 0 0 10px rgba(166, 52, 41, 0.2);
+    box-shadow: 0 0 10px rgba(var(--wolf-red-rgb), 0.2);
   }
   50% {
     border-color: #ff4d4d;
-    box-shadow: 0 0 25px rgba(166, 52, 41, 0.5);
+    box-shadow: 0 0 25px rgba(var(--wolf-red-rgb), 0.5);
   }
 }
 
@@ -2126,7 +2247,7 @@ body.light-theme .status-icon {
 
 .wolf-calendar .flatpickr-day.selected {
   background: var(--wolf-red) !important;
-  box-shadow: 0 12px 32px rgba(166, 52, 41, 0.6);
+  box-shadow: 0 12px 32px rgba(var(--wolf-red-rgb), 0.6);
   transform: scale(1.08);
   border: none !important;
 }
@@ -2162,7 +2283,7 @@ body.light-theme .status-icon {
 
 /* Shared SweetAlert Buttons */
 .btn-wolf-red {
-  background: #a63429 !important;
+  background: var(--wolf-red) !important;
   color: #fff !important;
   font-weight: 900 !important;
   padding: 15px 30px !important;
@@ -2175,7 +2296,7 @@ body.light-theme .status-icon {
 }
 .btn-wolf-red:hover {
   filter: brightness(1.1) !important;
-  box-shadow: 0 0 15px rgba(166, 52, 41, 0.4) !important;
+  box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4) !important;
 }
 .btn-wolf-secondary {
   background: #1a1a1a !important;
@@ -2404,7 +2525,7 @@ body.light-theme .status-icon {
 
 .image-box img.selected {
   outline: 2px solid var(--wolf-red);
-  box-shadow: 0 0 12px rgba(166, 52, 41, 0.8);
+  box-shadow: 0 0 12px rgba(var(--wolf-red-rgb), 0.8);
   transform: translateY(-2px);
 }
 

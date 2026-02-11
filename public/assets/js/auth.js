@@ -1108,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (window.wolfAudio) window.wolfAudio.play('error');
       window.Swal.fire({
         title: '[ERR_500] TERMINAL_FAULT',
-        html: `<div style="color:#a63429; font-size:4rem; margin-bottom:15px;"><i class='bx bx-error-alt'></i></div>
+        html: `<div style="color:var(--wolf-red); font-size:4rem; margin-bottom:15px;"><i class='bx bx-error-alt'></i></div>
                <p style="color:#888; font-size:14px;">CRITICAL_ERROR: ${err.message}</p>`,
         background: '#111',
         buttonsStyling: false,

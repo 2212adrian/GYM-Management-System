@@ -22,6 +22,7 @@
       :root {
         --bg-dark: #0f0f0f;
         --wolf-red: #a63429;
+        --wolf-red-rgb: 166, 52, 41;
         --text-main: #ffffff;
         --text-muted: #888888;
       }
@@ -85,7 +86,7 @@
         font-weight: 900;
         line-height: 0.8;
         margin-bottom: 10px;
-        filter: drop-shadow(0 0 20px rgba(166, 52, 41, 0.4));
+        filter: drop-shadow(0 0 20px rgba(var(--wolf-red-rgb), 0.4));
       }
 
       .fault-title {

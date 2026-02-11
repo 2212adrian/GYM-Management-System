@@ -35,7 +35,10 @@ window.wolfRetry = async function () {
       return;
     }
 
-    if (window.wolfRouter && typeof window.wolfRouter.refreshCurrent === 'function') {
+    if (
+      window.wolfRouter &&
+      typeof window.wolfRouter.refreshCurrent === 'function'
+    ) {
       await window.wolfRouter.refreshCurrent({ replace: true });
       return;
     }
@@ -234,7 +237,10 @@ window.handleLogout = async function () {
         sessionStorage.clear();
       }
 
-      if (window.wolfRouter && typeof window.wolfRouter.goToLogin === 'function') {
+      if (
+        window.wolfRouter &&
+        typeof window.wolfRouter.goToLogin === 'function'
+      ) {
         await window.wolfRouter.goToLogin({ replace: true, seamless: true });
       } else {
         window.location.replace('/index.html');
@@ -245,7 +251,7 @@ window.handleLogout = async function () {
       if (swal) {
         swal.fire({
           title: 'LOGOUT FAILED',
-          html: `<div style="color:#a63429; font-size:3rem; margin-bottom:12px;"><i class='bx bx-error-alt'></i></div>
+          html: `<div style="color:var(--wolf-red); font-size:3rem; margin-bottom:12px;"><i class='bx bx-error-alt'></i></div>
                  <p style="color:#888; font-size:13px;">${err.message || 'Unknown error'}</p>`,
           background: '#111',
           buttonsStyling: false,
@@ -336,7 +342,10 @@ function updateNavHighlights(pageName) {
       el.classList.remove('active');
       // REVERT TO OUTLINE (bx)
       if (icon) {
-        if (icon.classList.contains('bx-target') || icon.classList.contains('bxf')) {
+        if (
+          icon.classList.contains('bx-target') ||
+          icon.classList.contains('bxf')
+        ) {
           icon.className = 'bx bx-target';
         } else {
           icon.className = icon.className.replace(
@@ -471,7 +480,10 @@ async function closeAllActiveModals() {
   forceHideModal('logbook-modal-overlay');
 
   try {
-    if (window.salesManager && typeof window.salesManager.closeTrash === 'function') {
+    if (
+      window.salesManager &&
+      typeof window.salesManager.closeTrash === 'function'
+    ) {
       window.salesManager.closeTrash();
     }
   } catch (err) {
@@ -485,7 +497,7 @@ async function closeAllActiveModals() {
       typeof window.wolfScanner.stop === 'function' &&
       document.getElementById('wolf-scanner-overlay')
     ) {
-      await window.wolfScanner.stop();
+      await window.wolfScanner.stop({ skipOnClose: true });
     }
   } catch (err) {
     console.warn('Wolf OS: Scanner close handler failed.', err);
@@ -494,7 +506,9 @@ async function closeAllActiveModals() {
   forceHideModal('scanResultModal');
 
   document
-    .querySelectorAll('.master-modal-overlay, .wolf-modal-overlay, .modal-overlay')
+    .querySelectorAll(
+      '.master-modal-overlay, .wolf-modal-overlay, .modal-overlay',
+    )
     .forEach((modal) => forceHideModalElement(modal));
 }
 
@@ -587,10 +601,10 @@ async function navigateTo(pageName, options = {}) {
   // --- OFFLINE UI ---
   const offlineUI = `
     <div class="wolf-page-intro" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:70vh; text-align:center; color:var(--text-main);">
-      <i class='bx bx-wifi-off' style="font-size:80px; color:#a63429; margin-bottom:20px;"></i>
+      <i class='bx bx-wifi-off' style="font-size:80px; color:var(--wolf-red); margin-bottom:20px;"></i>
       <h1 style="font-size:32px; font-weight:900; margin:0; letter-spacing:-1px;">SIGNAL LOST</h1>
       <p style="color:var(--text-muted); max-width:400px; margin:15px 0 30px 0; line-height:1.6;">The encrypted uplink to Wolf OS was severed.</p>
-      <button class="retry-btn" onclick="window.wolfRetry()" style="background:#a63429; color:var(--text-on-accent); border:none; padding:12px 30px; font-weight:bold; border-radius:8px; cursor:pointer; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+      <button class="retry-btn" onclick="window.wolfRetry()" style="background:var(--wolf-red); color:var(--text-on-accent); border:none; padding:12px 30px; font-weight:bold; border-radius:8px; cursor:pointer; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
         <i class='bx bx-refresh' style="font-size:20px;"></i>
         <span>RETRY CONNECTION</span>
       </button>
@@ -672,8 +686,8 @@ async function navigateTo(pageName, options = {}) {
           brandEl.innerHTML = `
           <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
             ${parentHTML}
-            <i class='bx bx-chevron-right' style="color: #3498db; font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
-            <span style="letter-spacing: 1px; font-weight: 800; color: var(--text-main);">${info.label}</span>
+            <i class='bx bx-chevron-right' style="color: var(--wolf-red); font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
+            <span style="letter-spacing: 1px; font-weight: 800; color: var(--breadcrumb-current-color, var(--text-main));">${info.label}</span>
           </div>
         `;
         }
@@ -705,7 +719,8 @@ async function navigateTo(pageName, options = {}) {
       if (updateRoute && pageName) {
         if (wolfMainRouter) {
           const nextRoute = `/${pageName}`;
-          const currentRoute = String(window.location.hash || '').replace('#', '') || '/';
+          const currentRoute =
+            String(window.location.hash || '').replace('#', '') || '/';
 
           if (currentRoute !== nextRoute) {
             wolfMainRouterSyncing = true;
@@ -899,6 +914,11 @@ function setupGlobalClickHandlers() {
   if (window.wolfEventHandlersAttached) return;
   window.wolfEventHandlersAttached = true;
 
+  const syncMoreButtonState = (isSidebarActive) => {
+    const moreBtn = document.getElementById('moreNavBtn');
+    if (moreBtn) moreBtn.classList.toggle('sidebar-active', !!isSidebarActive);
+  };
+
   const collapseSidebar = () => {
     const sidebarElement = document.getElementById('wolfSidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -912,6 +932,7 @@ function setupGlobalClickHandlers() {
     const versionLabel = sidebarElement.querySelector('.version');
     if (closeIcon) closeIcon.className = 'bxf bx-caret-big-right';
     if (versionLabel) versionLabel.style.display = 'none';
+    syncMoreButtonState(false);
 
     // Close all dropdowns for a clean collapse
     document
@@ -957,6 +978,7 @@ function setupGlobalClickHandlers() {
       if (sidebar && !sidebar.classList.contains('active')) {
         sidebar.classList.add('active');
         document.body.classList.add('sidebar-open');
+        syncMoreButtonState(true);
       }
 
       // 2. SYNC UI: Sidebar is now expanded, flip icon to LEFT and hide .version
@@ -979,23 +1001,27 @@ function setupGlobalClickHandlers() {
     // 2. SEARCH ENGINE
     const searchToggle = e.target.closest('#toggle-search-btn');
     if (searchToggle) {
-      const container = document.getElementById('ledger-search-container');
-      const input =
-        document.getElementById('product-main-search') ||
-        document.getElementById('member-main-search') ||
-        document.getElementById('ledger-main-search');
+      const scope =
+        searchToggle.closest(
+          '#product-main-view, #member-main-view, #sales-main-view, #logbook-main-view, #main-content, .ledger-page-wrapper',
+        ) || document;
+      const container = scope.querySelector('#ledger-search-container');
+      // Keep global handler for Daily Ledger only.
+      // Members/Products have their own scoped handlers.
+      const input = scope.querySelector('#ledger-main-search');
       if (!container || !input) return;
 
       e.preventDefault();
       e.stopPropagation();
 
       const isActive = container.classList.toggle('active');
+      searchToggle.classList.toggle('active', isActive);
 
       if (isActive) {
         setTimeout(() => input.focus(), 150);
       } else {
         input.value = '';
-        const clearBtn = document.getElementById('search-clear-btn');
+        const clearBtn = scope.querySelector('#search-clear-btn');
         if (clearBtn) clearBtn.style.display = 'none';
       }
       return;
@@ -1061,6 +1087,7 @@ function setupGlobalClickHandlers() {
       const isActive = sidebarElement.classList.toggle('active');
       document.body.classList.toggle('sidebar-open', isActive);
       if (backdrop) backdrop.classList.toggle('active', isActive);
+      syncMoreButtonState(isActive);
 
       // --- CRITICAL UI SYNC FIX ---
       const closeIcon = document.getElementById('closeIcon');
@@ -1082,6 +1109,10 @@ function setupGlobalClickHandlers() {
       }
     }
   });
+
+  // Initial sync in case sidebar is restored in active state.
+  const initialSidebar = document.getElementById('wolfSidebar');
+  syncMoreButtonState(initialSidebar?.classList.contains('active'));
 
   // Global Input Handler for Search
   document.addEventListener('input', (e) => {
