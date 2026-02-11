@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wolf OS - Palomar Gym Login</title>
+    <link
+      href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="assets/css/auth.css" />
+  </head>
+  <body>
+    <!-- SUCCESS MODAL -->
+    <div id="successModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="success-icon"><i class="bx bx-check-circle"></i></div>
+        <h3>NEW PASSWORD SUCCESS</h3>
+        <p>
+          Password updated successfully. Re-enter new password on login page.
+        </p>
+        <button id="closeModalBtn">RETURN TO LOGIN</button>
+      </div>
+    </div>
+
+    <div class="flip-card">
+      <div class="flip-card-inner" id="flipCardInner">
+        <!-- FRONT: LOGIN -->
+        <div class="flip-card-front">
+          <div class="brand">WOLF <span>PALOMAR</span></div>
+          <div class="version">V0.1.0</div>
+          <form id="loginForm">
+            <label>Email Address</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="e.g: admin@palomar.com"
+              required
+            />
+            <label>Password</label>
+            <input
+              type="password"
+              id="password"
+              placeholder="Your password"
+              required
+            />
+            <button type="submit" id="loginBtn">LOGIN</button>
+          </form>
+          <a href="#" class="link-muted" id="forgotLink">System Recovery</a>
+          <div id="loginOutput"></div>
+        </div>
+
+        <!-- BACK: RECOVERY MODE -->
+        <div class="flip-card-back">
+          <div class="brand">RECOVERY <span>MODE</span></div>
+
+          <div id="recoveryContainer" class="recovery-container">
+            <!-- STEP 1: Request OTP -->
+            <div id="recoveryStep1" class="recovery-step active-step">
+              <p class="desc">Enter authorized email to receive security OTP</p>
+              <form id="otpForm">
+                <input
+                  type="email"
+                  id="forgotEmail"
+                  placeholder="Authorized Email"
+                  required
+                />
+                <button type="submit" id="sendOtpBtn">SEND SECURITY OTP</button>
+              </form>
+            </div>
+
+            <!-- STEP 2: Verify & Reset (AJAX Layer) -->
+            <div id="recoveryStep2" class="recovery-step">
+              <p class="desc">Enter the 6-digit code sent to your email.</p>
+
+              <form id="verifyResetForm">
+                <div class="otp-input-group">
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 1"
+                  />
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 2"
+                  />
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 3"
+                  />
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 4"
+                  />
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 5"
+                  />
+                  <input
+                    type="text"
+                    class="otp-field"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    title="OTP digit 6"
+                  />
+                </div>
+                <input
+                  type="password"
+                  id="newPassword"
+                  placeholder="Enter your new password"
+                  required
+                />
+                <button type="submit" id="resetBtn">CHANGE PASSWORD</button>
+              </form>
+              <div id="resetOutput"></div>
+              <!-- NOTICE BOX FOR OTP -->
+              <div class="protocol-notice-box secure-blue">
+                <div class="notice-header">
+                  <i class="bx bx-key"></i>
+                  <span>VERIFICATION STEP</span>
+                </div>
+                <div class="notice-body">
+                  Enter the 6-digit code sent to your email. This is Step 2 of
+                  password recovery - verify the code first, then enter your new
+                  password below to complete the reset.
+                </div>
+                <div class="resend-wrap"></div>
+              </div>
+              <a
+                href="#"
+                id="resendOtpBtn"
+                style="
+                  color: var(--wolf-red);
+                  font-size: 11px;
+                  text-decoration: none;
+                  font-weight: bold;
+                  position: static;
+                  pointer-events: none;
+                  opacity: 0.5;
+                "
+                >RESEND SECURITY CODE</a
+              >
+              <!-- MOVED HERE: Below blue notice box -->
+              <a href="#" class="link-muted" id="backToLoginTriggerSecondary"
+                >Already have an account?</a
+              >
+            </div>
+          </div>
+
+          <a href="#" class="link-muted" id="backToLogin">Return to Login</a>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/auth.js"></script>
+    <script>
+      document.querySelectorAll('.otp-field').forEach((input) => {
+        input.addEventListener('input', () => {
+          // Remove anything that's not 0–9
+          input.value = input.value.replace(/[^0-9]/g, '');
+        });
+
+        input.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const paste = (e.clipboardData || window.clipboardData)
+            .getData('text')
+            .replace(/[^0-9]/g, '');
+          input.value = paste.charAt(0) || '';
+        });
+      });
+    </script>
+  </body>
+</html>

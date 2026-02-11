@@ -1,0 +1,1 @@
+const themeManager={init(){localStorage.getItem("wolf-theme")==="light"&&document.body.classList.add("light-theme")},toggle(){const e=document.body.classList.toggle("light-theme");localStorage.setItem("wolf-theme",e?"light":"dark"),console.log(`Wolf OS: Theme set to ${e?"Light":"Dark"}`)}};themeManager.init();

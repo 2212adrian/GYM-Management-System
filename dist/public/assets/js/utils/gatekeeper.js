@@ -1,0 +1,1 @@
+(function(){if(window.self===window.top){if(document.documentElement.style.display="none",window.wolfRouter&&typeof window.wolfRouter.goToMain=="function"){window.wolfRouter.goToMain("logbook",{replace:!0,seamless:!0});return}window.location.replace("/pages/main.html?p=logbook")}})();

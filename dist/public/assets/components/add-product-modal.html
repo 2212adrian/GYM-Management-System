@@ -1,0 +1,1089 @@
+<style>
+  :root {
+    --wolf-red: var(--primary-color, #a63429);
+    --wolf-secondary: #1abc9c;
+    --wolf-bg: #050505;
+  }
+
+  /* ========= BASE OVERLAY (shared) ========= */
+  /* ========= BASE OVERLAY (shared) ========= */
+  .master-modal-overlay {
+    position: fixed;
+    inset: 0;
+    visibility: hidden;
+    display: none;
+    background: rgba(0, 0, 0, 0.96);
+    backdrop-filter: blur(12px);
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    padding: 16px 12px;
+    overflow-y: auto;
+    opacity: 0;
+    transition:
+      opacity 0.3s ease,
+      visibility 0.3s ease,
+      transform 0.22s ease;
+  }
+
+  .master-modal-overlay.is-open {
+    display: flex;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .master-modal-overlay.is-closing {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  /* ========= PRODUCT OVERLAY (just overrides) ========= */
+  #product-modal-overlay {
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+  }
+
+  /* ========= MODAL CONTAINER ========= */
+  .master-terminal-container {
+    background: var(--wolf-bg) url('/assets/images/textures/black-twill.png')
+      repeat;
+    width: 100%;
+    max-width: 900px;
+    border-radius: 28px;
+    padding: 22px 22px 20px;
+    border: 1px solid #222;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
+    max-height: calc(100vh - 40px);
+    margin: 16px auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    transform-origin: center top;
+    opacity: 1;
+    animation: terminalSlideIn 0.35s cubic-bezier(0.19, 1, 0.22, 1);
+  }
+
+  /* open/close animation states (controlled via JS) */
+  .master-terminal-container.modal-open {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0deg);
+  }
+
+  .master-terminal-container.modal-closing {
+    opacity: 0;
+    transform: translateY(22px) scale(0.9) rotateX(10deg);
+  }
+
+  .master-terminal-body {
+    margin-top: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* ========= MAIN GRID LAYOUT ========= */
+  /* Desktop: 2 columns, LEFT = main details, RIGHT = lookup + barcode + images */
+  .terminal-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr);
+    gap: 20px;
+  }
+
+  .terminal-left,
+  .terminal-right {
+    display: flex;
+  }
+
+  .terminal-left {
+    flex-direction: column;
+  }
+
+  .terminal-right-inner {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+
+  /* Tablet & mobile: stack, RIGHT side first */
+  @media (max-width: 992px) {
+    .master-terminal-container {
+      max-width: 100%;
+      border-radius: 22px;
+      padding: 18px 14px 16px;
+    }
+
+    .terminal-main-grid {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .terminal-right {
+      order: 1; /* image + lookup + barcode on top */
+    }
+
+    .terminal-left {
+      order: 2; /* rest below */
+    }
+  }
+
+  /* Small phones: tighter */
+  @media (max-width: 576px) {
+    .master-terminal-container {
+      border-radius: 18px;
+      padding: 14px 10px 12px;
+    }
+
+    .terminal-title {
+      font-size: 1.25rem;
+    }
+  }
+
+  /* ========= HEADER ========= */
+  .terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .terminal-title {
+    font-weight: 900;
+    font-size: 1.45rem;
+    font-style: italic;
+    color: #fff;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .terminal-title span {
+    color: var(--wolf-red);
+  }
+
+  .terminal-protocol {
+    font-size: 9px;
+    color: #888;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .terminal-protocol::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--wolf-red);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 8px var(--wolf-red);
+    animation: protocolPulse 2s infinite ease-in-out;
+  }
+
+  @keyframes protocolPulse {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+
+  .terminal-close-btn {
+    background: #141414;
+    border: 1px solid #222;
+    color: #777;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .terminal-close-btn:hover {
+    background: var(--wolf-red);
+    color: #fff;
+    transform: rotate(90deg);
+    border-color: var(--wolf-red);
+    box-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.4);
+  }
+
+  /* ========= FORM LAYOUT ========= */
+  .terminal-section {
+    margin-bottom: 16px;
+  }
+
+  .terminal-section.no-margin {
+    margin-bottom: 0;
+  }
+
+  .terminal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 14px;
+  }
+
+  @media (max-width: 576px) {
+    .terminal-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .field-label {
+    font-size: 9px;
+    font-weight: 900;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* ========= INPUTS ========= */
+  .terminal-input,
+  .id-wrapper input,
+  .id-prefix,
+  .terminal-input::placeholder {
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .terminal-input,
+  .id-wrapper-group {
+    width: 100%;
+    background: rgba(8, 8, 8, 0.96) !important;
+    border: 1px solid #222 !important;
+    border-radius: 14px;
+    transition:
+      border-color 0.22s ease,
+      box-shadow 0.22s ease,
+      background 0.22s ease,
+      transform 0.15s ease;
+    color: #fff !important;
+  }
+
+  .terminal-input {
+    padding: 14px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .static-area {
+    resize: none;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .terminal-input:hover,
+  .id-wrapper-group:hover {
+    border-color: #444 !important;
+    transform: translateY(-1px);
+  }
+
+  .terminal-input:focus,
+  .id-wrapper-group:focus-within {
+    border-color: var(--wolf-red) !important;
+    background: #000 !important;
+    box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.16);
+  }
+
+  /* Lookup row */
+  .id-wrapper-group {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    padding-right: 4px;
+  }
+
+  .id-wrapper-group input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #fff !important;
+    flex: 1;
+    padding: 14px 10px !important;
+    font-size: 13px;
+    outline: none !important;
+  }
+
+  /* TYPE NAME OR BARCODE styling */
+  #lookup-input {
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+    text-transform: none;
+    font-size: 13px;
+  }
+
+  #lookup-input::placeholder {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+
+  .id-prefix {
+    padding-left: 18px;
+    color: var(--wolf-red);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900;
+    font-size: 14px;
+  }
+
+  #master-asset-id {
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+  }
+
+  input[type='number'] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* ========= SEARCH ICON BUTTON ========= */
+  .terminal-icon-btn {
+    background: #181818;
+    border: 1px solid #222;
+    color: #888;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition:
+      background 0.25s ease,
+      color 0.25s ease,
+      border-color 0.25s ease,
+      transform 0.15s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .terminal-icon-btn:hover {
+    color: var(--wolf-red);
+    background: #222;
+    border-color: #444;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  }
+
+  .terminal-icon-btn:active {
+    transform: translateY(0) scale(0.96);
+    box-shadow: none;
+  }
+
+  /* ========= STOCK / QTY + INFINITE ========= */
+  .stock-action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .terminal-section .stock-action-row input {
+    width: 100%;
+  }
+
+  .cyber-checkbox-symbol {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .cyber-checkbox-symbol input {
+    display: none;
+  }
+
+  .symbol-box {
+    width: 42px;
+    height: 42px;
+    background: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 22px;
+    transition:
+      background 0.25s ease,
+      border-color 0.25s ease,
+      color 0.25s ease,
+      box-shadow 0.25s ease,
+      transform 0.15s ease;
+  }
+
+  .cyber-checkbox-symbol input:checked + .symbol-box {
+    background: rgba(var(--wolf-red-rgb), 0.18);
+    border-color: var(--wolf-red);
+    color: var(--wolf-red);
+    box-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.35);
+    transform: translateY(-1px);
+  }
+
+  /* ========= OPTIONAL BOX + TOGGLE ========= */
+  .optional-protocol-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed #333;
+    border-radius: 18px;
+    padding: 14px 14px 10px;
+    margin: 20px 0 8px;
+    overflow: hidden;
+  }
+
+  .optional-toggle-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .optional-tag {
+    font-size: 8px;
+    font-weight: 900;
+    color: #aaa;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .optional-toggle-icon {
+    color: #888;
+    font-size: 18px;
+    transition:
+      transform 0.25s ease,
+      color 0.25s ease;
+  }
+
+  /* expanding body */
+  .optional-body {
+    max-height: 500px;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      max-height 0.25s ease,
+      opacity 0.25s ease,
+      transform 0.25s ease;
+  }
+
+  /* collapsed state */
+  .optional-protocol-box.is-collapsed .optional-body {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+  }
+
+  .optional-protocol-box.is-expanded .optional-toggle-icon {
+    transform: rotate(180deg);
+    color: var(--wolf-secondary);
+  }
+
+  /* ========= RIGHT: IMAGE PANEL ========= */
+  .image-panel {
+    background: rgba(0, 0, 0, 0.58);
+    border-radius: 18px;
+    padding: 14px 14px 12px;
+    border: 1px solid #222;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+    width: 100%;
+  }
+
+  .image-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .image-panel-title {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #ccc;
+  }
+
+  .image-panel-badge {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.3px;
+    color: #eee;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #222, #444);
+    border: 1px solid var(--wolf-secondary);
+  }
+
+  .image-panel-subtitle {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  /* grid of images */
+  .image-box {
+    width: 100%;
+    min-height: 150px;
+    background: #000;
+    margin-top: 4px;
+    border-radius: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 6px;
+    padding: 6px;
+    box-sizing: border-box;
+    justify-items: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .image-box img {
+    width: 100%;
+    height: 112px;
+    object-fit: cover;
+    border-radius: 8px;
+    opacity: 0.85;
+    cursor: pointer;
+    transform: scale(1);
+    border: 1px solid transparent;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease,
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .image-box img:hover {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.7);
+  }
+
+  .image-box img.selected {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.05);
+    border-color: var(--wolf-red);
+    box-shadow: 0 0 16px rgba(var(--wolf-red-rgb), 0.7);
+  }
+
+  #imageContainer {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 columns */
+    grid-auto-rows: auto; /* 2 rows as items fill */
+    gap: 8px; /* spacing between images */
+  }
+
+  #imageContainer img {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  /* status under images */
+  .status {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-top: 6px;
+    color: #aaa;
+  }
+
+  /* ========= SUBMIT BUTTON ========= */
+  .btn-terminal-commit {
+    width: 100%;
+    background: var(--wolf-red);
+    color: #fff;
+    border: none;
+    padding: 16px;
+    border-radius: 16px;
+    font-weight: 900;
+    font-style: italic;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(var(--wolf-red-rgb), 0.3);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
+    margin-top: 6px;
+  }
+
+  .btn-terminal-commit:hover {
+    filter: brightness(1.2);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(var(--wolf-red-rgb), 0.4);
+  }
+
+  .btn-terminal-commit:active {
+    transform: translateY(0) scale(0.97);
+    box-shadow: 0 8px 18px rgba(var(--wolf-red-rgb), 0.35);
+  }
+
+  /* ========= VALIDATION: ERROR HIGHLIGHT + SHAKE ========= */
+  .field-error {
+    border-color: #ff3b3b !important;
+    box-shadow: 0 0 12px rgba(255, 59, 59, 0.45) !important;
+    animation: fieldShake 0.28s ease-in-out 0s 1;
+  }
+
+  @keyframes fieldShake {
+    0% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-4px);
+    }
+    40% {
+      transform: translateX(4px);
+    }
+    60% {
+      transform: translateX(-3px);
+    }
+    80% {
+      transform: translateX(3px);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .search-collapsible {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition:
+      max-height 0.22s ease,
+      opacity 0.22s ease;
+  }
+
+  .search-collapsible.active {
+    max-height: 80px; /* or whatever fits your box */
+    opacity: 1;
+  }
+</style>
+<div id="product-modal-overlay" class="master-modal-overlay">
+  <div class="master-terminal-container optional-expanded">
+    <div class="terminal-header">
+      <div class="terminal-title-group">
+        <h1 class="terminal-title">ADD <span>PRODUCT</span></h1>
+        <p class="terminal-protocol">
+          MANUAL PRODUCT ENTRY - ADDS TO INVENTORY ONLY
+        </p>
+      </div>
+      <button
+        class="terminal-close-btn"
+        id="closeProductModal"
+        type="button"
+        onclick="closeProductModal()"
+      >
+        <i class="bx bx-x"></i>
+      </button>
+    </div>
+
+    <div class="master-terminal-body">
+      <form id="master-product-form" class="terminal-form">
+        <div class="terminal-main-grid">
+          <!-- LEFT: FORM DETAILS -->
+          <div class="terminal-left">
+            <!-- Name -->
+            <div class="terminal-section">
+              <label class="field-label">Product Name</label>
+              <input
+                type="text"
+                id="master-name"
+                class="terminal-input"
+                placeholder="E.G.: MILK 500G"
+                autocomplete="off"
+                required
+              />
+            </div>
+
+            <!-- Price + Qty -->
+            <div class="terminal-grid">
+              <div class="terminal-section">
+                <label class="field-label">Price (₱)</label>
+                <input
+                  type="number"
+                  id="master-price"
+                  class="terminal-input"
+                  placeholder="0.00"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div class="terminal-section">
+                <label class="field-label">Stock / Qty</label>
+                <div class="stock-action-row">
+                  <input
+                    type="number"
+                    id="master-qty"
+                    class="terminal-input"
+                    placeholder="0"
+                    required
+                  />
+                  <label
+                    class="cyber-checkbox-symbol"
+                    title="Toggle Unlimited Stock"
+                  >
+                    <input type="checkbox" id="master-unlimited" />
+                    <span class="symbol-box">
+                      <i class="bx bx-infinite"></i>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- OPTIONAL DETAILS -->
+            <div class="optional-protocol-box is-expanded">
+              <div class="optional-toggle-bar">
+                <span class="optional-tag">OPTIONAL DETAILS</span>
+                <i class="bx bx-chevron-down optional-toggle-icon"></i>
+              </div>
+              <div class="optional-body">
+                <div class="terminal-section">
+                  <label class="field-label">Brand Name</label>
+                  <input
+                    type="text"
+                    id="master-brand"
+                    class="terminal-input"
+                    placeholder="E.G.: NESTLÉ"
+                  />
+                </div>
+
+                <div class="terminal-section no-margin">
+                  <label class="field-label">Product Description</label>
+                  <textarea
+                    id="master-desc"
+                    class="terminal-input static-area"
+                    placeholder="E.G.: 500G CARTON BOX OF MILK..."
+                    rows="3"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-terminal-commit">
+              ADD PRODUCT
+            </button>
+          </div>
+
+          <!-- RIGHT: IMAGE + BARCODE -->
+          <div class="terminal-right">
+            <div class="image-panel">
+              <div class="image-panel-tabs" role="tablist" aria-label="Image source">
+                <button
+                  type="button"
+                  id="image-tab-web"
+                  class="image-panel-tab is-active"
+                  data-image-tab="web"
+                >
+                  IMAGE PANEL
+                </button>
+                <button
+                  type="button"
+                  id="image-tab-upload"
+                  class="image-panel-tab"
+                  data-image-tab="upload"
+                >
+                  ATTACH FILE
+                </button>
+              </div>
+
+              <div
+                id="image-web-panel"
+                class="image-panel-content is-active"
+                role="tabpanel"
+                aria-labelledby="image-tab-web"
+              >
+                <div class="terminal-section">
+                  <label class="field-label">Lookup Product</label>
+                  <div class="id-wrapper-group">
+                    <span class="id-prefix">ID:</span>
+                    <input
+                      type="text"
+                      id="lookup-input"
+                      placeholder="TYPE NAME / BARCODE / HTTPS IMAGE LINK"
+                      maxlength="512"
+                      autocomplete="off"
+                    />
+                    <button
+                      type="button"
+                      id="lookupBtn"
+                      class="terminal-icon-btn"
+                      title="Lookup by name or barcode"
+                    >
+                      <i class="bx bx-search"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="image-panel-header">
+                  <span class="image-panel-title">IMAGE PICKER</span>
+                  <span class="image-panel-badge">WEB / BARCODE</span>
+                </div>
+                <p class="image-panel-subtitle">
+                  Choose one image to attach as the product thumbnail.
+                </p>
+                <div class="image-box" id="imageContainer"></div>
+              </div>
+
+              <div
+                id="image-upload-panel"
+                class="image-panel-content"
+                role="tabpanel"
+                aria-labelledby="image-tab-upload"
+              >
+                <div
+                  id="upload-image-trigger"
+                  class="upload-image-trigger"
+                  tabindex="0"
+                  role="button"
+                  aria-label="Choose an image file from your device"
+                >
+                  <i class="bx bx-cloud-upload"></i>
+                  <strong id="upload-image-action">Attach Image File</strong>
+                  <span id="upload-image-name">No file selected</span>
+                </div>
+                <input
+                  type="file"
+                  id="upload-image-input"
+                  accept="image/*"
+                  hidden
+                />
+                <div class="image-box image-box-upload" id="uploadImageContainer"></div>
+              </div>
+
+              <div class="status" id="status"></div>
+
+              <!-- Barcode -->
+              <div class="terminal-section">
+                <label class="field-label">Barcode ID</label>
+                <div class="id-wrapper-group">
+                  <span class="id-prefix">PR -</span>
+                  <input
+                    type="text"
+                    id="master-asset-id"
+                    placeholder="0000"
+                    maxlength="4"
+                    autocomplete="off"
+                    readonly
+                  />
+                  <button
+                    type="button"
+                    id="roll-barcode-btn"
+                    class="terminal-icon-btn"
+                    title="Randomize ID"
+                  >
+                    <i class="bx bx-dice-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- /RIGHT -->
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.PIXABAY_KEY = '54360015-81e98130630ae3ed1faf5a9b9';
+
+  /* -------------------- ELEMENTS -------------------- */
+  const lookupInput = document.getElementById('lookup-input');
+  const lookupBtn = document.getElementById('lookupBtn');
+  const imageContainer = document.getElementById('imageContainer');
+  const statusEl = document.getElementById('status');
+
+  const productOverlay = document.getElementById('product-modal-overlay');
+  const closeProductModalBtn = document.getElementById('closeProductModal');
+
+  const masterAssetId = document.getElementById('master-asset-id');
+  const masterName = document.getElementById('master-name');
+  const masterBrand = document.getElementById('master-brand');
+  const masterImagePage = document.getElementById('master-image-page'); // optional hidden input
+
+  /* -------------------- MODAL CLOSE -------------------- */
+  if (closeProductModalBtn && productOverlay) {
+    closeProductModalBtn.addEventListener('click', closeModal);
+    productOverlay.addEventListener('click', (e) => {
+      if (e.target === productOverlay) closeModal();
+    });
+  }
+
+  function closeModal() {
+    productOverlay.style.display = 'none';
+    productOverlay.classList.remove('is-open');
+  }
+
+  /* -------------------- LOOKUP EVENTS -------------------- */
+  lookupBtn.addEventListener('click', handleLookup);
+  lookupInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleLookup();
+    }
+  });
+
+  function handleLookup() {
+    const value = lookupInput.value.trim();
+    if (!value) return;
+
+    clearImages();
+
+    if (/^\d/.test(value)) {
+      masterAssetId.value = value;
+      searchBarcode(value);
+    } else {
+      masterName.value = value;
+      fetchPixabayImages(value);
+    }
+  }
+
+  /* -------------------- BARCODE SEARCH -------------------- */
+  async function searchBarcode(barcode) {
+    statusEl.textContent = 'Fetching product info from barcode...';
+
+    try {
+      const res = await fetch(
+        `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      );
+      const data = await res.json();
+
+      if (data.status !== 1) {
+        statusEl.textContent = 'Product not found.';
+        return;
+      }
+
+      const product = data.product;
+      masterName.value = product.product_name || '';
+      masterBrand.value = product.brands || '';
+      statusEl.textContent = 'Product info found!';
+
+      if (product.image_url) {
+        appendSelectableImage({
+          src: product.image_url,
+          pageUrl: null,
+          alt: product.product_name || 'Product image',
+        });
+      } else {
+        statusEl.textContent += ' (No image available)';
+      }
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Error fetching barcode data.';
+    }
+  }
+
+  /* -------------------- PIXABAY SEARCH -------------------- */
+  async function fetchPixabayImages(query) {
+    statusEl.textContent = 'Searching images on Pixabay...';
+
+    try {
+      const res = await fetch(
+        `https://pixabay.com/api/?key=${PIXABAY_KEY}&q=${encodeURIComponent(
+          query,
+        )}&image_type=photo&per_page=4`,
+      );
+
+      if (!res.ok) {
+        statusEl.textContent =
+          res.status === 429
+            ? 'Pixabay API limit reached.'
+            : 'Error fetching Pixabay images.';
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!data.hits?.length) {
+        statusEl.textContent = 'No images found.';
+        return;
+      }
+
+      data.hits.forEach((photo) => {
+        appendSelectableImage({
+          src: photo.webformatURL, // preview only
+          pageUrl: photo.pageURL, // ✅ permanent
+          alt: query,
+        });
+      });
+
+      statusEl.textContent = 'Images found!';
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Image fetch failed.';
+    }
+  }
+
+  /* -------------------- IMAGE HANDLING -------------------- */
+  function appendSelectableImage({ src, pageUrl, alt }) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt || '';
+    img.loading = 'lazy';
+
+    if (pageUrl) {
+      img.dataset.pageUrl = pageUrl;
+    }
+
+    img.addEventListener('click', () => selectImage(img));
+    imageContainer.appendChild(img);
+  }
+
+  function selectImage(imgEl) {
+    imageContainer
+      .querySelectorAll('img')
+      .forEach((img) => img.classList.remove('selected'));
+
+    imgEl.classList.add('selected');
+
+    // ✅ permanent Pixabay page URL
+    if (masterImagePage) {
+      masterImagePage.value = imgEl.dataset.pageUrl || '';
+    }
+
+    console.log('Selected page URL:', imgEl.dataset.pageUrl || 'N/A');
+  }
+
+  function clearImages() {
+    imageContainer.innerHTML = '';
+  }
+
+  /* -------------------- OPTIONAL PANEL -------------------- */
+  const optionalBox = document.querySelector('.optional-protocol-box');
+  const optionalToggle = document.getElementById('optionalToggle');
+  const modalContainer = document.querySelector('.master-terminal-container');
+
+  if (optionalBox && optionalToggle && modalContainer) {
+    optionalToggle.addEventListener('click', () => {
+      const expanded = optionalBox.classList.toggle('is-expanded');
+      optionalBox.classList.toggle('is-collapsed', !expanded);
+      modalContainer.classList.toggle('optional-expanded', expanded);
+      modalContainer.classList.toggle('optional-collapsed', !expanded);
+    });
+  }
+</script>

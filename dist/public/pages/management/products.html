@@ -1,0 +1,431 @@
+<style>
+  /* --- 1. PRODUCT LAYOUT & GRID --- */
+  #product-main-view {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Fix for the Header stacking issue */
+  .ledger-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    margin-bottom: 20px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .ledger-brand {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #fff;
+    text-transform: uppercase;
+    font-style: italic;
+    margin: 0 !important; /* Prevents title from pushing buttons down */
+    white-space: nowrap;
+  }
+
+  .ledger-actions {
+    display: flex !important;
+    flex-direction: row !important; /* Forces buttons side-by-side */
+    align-items: center !important;
+    gap: 12px !important;
+    flex-shrink: 0; /* Prevents buttons from squishing */
+  }
+
+  .icon-btn {
+    /* Ensure no block-level overrides */
+    display: inline-flex !important;
+    background: #1a1a1a;
+    border: 1px solid #222;
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.3s;
+    flex-shrink: 0;
+  }
+  .icon-btn.active {
+    border-color: var(--wolf-red);
+    color: var(--wolf-red);
+    background: rgba(var(--wolf-red-rgb), 0.1);
+  }
+
+  .hud-item {
+    /* High-end Glassmorphism */
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 20, 0.85),
+      rgba(10, 10, 10, 0.95)
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    /* Wolf Red Accent Border */
+    border: 1px solid rgba(var(--wolf-red-rgb), 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+
+    padding: 25px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Background Textures */
+    background-image:
+      url('/assets/images/textures/dark-mosaic.png'),
+      radial-gradient(circle at 50% 0%, rgba(var(--wolf-red-rgb), 0.1), transparent);
+    background-blend-mode: overlay, normal;
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Hover Effect: Glow intensifies */
+  .hud-item:hover {
+    transform: translateY(-5px);
+    border-color: rgba(var(--wolf-red-rgb), 0.6);
+    box-shadow:
+      0 15px 35px rgba(var(--wolf-red-rgb), 0.15),
+      0 5px 15px rgba(0, 0, 0, 0.5);
+  }
+
+  .hud-item label {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    color: #777; /* Muted gray */
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .hud-item span {
+    display: block;
+    font-size: 2.8rem;
+    font-weight: 900;
+    font-style: italic; /* Aggressive fitness look */
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -1.5px;
+
+    /* Wolf Red Text Glow */
+    text-shadow:
+      0 0 15px rgba(var(--wolf-red-rgb), 0.4),
+      2px 2px 0px rgba(0, 0, 0, 0.8);
+  }
+
+  /* Subtle Data Node (The Red Dot in the corner) */
+  .hud-item::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 3px;
+    height: 3px;
+    background: var(--wolf-red);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--wolf-red);
+    opacity: 0.6;
+  }
+
+  /* Red underline on hover */
+  .hud-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--wolf-red);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+  }
+
+  .hud-item:hover::after {
+    width: 40%;
+  }
+
+  /* --- 2. 3D PRODUCT CARD ENGINE --- */
+  .product-card-scene {
+    width: 100%;
+    height: 380px; /* Taller than member cards to fit images */
+    perspective: 1500px;
+  }
+
+  .product-card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.3s ease;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    cursor: pointer;
+  }
+
+  .product-card.is-flipped {
+    transform: none;
+  }
+
+  .product-card-rotor {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .product-card.is-flipped .product-card-rotor {
+    transform: rotateY(180deg);
+  }
+
+  .card-face.card-front {
+    transform: rotateY(0deg);
+  }
+
+  .card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 24px;
+    padding: 20px;
+    background-color: #0d0d0d;
+    background-image: url('/assets/images/textures/dark-mosaic.png');
+    background-blend-mode: overlay;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-back {
+    transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg);
+    background-color: #050505;
+    overflow: hidden;
+  }
+
+  .card-back > * {
+    transform: translateZ(2px);
+  }
+
+  /* --- 3. PRODUCT SPECIFIC ELEMENTS --- */
+  .stock-badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    z-index: 10;
+  }
+  .status-critical {
+    background: rgba(var(--wolf-red-rgb), 0.3);
+    color: #ff4d4d;
+    border: 1px solid var(--wolf-red);
+  }
+  .status-good {
+    background: rgba(40, 167, 69, 0.3);
+    color: #4ade80;
+    border: 1px solid #28a745;
+  }
+
+  .product-visual-container {
+    width: 100%;
+    height: 160px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .product-visual-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+  }
+
+  .product-price-display {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #fff;
+    font-style: italic;
+    text-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.3);
+  }
+
+  /* Back Card Quick Adjuster */
+  .stock-adjuster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 15px;
+    border-radius: 16px;
+    margin: 20px 0;
+  }
+
+  /* --- TABLET RESPONSIVENESS --- */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    #product-main-view {
+      padding: 16px;
+    }
+
+    .ledger-header {
+      flex-wrap: wrap !important;
+      gap: 10px !important;
+      align-items: flex-start !important;
+    }
+
+    .ledger-brand {
+      font-size: 1.25rem;
+      white-space: normal;
+      line-height: 1.1;
+    }
+
+    .ledger-actions {
+      gap: 8px !important;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+    }
+
+    .product-card-scene {
+      height: 340px;
+    }
+  }
+
+  /* --- LIGHT THEME OVERRIDES --- */
+  body.light-theme .ledger-brand {
+    color: var(--text-main);
+  }
+
+  body.light-theme .icon-btn {
+    background: var(--surface-elevated);
+    border-color: var(--border-color);
+    color: var(--text-main);
+  }
+
+  body.light-theme .hud-item {
+    background: linear-gradient(
+      145deg,
+      var(--surface-elevated),
+      var(--card-bg)
+    );
+    background-image: none;
+    border: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  body.light-theme .hud-item label {
+    color: var(--text-muted);
+  }
+
+  body.light-theme .hud-item span,
+  body.light-theme .product-price-display {
+    color: var(--text-main);
+    text-shadow: none;
+  }
+
+  body.light-theme .card-face,
+  body.light-theme .product-card,
+  body.light-theme .product-visual-container,
+  body.light-theme .stock-adjuster,
+  body.light-theme .ledger-search-box {
+    background: var(--card-bg);
+    background-image: none;
+    border-color: var(--border-color);
+    color: var(--text-main);
+  }
+
+  body.light-theme .ledger-search-box input {
+    color: var(--text-main);
+  }
+</style>
+
+<div class="ledger-page-wrapper stage-center" id="product-main-view">
+  <!-- Header Section -->
+  <div class="ledger-header">
+    <div class="ledger-brand">PRODUCT INVENTORY</div>
+    <div class="ledger-actions">
+      <button class="icon-btn" id="btn-view-trash">
+        <i class="bx bx-trash-alt"></i>
+      </button>
+      <button class="icon-btn active" id="toggle-search-btn" type="button">
+        <i class="bx bx-search"></i>
+      </button>
+      <button class="icon-btn red" id="btn-add-product">
+        <i class="bx bx-plus"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary HUD -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+      <div class="hud-item">
+        <label>Total SKU Count</label>
+        <span id="total-products-count">0</span>
+      </div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="hud-item" style="border-color: rgba(255, 193, 7, 0.2)">
+        <label>Low Stock Alerts</label>
+        <span id="low-stock-count" style="color: #ffc107">0</span>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="hud-item" style="border-color: rgba(40, 167, green, 0.2)">
+        <label>Total Asset Value</label>
+        <span id="total-inventory-value" style="color: #28a745">₱0.00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Engine Hub -->
+  <div class="search-collapsible active" id="ledger-search-container">
+    <div class="ledger-search-box">
+      <i class="bx bx-search text-secondary"></i>
+      <input
+        type="text"
+        id="product-main-search"
+        placeholder="Search product by name or SKU..."
+      />
+      <i
+        class="bx bx-x text-secondary"
+        id="search-clear-btn"
+        style="cursor: pointer; display: none"
+      ></i>
+    </div>
+  </div>
+
+  <!-- Product Grid -->
+  <div id="products-list" class="row g-4">
+    <!-- Skeleton will show here first -->
+  </div>
+</div>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>

@@ -1,0 +1,212 @@
+<style>
+  .id-maker-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .id-maker-wrapper {
+      max-width: 1200px;
+      min-width: 650px;
+    }
+  }
+
+  .id-title {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .id-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .id-panel {
+    background: linear-gradient(180deg, #171717, #0f0f0f);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    padding: 18px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+  }
+
+  .id-field {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .id-field label {
+    font-size: 9px;
+    font-weight: 900;
+    color: #666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .id-field input,
+  .id-field select {
+    background: #202020;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    color: #fff;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .id-preview {
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .id-preview-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .id-brand {
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .id-badge {
+    background: #1f1f1f;
+    border: 1px solid #2a2a2a;
+    color: #7cff7c;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    font-weight: 900;
+  }
+
+  .id-preview-body {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .id-qr {
+    background: #fff;
+    border-radius: 10px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    color: #000;
+  }
+
+  .id-meta {
+    font-size: 9px;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: grid;
+    gap: 6px;
+  }
+
+  .id-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .id-btn {
+    background: var(--wolf-red);
+    border: none;
+    color: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+
+  .id-btn.secondary {
+    background: #1f1f1f;
+    color: #aaa;
+    border: 1px solid #2a2a2a;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="id-maker-wrapper">
+  <div class="id-title">ID MAKER (static)</div>
+
+  <div class="id-grid">
+    <div class="id-panel">
+      <div class="id-field">
+        <label>MEMBER NAME</label>
+        <input placeholder="TYPE OR SEARCH EXISTING..." />
+      </div>
+      <div class="id-field">
+        <label>CONTACT #</label>
+        <input value="0917-XXX-XXXX" />
+      </div>
+      <div class="id-field">
+        <label>STATUS</label>
+        <input value="ONGOING" />
+      </div>
+      <div class="id-field">
+        <label>SUBSCRIPTION TIER</label>
+        <input value="Monthly Membership (Free)" />
+      </div>
+    </div>
+
+    <div class="id-panel">
+      <div style="font-size: 9px; color: #666; letter-spacing: 2px">
+        ID MAKER PREVIEW
+      </div>
+      <div class="id-preview">
+        <div class="id-preview-top">
+          <div class="id-brand">WOLFPALOMAR</div>
+          <div class="id-badge">ONGOING STATUS</div>
+        </div>
+        <div class="id-preview-body">
+          <div class="id-qr">QR</div>
+          <div class="id-meta">
+            <div>NAME: JUAN DELA CRUZ</div>
+            <div>ID: TG-5200</div>
+            <div>ISSUE DATE: 2026-02-05</div>
+            <div>MEMBERSHIP: MONTHLY MEMBERSHIP</div>
+          </div>
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 9px;
+            color: #666;
+          "
+        >
+          <span>OWNER SIGNATURE</span>
+          <span>FRONT</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="id-actions">
+      <button class="id-btn secondary">SAVE ASSET</button>
+      <button class="id-btn">PRINT CARD</button>
+    </div>
+  </div>
+</div>

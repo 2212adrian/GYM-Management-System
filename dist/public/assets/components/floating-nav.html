@@ -1,0 +1,218 @@
+<style>
+  /* --- MASTER NAV CONTAINER (MOBILE DEFAULT) --- */
+  .gcash-nav-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 75px;
+    background: var(--card-bg) !important;
+    border-top: 1px solid var(--border-color);
+    z-index: 1050;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 0;
+  }
+
+  .gcash-nav-content {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  /* --- PC REDESIGN (MORPH TO PILL) --- */
+  @media (min-width: 768px) {
+    .gcash-nav-container {
+      bottom: 25px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      width: 520px;
+      border-radius: 100px;
+      height: 85px;
+      border: 1px solid var(--shell-nav-border);
+      background: var(--shell-nav-bg) !important;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shell-nav-shadow);
+    }
+  }
+
+  /* Individual Item Styling */
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--shell-nav-item-muted);
+    flex: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+
+    /* DEFAULT STATE: Clickable */
+    pointer-events: auto;
+    opacity: 0.7;
+  }
+
+  .nav-item i {
+    color: var(--shell-nav-item-muted);
+    font-size: 24px;
+    margin-bottom: 2px;
+    transition: all 0.3s ease;
+  }
+
+  .nav-item span {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: inherit; /* Inherits the #666666 */
+  }
+
+  /* HOVER: Only for items that are NOT active */
+  .nav-item:not(.active):hover {
+    opacity: 1;
+    color: var(--text-main);
+  }
+  .nav-item:not(.active):hover i {
+    color: var(--text-main);
+    transform: scale(1.1);
+  }
+
+  /* ACTIVE STATE: Physically Locked and Color Changed */
+  .nav-item.active {
+    /* THE LOCK: Active button cannot be clicked */
+    pointer-events: none !important;
+    cursor: default;
+
+    /* VISUALS: Fully visible and Wolf Red */
+    opacity: 1 !important;
+    color: var(--wolf-red) !important;
+    transform: translateY(-3px);
+  }
+
+  .nav-item.active i {
+    color: var(--wolf-red) !important;
+    text-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.6);
+    transform: scale(1.15);
+  }
+
+  .nav-item.active span {
+    color: var(--wolf-red) !important;
+    font-weight: 900;
+  }
+
+  /* Sidebar/More Button Special Case */
+  .nav-item#moreNavBtn.sidebar-active {
+    color: var(--wolf-red) !important;
+    opacity: 1;
+  }
+  .nav-item#moreNavBtn.sidebar-active i {
+    color: var(--wolf-red) !important;
+  }
+  /* THE FLOATING QR BUTTON */
+  .qr-wrapper {
+    position: relative;
+    width: 80px;
+    display: flex;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .qr-btn {
+    position: absolute;
+    top: -45px;
+    width: 68px;
+    height: 68px;
+    background: var(--wolf-red);
+    border-radius: 50%;
+    border: 6px solid var(--bg-dark) !important;
+    color: var(--text-on-accent);
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(var(--wolf-red-rgb), 0.4);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  /* --- 🧭 NAVIGATION ORDERING LOGIC --- */
+
+  /* MOBILE DEFAULT ORDER: Home > Sales > QR > Logbook > More */
+  .item-home {
+    order: 1;
+  }
+  .item-sales {
+    order: 2;
+  }
+  .item-qr {
+    order: 3;
+  }
+  .item-logbook {
+    order: 4;
+  }
+  .item-more {
+    order: 5;
+  }
+
+  @media (min-width: 768px) {
+    /* PC ORDER SHIFT: More > Home > QR > Sales > Logbook */
+    .item-more {
+      order: 1 !important;
+    }
+    .item-home {
+      order: 2 !important;
+    }
+    .item-qr {
+      order: 3 !important;
+    }
+    .item-sales {
+      order: 4 !important;
+    }
+    .item-logbook {
+      order: 5 !important;
+    }
+
+    .nav-item i {
+      font-size: 26px;
+    }
+  }
+</style>
+
+<nav class="gcash-nav-container shadow">
+  <div class="gcash-nav-content">
+    <!-- More (Burger Icon) -->
+    <div class="nav-item item-more" id="moreNavBtn">
+      <i class="bx bx-menu" id="navMoreIcon"></i>
+      <span>MORE</span>
+    </div>
+
+    <!-- Home (Dashboard) -->
+    <div class="nav-item item-home" data-page="dashboard">
+      <i class="bx bx-home-circle"></i>
+      <span>HOME</span>
+    </div>
+
+    <!-- Scan Module (Master Button) -->
+    <div class="qr-wrapper item-qr">
+      <button class="qr-btn" id="qrScannerBtn">
+        <i class="bx bx-scan"></i>
+      </button>
+    </div>
+
+    <!-- Sales -->
+    <div class="nav-item item-sales" data-page="sales">
+      <i class="bx bx-shopping-bag"></i>
+      <span>SALES</span>
+    </div>
+
+    <!-- Logbook -->
+    <div class="nav-item item-logbook" data-page="logbook">
+      <i class="bx bx-detail"></i>
+      <span>LOGBOOK</span>
+    </div>
+  </div>
+</nav>

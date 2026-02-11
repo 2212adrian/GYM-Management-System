@@ -1,0 +1,152 @@
+<style>
+  .alert-icon {
+    font-size: 24px;
+  }
+  .alert-text {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  /* DISBALE ZOOM AND PULL-TO-REFRESH */
+  html,
+  body {
+    overscroll-behavior-y: none; /* Prevents pull-to-refresh */
+    touch-action: pan-x pan-y; /* Disables pinch-zoom while allowing scrolling */
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS from zooming in on focus */
+  }
+
+  /* Page transitions / layout tweaks */
+  .page-wrapper {
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<!-- INTERNAL VIEW GUARD -->
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="page-wrapper" id="page-wrapper">
+  <!-- HEADER ACTIONS -->
+  <div class="page-top-actions">
+    <div class="brand" style="font-size: 1.5rem; font-weight: 900">SALES</div>
+    <div class="action-icons">
+      <!-- Added ID for Day Clear logic -->
+      <button class="icon-btn" id="clear-sales-btn" title="Clear Day Records">
+        <i class="bx bx-trash"></i>
+      </button>
+      <!-- Added ID for the POS Terminal trigger -->
+      <button
+        class="icon-btn red"
+        id="open-sale-terminal-btn"
+        title="New Transaction"
+      >
+        <i class="bx bx-plus"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- DYNAMIC SUMMARY CARD -->
+  <div class="summary-container">
+    <div class="summary-card hud-item shadow-sm">
+      <label
+        id="sales-summary-label"
+        style="
+          font-size: 10px;
+          color: #666;
+          text-transform: uppercase;
+          font-weight: 800;
+        "
+        >Income Summary</label
+      >
+      <div
+        class="value"
+        id="sales-total-amount"
+        style="
+          font-size: 1.8rem;
+          font-weight: 900;
+          font-style: italic;
+          color: #fff;
+        "
+      >
+        ₱0
+      </div>
+    </div>
+  </div>
+  <nav class="week-nav-container">
+    <!-- PREVIOUS BUTTON -->
+    <button class="chrono-nav-btn" id="prev-week-btn">
+      <i class="bx bx-left-arrow-alt"></i>
+      <span class="btn-label">PREVIOUS</span>
+    </button>
+
+    <!-- CENTER DISPLAY -->
+    <div class="date-status-pill" id="chrono-picker-trigger">
+      <span class="protocol-label">SYSTEM_CHRONOLOCK << ACTIVE</span>
+      <span id="week-range-display">--- - ---</span>
+    </div>
+
+    <!-- NEXT BUTTON -->
+    <button class="chrono-nav-btn" id="next-week-btn">
+      <span class="btn-label">NEXT</span>
+      <i class="bx bx-right-arrow-alt"></i>
+    </button>
+  </nav>
+
+  <!-- Hidden Input -->
+  <input
+    type="date"
+    id="hidden-chrono-input"
+    style="position: absolute; opacity: 0; pointer-events: none"
+  />
+
+  <!-- DAY SELECTOR -->
+  <div class="day-selector" id="sales-day-picker">
+    <button class="day-btn" data-day="0">SUN</button>
+    <button class="day-btn" data-day="1">MON</button>
+    <button class="day-btn" data-day="2">TUE</button>
+    <button class="day-btn" data-day="3">WED</button>
+    <button class="day-btn" data-day="4">THU</button>
+    <button class="day-btn" data-day="5">FRI</button>
+    <button class="day-btn" data-day="6">SAT</button>
+  </div>
+
+  <!-- LIVE SEARCH -->
+  <div
+    class="filter-container mb-4"
+    style="
+      background: #111;
+      border-radius: 12px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    "
+  >
+    <i class="bx bx-search" style="color: #444"></i>
+    <input
+      type="text"
+      id="sales-search"
+      placeholder="Search product or reference..."
+      style="
+        background: none;
+        border: none;
+        color: #fff;
+        width: 100%;
+        outline: none;
+        font-size: 14px;
+      "
+    />
+  </div>
+
+  <!-- DATA INJECTION POINT -->
+  <div id="sales-list-container" style="min-height: 200px">
+    <div class="text-center p-5" style="opacity: 0.2">
+      <i class="bx bx-loader-alt bx-spin" style="font-size: 2rem"></i>
+    </div>
+  </div>
+</div>

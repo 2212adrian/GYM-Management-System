@@ -1,0 +1,208 @@
+<style>
+  .feedback-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .feedback-wrapper {
+      max-width: 1200px;
+      min-width: 650px;
+    }
+  }
+
+  .feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .feedback-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .feedback-pool {
+    background: radial-gradient(circle at top, #111, #090909);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.75);
+  }
+
+  .feedback-card {
+    background: rgba(20, 20, 20, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 22px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .feedback-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .feedback-author {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--wolf-red);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .feedback-meta {
+    font-size: 9px;
+    color: #666;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .btn-mark-read {
+    background: var(--wolf-red);
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .btn-mark-read:hover {
+    filter: brightness(1.1);
+  }
+
+  .tagged-label {
+    font-size: 9px;
+    font-weight: 900;
+    color: #777;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .tagged-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tagged-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .tagged-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .tagged-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .tagged-name {
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .tagged-sub {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .feedback-text {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 12px;
+    color: #ddd;
+    font-style: italic;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="feedback-wrapper" id="feedback-page">
+  <div class="feedback-header">
+    <div class="feedback-title">FEEDBACK POOL (STATIC)</div>
+  </div>
+
+  <div class="feedback-pool" id="feedback-pool">
+    <div class="feedback-card" data-feedback-id="demo-feedback">
+      <div class="feedback-card-header">
+        <div>
+          <div class="feedback-author">COACH RICARDO · TRAINER</div>
+          <div class="feedback-meta">2/6/2026, 11:17 AM</div>
+        </div>
+        <button class="btn-mark-read">MARK READ</button>
+      </div>
+
+      <div class="tagged-label">TAGGED ASSETS (3)</div>
+
+      <div class="tagged-list">
+        <div class="tagged-item">
+          <div class="tagged-icon"><i class="bx bx-user"></i></div>
+          <div class="tagged-info">
+            <div class="tagged-name">MARIA SANTOS</div>
+            <div class="tagged-sub">MEMBER · TG-1002</div>
+          </div>
+        </div>
+
+        <div class="tagged-item">
+          <div class="tagged-icon"><i class="bx bx-package"></i></div>
+          <div class="tagged-info">
+            <div class="tagged-name">WATER BOTTLE XL</div>
+            <div class="tagged-sub">PRODUCT · P005</div>
+          </div>
+        </div>
+
+        <div class="tagged-item">
+          <div class="tagged-icon"><i class="bx bx-dumbbell"></i></div>
+          <div class="tagged-info">
+            <div class="tagged-name">OLYMPIC POWER RACK</div>
+            <div class="tagged-sub">EQUIPMENT · EQ-002</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feedback-text">"nagbasag"</div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Wolf OS - Login Terminal</title>
+    <link rel="icon" href="/assets/images/favicon.ico" />
+    <link
+      href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
+    <script src="/assets/js/libraries/qrcode-generator.min.js"></script>
+    <script src="assets/js/utils/supabase-init.js"></script>
+    <script src="assets/js/utils/system-config.js"></script>
+    <script src="assets/js/utils/wolf-router.js"></script>
+    <script src="assets/js/utils/auth-guard.js"></script>
+    <link rel="stylesheet" href="assets/css/auth.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* prevent scrollbars */
+        width: 100%;
+        height: 100%;
+        touch-action: none; /* optional: prevent swipe scroll on mobile */
+      }
+      #starCanvas {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      .auth-split-container {
+        position: relative;
+        z-index: 1;
+      }
+
+      body:not(.intro-boot-ready) .intro-cutout,
+      body:not(.intro-boot-ready) #starCanvas,
+      body:not(.intro-boot-ready) .auth-split-container {
+        opacity: 0;
+      }
+
+      body.intro-boot-ready #starCanvas,
+      body.intro-boot-ready .auth-split-container {
+        opacity: 1;
+        transition: opacity 0.5s ease;
+      }
+
+      /* ===== Intro Mask Animation ===== */
+      @import url('https://fonts.googleapis.com/css?family=Montserrat:700');
+      @property --intro-o {
+        syntax: '<number>';
+        initial-value: 1;
+        inherits: true;
+      }
+      :root {
+        --intro-anim-delay: 2s;
+      }
+      body {
+        width: 100%;
+        background:
+          conic-gradient(rgb(0 0 0 / var(--intro-o)) 0 0),
+          url('/assets/images/1-carousel.jpg') 50% / cover no-repeat;
+        animation: --intro-o 2s forwards ease-out var(--intro-anim-delay);
+      }
+      @keyframes --intro-o {
+        to {
+          --intro-o: 0;
+        }
+      }
+      .intro-cutout {
+        width: 100%;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0;
+        animation:
+          introCutoutFadeIn 0.55s ease-out forwards,
+          introFade 3s forwards ease-out var(--intro-anim-delay);
+      }
+      .intro-cutout-svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        transform-origin: 49% 50.5%;
+        transform: scale(1);
+        opacity: 0;
+        animation:
+          introCutoutSvgFade 0.5s ease-out forwards,
+          reveal 3s forwards ease-out var(--intro-anim-delay);
+        shape-rendering: geometricPrecision;
+        text-rendering: geometricPrecision;
+      }
+      .intro-cutout-text {
+        font-family: 'Inter', sans-serif;
+        font-weight: 1000;
+        font-size: 5vmin;
+        letter-spacing: 0.06em;
+      }
+      .intro-cutout-text-mobile {
+        display: none;
+      }
+      .intro-cutout-text-ghost {
+        fill: #ffffff;
+        opacity: 1;
+        animation: textFade 3s forwards ease-out var(--intro-anim-delay);
+      }
+      @keyframes reveal {
+        to {
+          transform: scale(150);
+        }
+      }
+      @keyframes introCutoutFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes introCutoutSvgFade {
+        from {
+          opacity: 0;
+          filter: blur(6px);
+        }
+        to {
+          opacity: 1;
+          filter: blur(0);
+        }
+      }
+      @keyframes textFade {
+        0% {
+          opacity: 1;
+        }
+        25% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      @keyframes introFade {
+        0% {
+          opacity: 1;
+        }
+        70% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body.intro-boot-ready #starCanvas,
+        body.intro-boot-ready .auth-split-container {
+          transition: none;
+        }
+        body {
+          animation: none;
+        }
+        .intro-cutout {
+          animation: none;
+          display: none;
+        }
+      }
+
+      @media (max-width: 1023px) {
+        :root {
+          --intro-anim-delay: 0s;
+        }
+        body {
+          animation: none;
+          background: url('/assets/images/1-carousel.jpg') 50% / cover no-repeat;
+        }
+        .intro-cutout {
+          display: none;
+          animation: none;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .intro-cutout-text {
+          font-size: 35vmin;
+          letter-spacing: 0.08em;
+        }
+        .intro-cutout-svg {
+          transform-origin: 47% 53.3%;
+        }
+        .intro-cutout-text-desktop {
+          display: none;
+        }
+        .intro-cutout-text-mobile {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro-cutout" id="introCutout" aria-hidden="true">
+      <svg
+        class="intro-cutout-svg"
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        <defs>
+          <mask id="introMask">
+            <rect width="100%" height="100%" fill="white" />
+            <text
+              class="intro-cutout-text intro-cutout-text-desktop"
+              x="50%"
+              y="50%"
+              text-anchor="middle"
+              dominant-baseline="middle"
+              fill="black"
+            >
+              GYM PALOMAR
+            </text>
+            <text
+              class="intro-cutout-text intro-cutout-text-mobile"
+              x="50%"
+              y="50%"
+              text-anchor="middle"
+              dominant-baseline="middle"
+              fill="black"
+            >
+              <tspan x="50%" dy="-0.35em">GYM</tspan>
+              <tspan x="50%" dy="1.1em">PALOMAR</tspan>
+            </text>
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="black" mask="url(#introMask)" />
+        <text
+          class="intro-cutout-text intro-cutout-text-ghost intro-cutout-text-desktop"
+          x="50%"
+          y="50%"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >
+          GYM PALOMAR
+        </text>
+        <text
+          class="intro-cutout-text intro-cutout-text-ghost intro-cutout-text-mobile"
+          x="50%"
+          y="50%"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >
+          <tspan x="50%" dy="-0.35em">GYM</tspan>
+          <tspan x="50%" dy="1.1em">PALOMAR</tspan>
+        </text>
+      </svg>
+    </div>
+    <canvas id="starCanvas"></canvas>
+    <!-- SUCCESS MODAL -->
+    <div id="successModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="success-icon animate-check">
+          <i class="bx bx-check-circle"></i>
+        </div>
+        <h3>SYSTEM RESTORED</h3>
+        <p>Access granted to login console.</p>
+        <button id="closeModalBtn">RETURN TO LOGIN</button>
+      </div>
+    </div>
+
+    <!-- QUICK LOGIN QR MODAL -->
+    <div id="quickLoginModal" class="quick-login-modal" aria-hidden="true">
+      <div class="quick-login-backdrop" id="quickLoginBackdrop"></div>
+      <div class="quick-login-card">
+        <button
+          type="button"
+          class="quick-login-close"
+          id="quickLoginClose"
+          aria-label="Close quick login"
+        >
+          <i class="bx bx-x"></i>
+        </button>
+
+        <div class="quick-login-head">
+          <div class="quick-login-icon">
+            <i class="bx bx-shield-quarter"></i>
+          </div>
+          <h3>Quick Login Portal</h3>
+          <p>Scan this one-time code from a trusted signed-in terminal.</p>
+        </div>
+
+        <div class="quick-login-qr-shell">
+          <div class="quick-login-qr-glow"></div>
+          <canvas id="quickLoginQrCanvas" width="260" height="260"></canvas>
+        </div>
+
+        <div class="quick-login-status" id="quickLoginStatus">
+          Initializing secure QR channel...
+        </div>
+
+        <div class="quick-login-meta">
+          <div class="quick-login-meta-item">
+            <span>Session Ref</span>
+            <strong id="quickLoginRef">---</strong>
+          </div>
+          <div class="quick-login-meta-item">
+            <span>Expires In</span>
+            <strong id="quickLoginTimer">--s</strong>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="quick-login-refresh"
+          id="quickLoginRefresh"
+        >
+          <i class="bx bx-refresh"></i>
+          <span>Regenerate QR</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- EXIT CONFIRMATION MODAL -->
+    <div id="confirmExitModal" class="modal-overlay">
+      <div class="modal-content warning-modal">
+        <!-- Keep only one icon for a clean look -->
+        <div class="success-icon animate-pulse-red">
+          <i class="bx bx-shield-quarter"></i>
+        </div>
+        <h3>ABANDON RECOVERY?</h3>
+        <p>
+          If you return to the login screen, you will need to wait 1 minute
+          before requesting a new security code. Are you sure you want to leave?
+        </p>
+
+        <div class="modal-btn-group">
+          <button id="cancelExitBtn">NO, KEEP VERIFYING</button>
+          <button id="confirmExitBtn" class="btn-secondary">
+            YES, GO BACK
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-split-container">
+      <!-- LEFT: LOGIN & STARS -->
+      <div class="auth-left" id="starContainer">
+        <div class="flip-card">
+          <div class="flip-card-inner" id="flipCardInner">
+            <!-- FRONT: LOGIN -->
+            <div class="flip-card-front">
+              <div class="brand">WOLF <span>PALOMAR</span></div>
+              <p class="system-subtitle">Gym Management System</p>
+              <div class="version sys-version"></div>
+
+              <form id="loginForm">
+                <!-- REFINED LABELS -->
+                <div class="field-wrap">
+                  <input
+                    type="email"
+                    id="email"
+                    class="field-input"
+                    placeholder=" "
+                    autocomplete="email"
+                    required
+                  />
+                  <label for="email" class="field-label">
+                    <i class="bx bx-id-card"></i>
+                    <span>Email Address</span>
+                  </label>
+                </div>
+
+                <div class="field-wrap">
+                  <input
+                    type="password"
+                    id="password"
+                    class="field-input"
+                    placeholder=" "
+                    autocomplete="current-password"
+                    required
+                  />
+                  <label for="password" class="field-label">
+                    <i class="bx bx-lock-alt"></i>
+                    <span>Password</span>
+                  </label>
+                </div>
+
+                <div class="checkbox-group">
+                  <input
+                    type="checkbox"
+                    id="loginAgreement"
+                    class="styled-checkbox"
+                    checked
+                  />
+                  <label for="loginAgreement" class="checkbox-label">
+                    <span class="checkbox-ui" aria-hidden="true"></span>
+                    <span>I agree to keep customer data secure and safe.</span>
+                  </label>
+                </div>
+
+                <div class="checkbox-group checkbox-group-remember">
+                  <input
+                    type="checkbox"
+                    id="rememberDevice"
+                    class="styled-checkbox"
+                  />
+                  <label for="rememberDevice" class="checkbox-label">
+                    <span class="checkbox-ui" aria-hidden="true"></span>
+                    <span>Remember this device for 30 days.</span>
+                  </label>
+                </div>
+
+                <button type="submit" id="loginBtn">LOGIN NOW</button>
+              </form>
+
+              <div class="auth-action-row">
+                <a href="#" class="link-muted" id="forgotLink"
+                  >Forgot password?</a
+                >
+                <button
+                  type="button"
+                  class="quick-login-launch"
+                  id="quickLoginLaunch"
+                >
+                  <i class="bx bx-qr-scan"></i>
+                  <span>Quick Login</span>
+                </button>
+              </div>
+              <div id="loginOutput"></div>
+
+              <div
+                class="protocol-notice-box login-notice"
+                style="margin-top: 10px"
+              >
+                <div class="notice-header">
+                  <i class="bx bx-shield-quarter"></i>
+                  <span>ACCESS PROTOCOL</span>
+                </div>
+                <div class="notice-body">
+                  This terminal is exclusively for authorized staff members
+                  including trainers and coaches, as well as family members with
+                  administrative privileges. Access requires valid credentials
+                  and proper authorization.
+                </div>
+              </div>
+
+              <div class="auth-footer">
+                <div class="sys-copyright"></div>
+              </div>
+            </div>
+
+            <div class="flip-card-back">
+              <div class="brand">RECOVERY <span>MODE</span></div>
+              <div id="recoveryContainer" class="recovery-container">
+                <!-- STEP 1: INITIAL VIEW -->
+                <div id="recoveryStep1" class="recovery-step active-step">
+                  <p class="desc">
+                    Enter authorized email to receive security key.
+                  </p>
+                  <form id="otpForm">
+                    <div class="field-wrap">
+                      <input
+                        type="email"
+                        id="forgotEmail"
+                        class="field-input"
+                        placeholder=" "
+                        autocomplete="email"
+                        required
+                      />
+                      <label for="forgotEmail" class="field-label">
+                        <i class="bx bx-id-card"></i>
+                        <span>Email Address</span>
+                      </label>
+                    </div>
+                    <button type="submit" id="sendOtpBtn">
+                      SEND SECURITY OTP
+                    </button>
+                  </form>
+                  <div id="resetOutput"></div>
+                  <!-- NOTICE BOX -->
+                  <div class="protocol-notice-box">
+                    <div class="notice-header">
+                      <i class="bx bx-info-circle"></i
+                      ><span>SYSTEM PROTOCOL</span>
+                    </div>
+                    <div class="notice-body">
+                      Recovery Mode sends a secure OTP (One-Time Password) to
+                      your registered email address. This is used to request
+                      password changes and restore access to your account.
+                    </div>
+                  </div>
+                  <!-- MOVED HERE: Below notice box -->
+                  <a href="#" class="link-muted" id="backToLoginTrigger"
+                    >Already have an account?</a
+                  >
+                  <div class="auth-footer">
+                    <div class="sys-copyright"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: CAROUSEL & TYPEWRITER -->
+      <div class="auth-right">
+        <div class="carousel-bg-wrapper">
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/1-carousel.jpg')"
+          ></div>
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/2-carousel.jpg')"
+          ></div>
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/3-carousel.jpg')"
+          ></div>
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/4-carousel.jpg')"
+          ></div>
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/5-carousel.jpg')"
+          ></div>
+          <div
+            class="slide"
+            style="background-image: url('/assets/images/6-carousel.jpg')"
+          ></div>
+        </div>
+        <div class="carousel-overlay"></div>
+        <div class="carousel-content">
+          <h2 id="typewriterText">
+            Beyond <br />
+            <span>Strength</span>
+          </h2>
+
+          <div class="description-expandable-container" id="descContainer">
+            <p class="expandable-text">
+              The ultimate terminal for Palomar Gym administrative control.
+              Encrypted, fast, and precise.
+              <span class="extra-content">
+                Wolf OS provides end-to-end telemetry for modern fitness
+                centers. Managing membership lifecycles, financial encryption,
+                and real-time staff coordination through a high-velocity
+                industrial interface.
+              </span>
+            </p>
+            <div class="expand-hint">CLICK TO EXPAND PROTOCOL</div>
+          </div>
+          <div class="sys-name watermark"></div>
+        </div>
+      </div>
+    </div>
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/toastify-js"
+    ></script>
+    <script src="/assets/js/libraries/sweetalert2.all.js"></script>
+    <script src="/assets/js/utils/audio-engine.js"></script>
+    <script src="/assets/js/utils/stars-canvas.js"></script>
+    <script src="/assets/js/libraries/purify.min.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script>
+      requestAnimationFrame(() => {
+        document.body.classList.add('intro-boot-ready');
+      });
+
+      const introCutout = document.getElementById('introCutout');
+      if (introCutout) {
+        const svg = introCutout.querySelector('.intro-cutout-svg');
+        if (svg) {
+          svg.addEventListener('animationend', (event) => {
+            if (event.animationName !== 'reveal') return;
+            introCutout.style.opacity = '0';
+            setTimeout(() => {
+              introCutout.remove();
+            }, 160);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

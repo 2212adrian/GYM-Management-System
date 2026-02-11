@@ -1,0 +1,420 @@
+<style>
+  :root {
+    --accent-red: var(--wolf-red);
+    --rail-width: 80px;
+    --expanded-width: 280px;
+  }
+
+  /* 1. MASTER PANEL */
+  .sidebar-panel {
+    position: fixed;
+    top: 0;
+    height: 100vh;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    background: var(--shell-sidebar-bg);
+    background-image: url('/assets/images/textures/diagmonds.png');
+    background-blend-mode: overlay;
+    background-size: auto;
+    background-repeat: repeat;
+    /* This makes the background move with the element */
+    background-attachment: local;
+    border-right: 1px solid var(--shell-sidebar-divider);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    padding-bottom: 15px;
+  }
+
+  /* PC RAIL LOGIC */
+  @media (min-width: 768px) {
+    #sidebar-backdrop {
+      visibility: hidden !important;
+    }
+    .sidebar-panel {
+      left: 0;
+      width: var(--rail-width);
+    }
+    .sidebar-panel.active {
+      width: var(--expanded-width);
+    }
+
+    /* HIDE CONTENT IN MINI-RAIL MODE (When .active is NOT present) */
+    .sidebar-panel:not(.active) .profile-area,
+    .sidebar-panel:not(.active) .target-box,
+    .sidebar-panel:not(.active) .nav-text,
+    .sidebar-panel:not(.active) .sidebar-section-label,
+    .sidebar-panel:not(.active) .chevron-icon {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    /* Hide sub-item primary icons when minimized (keep sub-bg-icon) */
+    .sidebar-panel:not(.active) .sub-item i:first-child {
+      display: none;
+    }
+  }
+
+  /* MOBILE LOGIC */
+  @media (max-width: 767px) {
+    .version {
+      left: 200px !important;
+    }
+    .sidebar-header {
+      display: block !important;
+      position: relative;
+      top: 15px;
+    }
+    #closeIcon {
+      position: relative;
+      left: auto;
+    }
+    .sidebar-panel {
+      right: 0;
+      width: var(--expanded-width);
+      transform: translateX(100%);
+    }
+    .sidebar-panel.active {
+      transform: translateX(0);
+    }
+  }
+
+  /* 2. ITEM STYLING (BASE / UNCLICKED) */
+  .nav-item-side {
+    display: flex;
+    align-items: center;
+    height: 54px;
+    color: var(--shell-nav-item-muted);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    position: relative;
+    pointer-events: auto;
+  }
+
+  .nav-icon {
+    min-width: var(--rail-width);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    color: inherit;
+  }
+
+  .nav-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: inherit;
+  }
+
+  /* HOVER (Only non-active) */
+  .nav-item-side:not(.active):hover {
+    background: var(--shell-sidebar-hover);
+    color: var(--text-main);
+  }
+
+  /* 3. ACTIVE STATE (THE LOCK) */
+  .nav-item-side.active {
+    pointer-events: none !important;
+    cursor: default;
+    background: rgba(var(--wolf-red-rgb), 0.08) !important;
+    color: var(--accent-red) !important;
+  }
+  .nav-item-side.active .nav-icon i,
+  .nav-item-side.active .nav-text {
+    color: var(--accent-red) !important;
+    text-shadow: 0 0 15px rgba(var(--wolf-red-rgb), 0.3);
+  }
+
+
+  /* 4. DROPDOWNS & SUB-ITEMS */
+  .sub-nav-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease;
+    background: var(--shell-sidebar-sub-bg);
+  }
+  .nav-dropdown.open .sub-nav-list {
+    max-height: 500px;
+  }
+
+  .sub-item {
+    position: relative;
+    overflow: hidden;
+    height: 48px !important;
+  }
+
+  /* If a sub-item is active, keep ONLY it visible while dropdown is collapsed */
+  .nav-dropdown.active-only:not(.open) .sub-nav-list {
+    max-height: 56px;
+  }
+  .nav-dropdown.active-only:not(.open) .sub-item {
+    display: none;
+  }
+  .nav-dropdown.active-only:not(.open) .sub-item.active {
+    display: flex;
+  }
+
+  /* The 1st Icon (Foreground) */
+  .sub-item i:first-child {
+    min-width: var(--rail-width);
+    display: flex;
+    justify-content: center;
+    font-size: 16px !important;
+    opacity: 0.6;
+    z-index: 2;
+  }
+
+  /* --- THE 2ND ICON (WATERMARK) --- */
+  .sub-bg-icon {
+    position: absolute !important;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%) scale(1.2);
+    font-size: 120px !important;
+    filter: blur(1.2px);
+    opacity: 0.05;
+    pointer-events: none;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+    color: var(--shell-sidebar-watermark) !important;
+  }
+
+  .sub-bg-icon.active .sub-bg-icon {
+    position: absolute !important;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%) scale(1.2);
+    font-size: 120px !important;
+    filter: blur(1.2px);
+    opacity: 0.05;
+    pointer-events: none;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+    color: var(--shell-sidebar-watermark) !important;
+  }
+
+  .sub-item:not(.active):hover .sub-bg-icon {
+    transform: translateY(-50%) scale(0.4) rotate(-10deg);
+    opacity: 1;
+    filter: blur(0px);
+    color: var(--gold-accent) !important;
+    text-shadow:
+      0 0 70px var(--gold-accent),
+      0 0 16px var(--gold-accent);
+  }
+
+  .sub-item:not(.active):hover .sub-bg-icon,
+  .sub-item.active .sub-bg-icon {
+    transform: translateY(-50%) scale(0.4) rotate(-10deg);
+    opacity: 1;
+    filter: blur(0px);
+    color: var(--gold-accent) !important;
+    text-shadow:
+      0 0 70px var(--gold-accent),
+      0 0 16px var(--gold-accent);
+  }
+
+  /* MISC UI */
+  .sidebar-header {
+    height: 60px;
+    padding: 0 15px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .sidebar-section-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: var(--text-dim);
+    padding: 10px 0 10px 25px;
+    text-transform: uppercase;
+  }
+  .sidebar-divider {
+    height: 1px;
+    background: var(--shell-sidebar-divider);
+    margin: 10px 25px;
+  }
+  .btn-disconnect {
+    display: flex;
+    padding-top: 20px;
+    border-top: 1px solid var(--shell-sidebar-divider);
+    color: var(--accent-red);
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .version {
+    position: absolute;
+    left: 25px;
+    top: 22px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-muted);
+    pointer-events: none;
+    display: none;
+  }
+</style>
+
+<div class="sidebar-panel" id="wolfSidebar">
+  <!-- HEADER -->
+  <div class="version sys-full-version"></div>
+  <div class="sidebar-header">
+    <button
+      id="sidebarClose"
+      style="background: none; border: none; color: var(--text-muted); cursor: pointer"
+    >
+      <i
+        class="bxf bx-caret-big-right"
+        id="closeIcon"
+        style="font-size: 28px"
+      ></i>
+    </button>
+  </div>
+
+  <!-- PROFILE AREA -->
+  <div class="profile-area" style="padding: 0 25px 15px">
+    <div
+      class="user-name"
+      style="font-weight: 800; color: var(--text-main); white-space: nowrap"
+    >
+      PALOMAR ADMIN
+    </div>
+    <div
+      class="user-email"
+      style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap"
+    >
+      admin@palomargym.com
+    </div>
+  </div>
+
+  <!-- TARGET BOX -->
+  <div
+    class="target-box"
+    style="
+      background: var(--shell-sidebar-card-bg);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 0 20px 20px;
+      border: 1px solid var(--shell-sidebar-card-border);
+    "
+  >
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+      "
+    >
+      <span>TARGET</span>
+      <b id="sidebar-target-percent" style="color: var(--text-main)">0%</b>
+    </div>
+    <div
+      style="
+        height: 4px;
+        background: var(--shell-sidebar-track);
+        margin-top: 8px;
+        border-radius: 5px;
+        overflow: hidden;
+      "
+    >
+      <div
+        id="sidebar-target-bar"
+        style="height: 100%; background: var(--accent-red); width: 0%"
+      ></div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION -->
+  <div class="nav-list">
+    <div class="sidebar-section-label">Main</div>
+    <a href="#" class="nav-item-side" data-page="dashboard">
+      <div class="nav-icon"><i class="bx bx-home-circle"></i></div>
+      <span class="nav-text">HOME</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="sales">
+      <div class="nav-icon"><i class="bx bx-shopping-bag"></i></div>
+      <span class="nav-text">SALES</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="logbook">
+      <div class="nav-icon"><i class="bx bx-detail"></i></div>
+      <span class="nav-text">LOGBOOK</span>
+    </a>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Admin</div>
+
+    <!-- MANAGEMENT DROPDOWN -->
+    <div class="nav-dropdown" id="mgmtDropdown">
+    <div class="nav-item-side dropdown-trigger">
+      <div class="nav-icon"><i class="bx bx-grid-alt"></i></div>
+      <span class="nav-text">MANAGEMENT</span>
+      <i
+        class="bx bx-chevron-down chevron-icon"
+        style="margin-left: auto; padding-right: 20px"
+      ></i>
+    </div>
+      <div class="sub-nav-list">
+        <a href="#" class="nav-item-side sub-item" data-page="members">
+          <i class="bx bx-group"></i> <span class="nav-text">MEMBERS</span>
+          <i class="bx bxs-group sub-bg-icon"></i>
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="products">
+          <i class="bx bx-package"></i> <span class="nav-text">PRODUCTS</span>
+          <i class="bx bxs-package sub-bg-icon"></i>
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="equipments">
+          <i class="bx bx-dumbbell-alt"></i>
+          <span class="nav-text">EQUIPMENTS</span>
+          <i class="bxf bx-dumbbell-alt sub-bg-icon"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- TOOLS DROPDOWN -->
+    <div class="nav-dropdown" id="toolsDropdown">
+    <div class="nav-item-side dropdown-trigger">
+      <div class="nav-icon"><i class="bx bx-wrench"></i></div>
+      <span class="nav-text">SYSTEM TOOLS</span>
+      <i
+        class="bx bx-chevron-down chevron-icon"
+        style="margin-left: auto; padding-right: 20px"
+      ></i>
+    </div>
+      <div class="sub-nav-list">
+        <a href="#" class="nav-item-side sub-item" data-page="id-maker">
+          <i class="bx bx-id-card"></i> <span class="nav-text">ID MAKER</span>
+          <i class="bx bxs-id-card sub-bg-icon"></i>
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="goal-center">
+          <i class="bx bx-target"></i> <span class="nav-text">GOAL CENTER</span>
+          <i class="bxf bx-target sub-bg-icon"></i>
+        </a>
+        <a href="#" class="nav-item-side sub-item" data-page="feedback">
+          <i class="bx bx-chat"></i> <span class="nav-text">FEEDBACK</span>
+          <i class="bx bxs-chat sub-bg-icon"></i>
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">System</div>
+    <a href="#" class="nav-item-side" data-page="audit">
+      <div class="nav-icon"><i class="bx bx-file"></i></div>
+      <span class="nav-text">AUDIT LOG</span>
+    </a>
+    <a href="#" class="nav-item-side" data-page="settings">
+      <div class="nav-icon"><i class="bx bx-cog"></i></div>
+      <span class="nav-text">SETTINGS</span>
+    </a>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="btn-disconnect logout-btn">
+    <div class="nav-icon"><i class="bx bx-power-off"></i></div>
+    <span class="nav-text">LOGOUT</span>
+  </div>
+</div>

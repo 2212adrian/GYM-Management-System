@@ -1,0 +1,187 @@
+<style>
+  /* Breadcrumb hover effect */
+  .breadcrumb-link:hover {
+    opacity: 1 !important;
+    color: var(--wolf-red);
+  }
+
+  /* Ensure the brand-name container doesn't wrap on PC */
+  #topbar-brand {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .breadcrumb-container {
+    animation: fadeInBreadcrumb 0.3s ease-out;
+  }
+
+  @keyframes fadeInBreadcrumb {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .topbar {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--shell-topbar-bg);
+    background-image: url('/assets/images/textures/grid-me.png');
+    background-blend-mode: var(--shell-topbar-blend);
+    background-size: auto;
+    background-repeat: repeat;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.3s ease;
+    box-shadow: var(--shadow-soft);
+  }
+  .brand-name {
+    font-weight: 800;
+    color: var(--text-main);
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+  }
+  .brand-name span {
+    color: var(--accent-red);
+  }
+
+  #themeToggleBtn {
+    /* Base Settings */
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1060;
+  }
+
+  /* 📱 MOBILE: Left side, Icon only */
+  @media (max-width: 767px) {
+    #themeToggleBtn {
+      left: 15px; /* Snap to Left */
+      right: auto; /* Reset PC right positioning */
+      padding: 10px; /* Square box for icon only */
+    }
+
+    #themeToggleBtn .nav-text {
+      display: none; /* Hide text */
+    }
+
+    #themeToggleBtn i {
+      font-size: 1.3rem; /* Slightly larger icon for mobile touch */
+    }
+  }
+
+  /* 💻 PC: Right side, Pill shape with text */
+  @media (min-width: 768px) {
+    #themeToggleBtn {
+      right: 20px; /* Snap to Right */
+      left: auto;
+      padding: 6px 12px;
+      gap: 8px;
+    }
+
+    #themeToggleBtn .nav-text {
+      display: inline;
+      font-weight: 800;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  }
+
+  /* Hover effect for both */
+  #themeToggleBtn:hover {
+    border-color: var(--accent-red);
+    color: var(--text-main);
+    background: var(--surface-elevated);
+  }
+
+  #muteToggleBtn {
+    /* Base Settings */
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1060;
+  }
+
+  /* 📱 MOBILE: Right side, Icon only */
+  @media (max-width: 767px) {
+    #muteToggleBtn {
+      right: 15px; /* Snap to Right */
+      left: auto; /* Reset PC left positioning */
+      padding: 10px; /* Square box for icon only */
+    }
+
+    #muteToggleBtn .nav-text {
+      display: none; /* Hide text */
+    }
+
+    #muteToggleBtn i {
+      font-size: 1.3rem; /* Slightly larger icon for mobile touch */
+    }
+  }
+
+  /* 💻 PC: Left side, Pill shape with text */
+  @media (min-width: 768px) {
+    #muteToggleBtn {
+      right: 200px;
+      padding: 6px 12px;
+      gap: 8px;
+    }
+
+    #muteToggleBtn .nav-text {
+      display: inline;
+      font-weight: 800;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  }
+
+  /* Hover effect for muteToggleBtn */
+  #muteToggleBtn:hover {
+    border-color: var(--accent-red);
+    color: var(--text-main);
+    background: var(--surface-elevated);
+  }
+</style>
+
+<header class="topbar shadow-sm">
+  <a href="#" class="nav-item-side" id="themeToggleBtn">
+    <i class="bx bx-moon"></i>
+    <span class="nav-text">THEME TOGGLE</span>
+  </a>
+  <a href="#" class="nav-item-side" id="muteToggleBtn">
+    <i class="bx bx-volume-full" id="muteIcon"></i>
+    <span class="nav-text">AUDIO: NULL</span>
+  </a>
+  <div class="brand-name" id="topbar-brand">WOLF <span>PALOMAR</span> GYM</div>
+</header>

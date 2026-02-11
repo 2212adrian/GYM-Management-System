@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Wolf OS - Terminal</title>
+    <link rel="icon" href="/assets/images/favicon.ico" />
+    <!-- CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Basic Icons -->
+    <link
+      href="https://cdn.boxicons.com/3.0.8/fonts/basic/boxicons.min.css"
+      rel="stylesheet"
+    />
+    <!-- Filled Icons -->
+    <link
+      href="https://cdn.boxicons.com/3.0.8/fonts/filled/boxicons-filled.min.css"
+      rel="stylesheet"
+    />
+    <!-- Brand Icons -->
+    <link
+      href="https://cdn.boxicons.com/3.0.8/fonts/brands/boxicons-brands.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/css/main.css" />
+
+    <!-- Frameworks & Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
+    <!-- Shell Security & Config -->
+    <script>
+      window.WOLF_INTERNAL_SHELL = true;
+    </script>
+    <script src="/assets/js/utils/system-config.js"></script>
+    <script src="/assets/js/utils/wolf-router.js"></script>
+    <script src="/assets/js/utils/auth-guard.js"></script>
+
+    <style>
+      .htmx-fade-in.htmx-added {
+        opacity: 0;
+      }
+      .htmx-fade-in {
+        opacity: 1;
+        transition: opacity 0.3s ease-out;
+      }
+    </style>
+  </head>
+  <body id="wolf-terminal">
+    <div id="loading-overlay">
+      <!-- 1. Star container for the first 2 seconds -->
+      <div id="stars-container"></div>
+
+      <!-- 2. The actual loading info screen -->
+      <div id="loading-screen" class="show">
+        <div class="scanline"></div>
+        <div class="terminal-container">
+          <div class="boot-logo">WOLF <span class="os-brand">OS</span></div>
+
+          <div class="loading-wrapper">
+            <div class="boot-spinner"></div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="boot-status">INITIALIZING CORE SYSTEMS...</div>
+          <div class="boot-metadata sys-os-version"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="logout-overlay" aria-hidden="true">
+      <div class="logout-core">
+        <div class="logout-ring"></div>
+        <div class="logout-label">TERMINATING SESSION</div>
+        <div class="logout-sub">
+          Revoking credentials and sealing terminal...
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar-backdrop"></div>
+    <div id="topbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <div id="wolf-layout">
+      <div id="sidebar-container"></div>
+      <main id="main-content">
+        <!-- DEFAULT WELCOME SCREEN -->
+        <div
+          class="version sys-full-version"
+          style="
+            color: var(--text-muted);
+            font-size: 10px;
+            letter-spacing: 2px;
+            margin-top: 5px;
+          "
+        ></div>
+
+        <p
+          style="
+            margin-top: 30px;
+            color: #444;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+          "
+        >
+          SYSTEM READY. AUTHORIZED ACCESS ONLY.
+        </p>
+        <div class="brand brand-container">WOLF <span>PALOMAR</span></div>
+        <div id="page-wrapper" style="text-align: center; padding-top: 150px">
+          <!-- Using brand-container to protect your CSS span styling -->
+          <!-- DO NOT ADD ANYTHING-->
+        </div>
+      </main>
+    </div>
+
+    <div id="nav-container"></div>
+    <script src="/assets/js/libraries/sweetalert2.all.js"></script>
+    <!-- UI Logic -->
+    <script src="/assets/js/utils/audio-engine.js"></script>
+    <script src="/assets/js/utils/supabase-init.js"></script>
+    <script src="/assets/js/libraries/purify.min.js"></script>
+    <script
+      src="https://unpkg.com/html5-qrcode"
+      type="text/javascript"
+    ></script>
+
+    <!-- Data Engines -->
+    <script src="/assets/js/utils/data-loader.js"></script>
+    <script src="/assets/js/utils/logbook-manager.js"></script>
+    <script src="/assets/js/utils/sales-manager.js"></script>
+    <script src="/assets/js/utils/member-manager.js"></script>
+    <script src="/assets/js/utils/product-manager.js"></script>
+    <script src="/assets/js/utils/scanner.js"></script>
+
+    <!-- Navigation Engine -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/toastify-js"
+    ></script>
+    <script src="/assets/js/utils/ui-loader.js"></script>
+    <!-- Internal Security (Direct Access Redirect) -->
+    <script>
+      (function () {
+        if (!window.WOLF_INTERNAL_SHELL) {
+          document.documentElement.style.display = 'none';
+          window.location.replace('/index.html');
+        }
+      })();
+    </script>
+
+    <!-- "Ghost" Footer (Versioning) -->
+    <footer
+      style="
+        position: fixed;
+        bottom: 12px;
+        width: 100%;
+        text-align: center;
+        font-size: 9px;
+        color: #222;
+        pointer-events: none;
+        z-index: 1;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        left: 0px;
+      "
+    >
+      <span class="sys-copyright"></span> | <span class="sys-version"></span>
+    </footer>
+  </body>
+</html>

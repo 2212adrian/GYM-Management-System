@@ -1,0 +1,149 @@
+<style>
+  .audit-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  @media (min-width: 1024px) {
+    .audit-wrapper {
+      max-width: 1300px;
+      min-width: 650px;
+    }
+  }
+
+  .audit-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #fff;
+    margin-bottom: 15px;
+  }
+
+  .audit-card {
+    background: linear-gradient(180deg, #161616, #0d0d0d);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 28px;
+    padding: 22px;
+    box-shadow: 0 35px 70px rgba(0, 0, 0, 0.8);
+  }
+
+  .audit-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 14px;
+  }
+
+  .audit-header i {
+    color: var(--wolf-red);
+    font-size: 14px;
+  }
+
+  .audit-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  @media (max-width: 768px) {
+    .audit-range {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .audit-input {
+    background: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 14px;
+    color: #fff;
+    font-size: 12px;
+    padding: 14px;
+    outline: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .audit-input input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    outline: none;
+  }
+
+  .audit-logs {
+    margin-top: 18px;
+    background: linear-gradient(180deg, #101010, #0a0a0a);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 28px;
+    padding: 30px;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .audit-logs i {
+    font-size: 42px;
+    color: #222;
+  }
+
+  .audit-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    opacity: 0.8;
+  }
+</style>
+
+<script src="/assets/js/utils/gatekeeper.js"></script>
+<script src="/assets/js/utils/auth-guard.js"></script>
+
+<div class="audit-wrapper">
+  <div class="audit-title">SYSTEM HISTORY (static)</div>
+
+  <div class="audit-card">
+    <div class="audit-header">
+      <i class="bx bx-calendar"></i>
+      <span>DATE RANGE AUDIT</span>
+    </div>
+
+    <div class="audit-range">
+      <div class="audit-input">
+        <span style="font-size: 9px; letter-spacing: 2px; color: #666"
+          >FROM</span
+        >
+        <input type="text" placeholder="mm/dd/yyyy" />
+        <i class="bx bx-calendar"></i>
+      </div>
+      <div class="audit-input">
+        <span style="font-size: 9px; letter-spacing: 2px; color: #666">TO</span>
+        <input type="text" placeholder="mm/dd/yyyy" />
+        <i class="bx bx-calendar"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="audit-logs">
+    <div class="audit-empty">
+      <i class="bx bx-pulse"></i>
+      <span>NO MATCHING ACTIVITY LOGS</span>
+    </div>
+  </div>
+</div>

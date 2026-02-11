@@ -1,0 +1,125 @@
+<style>
+  .wolf-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(15px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000000; /* Above everything else */
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .wolf-confirm-container {
+    background: #0d0d0d;
+    width: 100%;
+    max-width: 450px;
+    border: 1px solid #222;
+    border-radius: 28px;
+    padding: 30px;
+    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
+    animation: modalScaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+  }
+
+  .wolf-confirm-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+  }
+
+  /* Types */
+  .wolf-confirm-container.danger {
+    border-color: #ef4444;
+  }
+  .wolf-confirm-container.danger .wolf-confirm-icon {
+    color: #ef4444;
+  }
+  .wolf-confirm-container.warning {
+    border-color: #eab308;
+  }
+  .wolf-confirm-container.warning .wolf-confirm-icon {
+    color: #eab308;
+  }
+
+  .wolf-confirm-title {
+    font-weight: 900;
+    font-size: 1.4rem;
+    color: #fff;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .wolf-confirm-msg {
+    font-size: 14px;
+    color: #888;
+    line-height: 1.6;
+    margin-bottom: 30px;
+  }
+
+  .wolf-confirm-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .wolf-confirm-actions button {
+    flex: 1;
+    padding: 16px;
+    border-radius: 14px;
+    font-weight: 900;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .btn-confirm-yes {
+    background: #fff;
+    color: #000;
+  }
+  .btn-confirm-yes:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(255, 255, 255, 0.1);
+  }
+
+  .btn-confirm-no {
+    background: #1a1a1a;
+    color: #555;
+  }
+  .btn-confirm-no:hover {
+    background: #222;
+    color: #fff;
+  }
+
+  @keyframes modalScaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+</style>
+
+<div id="wolf-modal-confirm" class="wolf-confirm-overlay">
+  <div class="wolf-confirm-container" id="wolf-modal-box">
+    <i class="bx wolf-confirm-icon" id="wolf-modal-icon"></i>
+    <h2 class="wolf-confirm-title" id="wolf-modal-title">CONFIRM_ACTION</h2>
+    <p class="wolf-confirm-msg" id="wolf-modal-msg">
+      Are you sure you want to proceed with this protocol?
+    </p>
+
+    <div class="wolf-confirm-actions">
+      <button class="btn-confirm-no" id="wolf-modal-cancel-btn">CANCEL</button>
+      <button class="btn-confirm-yes" id="wolf-modal-confirm-btn">
+        PROCEED
+      </button>
+    </div>
+  </div>
+</div>
