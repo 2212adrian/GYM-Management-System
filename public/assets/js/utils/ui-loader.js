@@ -22,8 +22,24 @@ window.wolfRetry = async function () {
       cache: 'no-store',
     });
 
-    // If we reach here, connection is back!
-    // Now we can safely reload the page to restore the OS state
+    // If we reach here, connection is back.
+    // Restore current in-app route without hard reload.
+    const activePage =
+      window.WOLF_LAST_REQUESTED_PAGE ||
+      window.WOLF_CURRENT_PAGE ||
+      new URLSearchParams(window.location.search).get('p') ||
+      'dashboard';
+
+    if (typeof navigateTo === 'function') {
+      await navigateTo(activePage, { updateRoute: false });
+      return;
+    }
+
+    if (window.wolfRouter && typeof window.wolfRouter.refreshCurrent === 'function') {
+      await window.wolfRouter.refreshCurrent({ replace: true });
+      return;
+    }
+
     window.location.reload();
   } catch (err) {
     // Still no signal
@@ -142,21 +158,90 @@ const themeManager = {
 // Initialize theme immediately to prevent "white flash"
 themeManager.init();
 
+let wolfMainRouter = null;
+let wolfMainRouterSyncing = false;
+let wolfLogoutInProgress = false;
+
+function getInitialMainPage() {
+  const hash = String(window.location.hash || '');
+  const hashPage = hash.startsWith('#/') ? hash.slice(2).trim() : '';
+  const queryPage = new URLSearchParams(window.location.search).get('p');
+  return hashPage || queryPage || 'dashboard';
+}
+
+function initMainRouter() {
+  if (typeof Navigo === 'undefined' || wolfMainRouter) return;
+
+  wolfMainRouter = new Navigo('/', { hash: true });
+
+  wolfMainRouter.on('/:page', (match) => {
+    if (wolfMainRouterSyncing) return;
+    const page = String(match?.data?.page || '').trim() || 'dashboard';
+    navigateTo(page, { updateRoute: false });
+  });
+
+  wolfMainRouter.notFound(() => {
+    if (wolfMainRouterSyncing) return;
+    navigateTo('dashboard', { updateRoute: false });
+  });
+}
+
+async function playLogoutOutro() {
+  if (wolfLogoutInProgress) return;
+
+  wolfLogoutInProgress = true;
+  document.body.classList.remove('logout-outro-final');
+  document.body.classList.add('logout-outro-active');
+
+  const overlay = document.getElementById('logout-overlay');
+  if (overlay) overlay.setAttribute('aria-hidden', 'false');
+
+  if (window.wolfAudio) {
+    window.wolfAudio.play('woosh');
+    setTimeout(() => {
+      window.wolfAudio.play('logoff');
+    }, 180);
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 1550));
+  document.body.classList.add('logout-outro-final');
+  await new Promise((resolve) => setTimeout(resolve, 950));
+}
+
+function rollbackLogoutOutro() {
+  document.body.classList.remove('logout-outro-final');
+  document.body.classList.remove('logout-outro-active');
+  const overlay = document.getElementById('logout-overlay');
+  if (overlay) overlay.setAttribute('aria-hidden', 'true');
+  wolfLogoutInProgress = false;
+}
+
 // --- GLOBAL LOGOUT HANDLER (SweetAlert confirm) ---
 window.handleLogout = async function () {
   const swal = window.Swal;
   const db = window.supabaseClient;
 
   const confirmLogout = async () => {
+    if (wolfLogoutInProgress) return;
+
     try {
+      await playLogoutOutro();
+
       if (db?.auth?.signOut) {
         await db.auth.signOut();
       } else {
         // Fallback if client is missing for any reason
         sessionStorage.clear();
+      }
+
+      if (window.wolfRouter && typeof window.wolfRouter.goToLogin === 'function') {
+        await window.wolfRouter.goToLogin({ replace: true, seamless: true });
+      } else {
         window.location.replace('/index.html');
       }
     } catch (err) {
+      rollbackLogoutOutro();
+
       if (swal) {
         swal.fire({
           title: 'LOGOUT FAILED',
@@ -413,10 +498,13 @@ async function closeAllActiveModals() {
     .forEach((modal) => forceHideModalElement(modal));
 }
 
-async function navigateTo(pageName) {
+async function navigateTo(pageName, options = {}) {
   const mainContent = document.getElementById('main-content');
   const brandEl = document.getElementById('topbar-brand');
   if (!mainContent) return;
+  const { updateRoute = true } = options;
+
+  window.WOLF_LAST_REQUESTED_PAGE = pageName;
 
   await closeAllActiveModals();
 
@@ -611,8 +699,25 @@ async function navigateTo(pageName) {
       mainContent.style.opacity = '1';
       updateNavHighlights(pageName);
 
-      if (pageName)
-        window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
+      window.WOLF_CURRENT_PAGE = pageName;
+      window.WOLF_LAST_REQUESTED_PAGE = pageName;
+
+      if (updateRoute && pageName) {
+        if (wolfMainRouter) {
+          const nextRoute = `/${pageName}`;
+          const currentRoute = String(window.location.hash || '').replace('#', '') || '/';
+
+          if (currentRoute !== nextRoute) {
+            wolfMainRouterSyncing = true;
+            wolfMainRouter.navigate(nextRoute);
+            setTimeout(() => {
+              wolfMainRouterSyncing = false;
+            }, 0);
+          }
+        } else {
+          window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
+        }
+      }
 
       if (window.applyVersioning) window.applyVersioning();
     }, 200);
@@ -665,6 +770,7 @@ async function loadHTML(path) {
 async function initUI() {
   // 1. Setup Theme and DOM References
   themeManager.init();
+  initMainRouter();
 
   const loadingScreen = document.getElementById('loading-screen');
   const loadingOverlay = document.getElementById('loading-overlay');
@@ -688,9 +794,9 @@ async function initUI() {
       document.getElementById('sidebar-container').innerHTML = sidebar;
       document.getElementById('nav-container').innerHTML = nav;
 
-      // Auto-load initial page based on URL or default to dashboard
-      const urlParams = new URLSearchParams(window.location.search);
-      await navigateTo(urlParams.get('p') || 'dashboard');
+      // Auto-load initial page based on Navigo hash route, query fallback, then dashboard.
+      const initialPage = getInitialMainPage();
+      await navigateTo(initialPage, { updateRoute: true });
 
       if (window.applyVersioning) window.applyVersioning();
     } catch (err) {

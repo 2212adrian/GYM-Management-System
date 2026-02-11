@@ -4,6 +4,8 @@ const crypto = require('node:crypto');
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const quickLoginSecret = process.env.QUICK_LOGIN_SECRET || serviceRoleKey;
+const quickLoginHashSecret =
+  process.env.QUICK_LOGIN_HASH_SECRET || quickLoginSecret || serviceRoleKey;
 
 function json(statusCode, body) {
   return {
@@ -35,15 +37,40 @@ function hashSecret(secret) {
     .digest('hex');
 }
 
+function hashWithSecret(value, prefix = '') {
+  return crypto
+    .createHash('sha256')
+    .update(`${prefix}${value}:${quickLoginHashSecret}`)
+    .digest('hex');
+}
+
+function hashIp(ip) {
+  return hashWithSecret(ip, 'ip:');
+}
+
+function hashUserAgent(userAgent) {
+  return hashWithSecret(userAgent, 'ua:');
+}
+
+function normalizeIp(rawIp) {
+  let ip = String(rawIp || '')
+    .split(',')[0]
+    .trim();
+  if (!ip) return 'unknown';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  if (ip === '::1') return '127.0.0.1';
+  return ip;
+}
+
 function getClientIp(event) {
   const xForwardedFor =
     event.headers?.['x-forwarded-for'] || event.headers?.['X-Forwarded-For'];
-  if (xForwardedFor) return String(xForwardedFor).split(',')[0].trim();
+  if (xForwardedFor) return normalizeIp(xForwardedFor);
 
-  return (
+  return normalizeIp(
     event.headers?.['x-real-ip'] ||
-    event.requestContext?.identity?.sourceIp ||
-    'unknown'
+      event.requestContext?.identity?.sourceIp ||
+      'unknown',
   );
 }
 
@@ -51,6 +78,10 @@ function getUserAgent(event) {
   return (
     event.headers?.['user-agent'] || event.headers?.['User-Agent'] || 'unknown'
   );
+}
+
+function looksLikeSha256Hex(value) {
+  return /^[a-f0-9]{64}$/i.test(String(value || '').trim());
 }
 
 function isLocalOrUnknownIp(ip) {
@@ -63,9 +94,29 @@ function isLocalOrUnknownIp(ip) {
   );
 }
 
+function deriveRequestSecret(requestId) {
+  return crypto
+    .createHmac('sha256', quickLoginSecret)
+    .update(`quick-login:${requestId}`)
+    .digest('hex');
+}
+
+function isValidRequestCredentials(row, requestId, requestSecret) {
+  const stored = String(row?.request_secret_hash || '');
+  if (!stored) return false;
+
+  const providedHash = hashSecret(requestSecret);
+  if (stored === providedHash) return true;
+
+  const deterministicHash = hashSecret(deriveRequestSecret(requestId));
+  return stored === deterministicHash;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
-  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+  if (event.httpMethod !== 'POST') {
+    return json(405, { error: 'Method not allowed' });
+  }
 
   try {
     if (!supabaseUrl || !serviceRoleKey) {
@@ -94,6 +145,7 @@ exports.handler = async (event) => {
       .select(
         `
           request_id,
+          created_at,
           request_secret_hash,
           status,
           expires_at,
@@ -103,6 +155,7 @@ exports.handler = async (event) => {
           requester_region,
           requester_country,
           requester_country_code,
+          approved_by_auth_user_id,
           approved_by_email,
           approved_access_token,
           approved_refresh_token
@@ -114,7 +167,7 @@ exports.handler = async (event) => {
     if (rowError) return json(500, { error: rowError.message });
     if (!row) return json(404, { error: 'Quick-login request not found' });
 
-    if (row.request_secret_hash !== hashSecret(requestSecret)) {
+    if (!isValidRequestCredentials(row, requestId, requestSecret)) {
       return json(401, { error: 'Invalid quick-login credentials' });
     }
 
@@ -141,27 +194,48 @@ exports.handler = async (event) => {
     if (row.status === 'approved' && consume) {
       const consumerIp = getClientIp(event);
       const consumerUserAgent = getUserAgent(event);
-      const requesterIp = String(row.requester_ip || '').trim();
-      const requesterUserAgent = String(row.requester_user_agent || '').trim();
+      const consumerIpHash = hashIp(consumerIp);
+      const consumerUserAgentHash = hashUserAgent(consumerUserAgent);
 
-      if (
-        !isLocalOrUnknownIp(requesterIp) &&
-        !isLocalOrUnknownIp(consumerIp) &&
-        requesterIp !== consumerIp
-      ) {
-        return json(403, { error: 'Quick-login consumer IP mismatch' });
-      }
+      const requesterIpStored = String(row.requester_ip || '').trim();
+      const requesterUserAgentStored = String(row.requester_user_agent || '').trim();
 
-      if (
-        requesterUserAgent &&
-        consumerUserAgent &&
-        requesterUserAgent !== consumerUserAgent
-      ) {
-        return json(403, { error: 'Quick-login consumer device mismatch' });
+      const requesterIpIsHashed = looksLikeSha256Hex(requesterIpStored);
+      const requesterUaIsHashed = looksLikeSha256Hex(requesterUserAgentStored);
+
+      if (requesterIpIsHashed || requesterUaIsHashed) {
+        if (requesterIpIsHashed && requesterIpStored !== consumerIpHash) {
+          return json(403, { error: 'Quick-login consumer IP mismatch' });
+        }
+
+        if (
+          requesterUaIsHashed &&
+          requesterUserAgentStored !== consumerUserAgentHash
+        ) {
+          return json(403, { error: 'Quick-login consumer device mismatch' });
+        }
+      } else {
+        // Legacy plaintext fallback support
+        if (
+          !isLocalOrUnknownIp(requesterIpStored) &&
+          !isLocalOrUnknownIp(consumerIp) &&
+          requesterIpStored !== consumerIp
+        ) {
+          return json(403, { error: 'Quick-login consumer IP mismatch' });
+        }
+
+        if (
+          requesterUserAgentStored &&
+          consumerUserAgent &&
+          requesterUserAgentStored !== consumerUserAgent
+        ) {
+          return json(403, { error: 'Quick-login consumer device mismatch' });
+        }
       }
 
       const accessToken = row.approved_access_token;
       const refreshToken = row.approved_refresh_token;
+      const consumedAtIso = new Date().toISOString();
 
       if (!accessToken || !refreshToken) {
         return json(410, { status: 'consumed', error: 'Approval already consumed' });
@@ -171,13 +245,37 @@ exports.handler = async (event) => {
         .from('quick_login_requests')
         .update({
           status: 'consumed',
-          updated_at: new Date().toISOString(),
-          consumed_at: new Date().toISOString(),
+          updated_at: consumedAtIso,
+          consumed_at: consumedAtIso,
           approved_access_token: null,
           approved_refresh_token: null,
         })
         .eq('request_id', requestId)
         .eq('status', 'approved');
+
+      const { error: auditError } = await supabase.from('audit_log').insert({
+        table_name: 'quick_login_requests',
+        operation: 'CONSUME',
+        record_id: row.request_id,
+        changed_by: row.approved_by_auth_user_id || null,
+        change_payload: {
+          status_from: 'approved',
+          status_to: 'consumed',
+          consumed_at: consumedAtIso,
+          created_at: row.created_at || null,
+          requester_ip_hash: row.requester_ip || null,
+          requester_city_hash: row.requester_city || null,
+          requester_region_hash: row.requester_region || null,
+          requester_country_hash: row.requester_country || null,
+          approved_by_email: row.approved_by_email || null,
+          consumed_by_ip_hash: consumerIpHash,
+          consumed_by_user_agent_hash: consumerUserAgentHash,
+        },
+      });
+
+      if (auditError) {
+        console.warn('Quick-login consume audit insert failed:', auditError.message);
+      }
 
       return json(200, {
         status: 'approved',
@@ -193,11 +291,11 @@ exports.handler = async (event) => {
       remainingSeconds:
         expiresAtMs > now ? Math.max(1, Math.ceil((expiresAtMs - now) / 1000)) : 0,
       location: {
-        ip: row.requester_ip || null,
-        city: row.requester_city || null,
-        region: row.requester_region || null,
-        country: row.requester_country || null,
-        countryCode: row.requester_country_code || null,
+        ip: 'Protected by SHA-256',
+        city: 'Protected by SHA-256',
+        region: 'Protected by SHA-256',
+        country: 'Protected by SHA-256',
+        countryCode: 'Protected by SHA-256',
       },
       approvedByEmail: row.approved_by_email || null,
     });

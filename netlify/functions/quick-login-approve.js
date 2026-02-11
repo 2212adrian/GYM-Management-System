@@ -4,6 +4,8 @@ const crypto = require('node:crypto');
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const quickLoginSecret = process.env.QUICK_LOGIN_SECRET || serviceRoleKey;
+const quickLoginHashSecret =
+  process.env.QUICK_LOGIN_HASH_SECRET || quickLoginSecret || serviceRoleKey;
 
 function json(statusCode, body) {
   return {
@@ -35,15 +37,58 @@ function hashSecret(secret) {
     .digest('hex');
 }
 
+function hashWithSecret(value, prefix = '') {
+  return crypto
+    .createHash('sha256')
+    .update(`${prefix}${value}:${quickLoginHashSecret}`)
+    .digest('hex');
+}
+
+function hashIp(ip) {
+  return hashWithSecret(ip, 'ip:');
+}
+
+function hashUserAgent(userAgent) {
+  return hashWithSecret(userAgent, 'ua:');
+}
+
+function deriveRequestSecret(requestId) {
+  return crypto
+    .createHmac('sha256', quickLoginSecret)
+    .update(`quick-login:${requestId}`)
+    .digest('hex');
+}
+
+function isValidRequestCredentials(row, requestId, requestSecret) {
+  const stored = String(row?.request_secret_hash || '');
+  if (!stored) return false;
+
+  const providedHash = hashSecret(requestSecret);
+  if (stored === providedHash) return true;
+
+  const deterministicHash = hashSecret(deriveRequestSecret(requestId));
+  return stored === deterministicHash;
+}
+
+function normalizeIp(rawIp) {
+  let ip = String(rawIp || '')
+    .split(',')[0]
+    .trim();
+  if (!ip) return 'unknown';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  if (ip === '::1') return '127.0.0.1';
+  return ip;
+}
+
 function getClientIp(event) {
   const xForwardedFor =
     event.headers?.['x-forwarded-for'] || event.headers?.['X-Forwarded-For'];
-  if (xForwardedFor) return String(xForwardedFor).split(',')[0].trim();
+  if (xForwardedFor) return normalizeIp(xForwardedFor);
 
-  return (
+  return normalizeIp(
     event.headers?.['x-real-ip'] ||
-    event.requestContext?.identity?.sourceIp ||
-    'unknown'
+      event.requestContext?.identity?.sourceIp ||
+      'unknown',
   );
 }
 
@@ -55,7 +100,9 @@ function getUserAgent(event) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
-  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+  if (event.httpMethod !== 'POST') {
+    return json(405, { error: 'Method not allowed' });
+  }
 
   try {
     if (!supabaseUrl || !serviceRoleKey) {
@@ -91,7 +138,7 @@ exports.handler = async (event) => {
     if (rowError) return json(500, { error: rowError.message });
     if (!row) return json(404, { error: 'Quick-login request not found' });
 
-    if (row.request_secret_hash !== hashSecret(requestSecret)) {
+    if (!isValidRequestCredentials(row, requestId, requestSecret)) {
       return json(401, { error: 'Invalid quick-login credentials' });
     }
 
@@ -133,8 +180,8 @@ exports.handler = async (event) => {
         approved_by_email: approverUser.email || null,
         approved_access_token: accessToken,
         approved_refresh_token: refreshToken,
-        approved_by_ip: getClientIp(event),
-        approved_by_user_agent: getUserAgent(event),
+        approved_by_ip: hashIp(getClientIp(event)),
+        approved_by_user_agent: hashUserAgent(getUserAgent(event)),
       })
       .eq('request_id', requestId)
       .eq('status', 'pending');

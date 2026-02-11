@@ -146,10 +146,42 @@
       </p>
 
       <!-- Retry Action -->
-      <button class="retry-btn" onclick="window.location.reload()">
+      <button class="retry-btn" onclick="window.wolfReconnect()">
         <i class="bx bx-refresh"></i>
         Retry Connection
       </button>
     </div>
+    <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
+    <script src="/assets/js/utils/wolf-router.js"></script>
+    <script>
+      window.wolfReconnect = async function () {
+        const btn = document.querySelector('.retry-btn');
+        const icon = btn?.querySelector('i');
+        const baseText = 'Retry Connection';
+
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = '';
+          if (icon) icon.className = 'bx bx-loader-alt bx-spin';
+          btn.appendChild(icon || document.createElement('i'));
+          const txt = document.createTextNode(' Re-establishing Link...');
+          btn.appendChild(txt);
+        }
+
+        try {
+          await fetch('/favicon.ico', { cache: 'no-store' });
+          if (window.wolfRouter && typeof window.wolfRouter.goToLogin === 'function') {
+            await window.wolfRouter.goToLogin({ replace: true, seamless: true });
+            return;
+          }
+          window.location.replace('/index.html');
+        } catch (_) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bx bx-refresh"></i> ${baseText}`;
+          }
+        }
+      };
+    </script>
   </body>
 </html>

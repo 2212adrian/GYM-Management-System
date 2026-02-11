@@ -26,6 +26,32 @@
   const PATH_MAIN = '/pages/main.html';
   const PATH_UNAUTHORIZED = '/pages/unauthorized.html';
 
+  const seamlessRedirect = async (targetPath) => {
+    try {
+      if (window.wolfRouter) {
+        if (targetPath === PATH_MAIN) {
+          await window.wolfRouter.goToMain('dashboard', {
+            replace: true,
+            seamless: true,
+          });
+          return;
+        }
+
+        if (targetPath === PATH_LOGIN) {
+          await window.wolfRouter.goToLogin({
+            replace: true,
+            seamless: true,
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Wolf OS Guard: Seamless redirect fallback ->', err);
+    }
+
+    window.location.replace(targetPath);
+  };
+
   const fullPath = window.location.pathname.toLowerCase();
 
   const isLoginPage =
@@ -52,7 +78,7 @@
     // AUTO-FORWARD: If user refreshes index.html while already logged in
     if (isLoginPage && user && isAdmin) {
       console.log('Wolf OS Guard: Active session found. Forwarding...');
-      window.location.replace(PATH_MAIN);
+      await seamlessRedirect(PATH_MAIN);
       return;
     }
 
@@ -93,14 +119,14 @@
     if (event === 'INITIAL_SESSION' && isLoginPage) {
       const user = session?.user;
       const isAdmin = user && user.user_metadata?.role === 'admin';
-      if (isAdmin) window.location.replace(PATH_MAIN);
+      if (isAdmin) await seamlessRedirect(PATH_MAIN);
     }
 
     // Handle global logout
     if (event === 'SIGNED_OUT') {
       sessionStorage.clear();
       // Only redirect if we aren't already on the login page
-      if (!isLoginPage) window.location.replace(PATH_LOGIN);
+      if (!isLoginPage) await seamlessRedirect(PATH_LOGIN);
     }
   });
 })();

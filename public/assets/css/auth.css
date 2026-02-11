@@ -250,7 +250,7 @@ input:focus {
 .field-wrap:focus-within .field-label,
 .field-input:not(:placeholder-shown) + .field-label,
 .field-input:-webkit-autofill + .field-label {
-  top: 7px;
+  top: 2px;
   transform: translateY(0);
   font-size: 9px;
   color: #a3b4ff;
@@ -535,7 +535,6 @@ button:hover:not(:disabled) {
 }
 #loginOutput {
   min-height: 34px;
-  margin: 8px 0 14px;
   padding: 0 6px;
   font-size: 12px;
   line-height: 1.35;
@@ -667,7 +666,11 @@ button:hover:not(:disabled) {
   border-radius: 24px;
   border: 1px solid rgba(77, 166, 255, 0.25);
   background:
-    radial-gradient(circle at top right, rgba(43, 54, 116, 0.35), transparent 56%),
+    radial-gradient(
+      circle at top right,
+      rgba(43, 54, 116, 0.35),
+      transparent 56%
+    ),
     linear-gradient(180deg, rgba(15, 16, 18, 0.96), rgba(21, 25, 32, 0.96));
   box-shadow:
     0 26px 70px rgba(0, 0, 0, 0.6),
@@ -730,14 +733,14 @@ button:hover:not(:disabled) {
 
 .quick-login-head h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   letter-spacing: 0.7px;
   text-transform: uppercase;
 }
 
 .quick-login-head p {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -800,7 +803,7 @@ button:hover:not(:disabled) {
 .quick-login-status {
   min-height: 20px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #9fb8ff;
   letter-spacing: 0.2px;
@@ -837,7 +840,7 @@ button:hover:not(:disabled) {
 }
 
 .quick-login-meta-item strong {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-main);
   font-weight: 800;
 }
@@ -850,7 +853,7 @@ button:hover:not(:disabled) {
   border: 1px solid rgba(166, 52, 41, 0.34);
   background: rgba(166, 52, 41, 0.12);
   color: #ffc0b8;
-  font-size: 11px;
+  font-size: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1106,8 +1109,16 @@ body.light-theme .quick-login-launch {
 
 body.light-theme .quick-login-card {
   background:
-    radial-gradient(circle at top right, rgba(43, 54, 116, 0.2), transparent 56%),
-    linear-gradient(180deg, rgba(245, 241, 234, 0.97), rgba(239, 233, 225, 0.97));
+    radial-gradient(
+      circle at top right,
+      rgba(43, 54, 116, 0.2),
+      transparent 56%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(245, 241, 234, 0.97),
+      rgba(239, 233, 225, 0.97)
+    );
   border-color: rgba(43, 54, 116, 0.2);
   box-shadow:
     0 22px 60px rgba(58, 43, 29, 0.2),

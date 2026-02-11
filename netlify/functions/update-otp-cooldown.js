@@ -14,6 +14,29 @@ function hashIp(ip, secret) {
   return crypto.createHash('sha256').update(`${ip}:${secret}`).digest('hex');
 }
 
+function normalizeIp(rawIp) {
+  let ip = String(rawIp || '')
+    .split(',')[0]
+    .trim();
+  if (!ip) return 'unknown';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  if (ip === '::1') return '127.0.0.1';
+  return ip;
+}
+
+function getClientIp(event) {
+  const reqHeaders = event.headers || {};
+  const xForwardedFor =
+    reqHeaders['x-forwarded-for'] || reqHeaders['X-Forwarded-For'];
+  if (xForwardedFor) return normalizeIp(xForwardedFor);
+
+  return normalizeIp(
+    reqHeaders['x-real-ip'] ||
+      event.requestContext?.identity?.sourceIp ||
+      'unknown',
+  );
+}
+
 exports.handler = async (event, context) => {
   // Enable CORS
   const headers = {
@@ -46,10 +69,7 @@ exports.handler = async (event, context) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get client IP address
-    const clientIP = event.headers['x-forwarded-for'] ||
-                     event.headers['x-real-ip'] ||
-                     event.requestContext?.identity?.sourceIp ||
-                     'unknown';
+    const clientIP = getClientIp(event);
     const clientIpHash = hashIp(clientIP, ipHashSecret);
 
     // Update or insert cooldown record

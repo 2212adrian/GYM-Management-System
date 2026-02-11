@@ -50,11 +50,13 @@
     <!-- Frameworks & Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
     <!-- Shell Security & Config -->
     <script>
       window.WOLF_INTERNAL_SHELL = true;
     </script>
     <script src="/assets/js/utils/system-config.js"></script>
+    <script src="/assets/js/utils/wolf-router.js"></script>
     <script src="/assets/js/utils/auth-guard.js"></script>
 
     <style>
@@ -87,6 +89,16 @@
 
           <div class="boot-status">INITIALIZING CORE SYSTEMS...</div>
           <div class="boot-metadata sys-os-version"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="logout-overlay" aria-hidden="true">
+      <div class="logout-core">
+        <div class="logout-ring"></div>
+        <div class="logout-label">TERMINATING SESSION</div>
+        <div class="logout-sub">
+          Revoking credentials and sealing terminal...
         </div>
       </div>
     </div>

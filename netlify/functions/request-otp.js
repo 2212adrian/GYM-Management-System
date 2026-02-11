@@ -22,15 +22,25 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function normalizeIp(rawIp) {
+  let ip = String(rawIp || '')
+    .split(',')[0]
+    .trim();
+  if (!ip) return 'unknown';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  if (ip === '::1') return '127.0.0.1';
+  return ip;
+}
+
 function getClientIp(event) {
   const xForwardedFor =
     event.headers?.['x-forwarded-for'] || event.headers?.['X-Forwarded-For'];
-  if (xForwardedFor) return String(xForwardedFor).split(',')[0].trim();
+  if (xForwardedFor) return normalizeIp(xForwardedFor);
 
-  return (
+  return normalizeIp(
     event.headers?.['x-real-ip'] ||
     event.requestContext?.identity?.sourceIp ||
-    'unknown'
+    'unknown',
   );
 }
 

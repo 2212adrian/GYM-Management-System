@@ -3,6 +3,8 @@
 -- - netlify/functions/quick-login-create
 -- - netlify/functions/quick-login-status
 -- - netlify/functions/quick-login-approve
+-- NOTE: requester/approver identity fields are stored as SHA-256 hashes
+-- in these same columns (no parallel *_hash columns).
 
 CREATE TABLE IF NOT EXISTS public.quick_login_requests (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -30,11 +32,21 @@ CREATE TABLE IF NOT EXISTS public.quick_login_requests (
   expires_at timestamptz NOT NULL
 );
 
+-- Optional cleanup if old parallel hash columns were previously added.
+ALTER TABLE IF EXISTS public.quick_login_requests
+DROP COLUMN IF EXISTS requester_ip_hash,
+DROP COLUMN IF EXISTS requester_user_agent_hash,
+DROP COLUMN IF EXISTS requester_identity_hash,
+DROP COLUMN IF EXISTS approved_by_ip_hash;
+
 CREATE INDEX IF NOT EXISTS idx_quick_login_requests_status_expires
 ON public.quick_login_requests (status, expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_quick_login_requests_created_at
 ON public.quick_login_requests (created_at);
+
+CREATE INDEX IF NOT EXISTS idx_quick_login_requests_requester_recent
+ON public.quick_login_requests (requester_ip, requester_user_agent, created_at DESC);
 
 ALTER TABLE public.quick_login_requests ENABLE ROW LEVEL SECURITY;
 

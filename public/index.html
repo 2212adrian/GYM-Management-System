@@ -22,9 +22,11 @@
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
     <script src="/assets/js/libraries/qrcode-generator.min.js"></script>
     <script src="assets/js/utils/supabase-init.js"></script>
     <script src="assets/js/utils/system-config.js"></script>
+    <script src="assets/js/utils/wolf-router.js"></script>
     <script src="assets/js/utils/auth-guard.js"></script>
     <link rel="stylesheet" href="assets/css/auth.css" />
     <style>
@@ -49,6 +51,18 @@
       .auth-split-container {
         position: relative;
         z-index: 1;
+      }
+
+      body:not(.intro-boot-ready) .intro-cutout,
+      body:not(.intro-boot-ready) #starCanvas,
+      body:not(.intro-boot-ready) .auth-split-container {
+        opacity: 0;
+      }
+
+      body.intro-boot-ready #starCanvas,
+      body.intro-boot-ready .auth-split-container {
+        opacity: 1;
+        transition: opacity 0.5s ease;
       }
 
       /* ===== Intro Mask Animation ===== */
@@ -79,7 +93,10 @@
         inset: 0;
         z-index: 9999;
         pointer-events: none;
-        animation: introFade 3s forwards ease-out var(--intro-anim-delay);
+        opacity: 0;
+        animation:
+          introCutoutFadeIn 0.55s ease-out forwards,
+          introFade 3s forwards ease-out var(--intro-anim-delay);
       }
       .intro-cutout-svg {
         width: 100%;
@@ -87,14 +104,17 @@
         display: block;
         transform-origin: 49% 50.5%;
         transform: scale(1);
-        animation: reveal 3s forwards ease-out var(--intro-anim-delay);
+        opacity: 0;
+        animation:
+          introCutoutSvgFade 0.5s ease-out forwards,
+          reveal 3s forwards ease-out var(--intro-anim-delay);
         shape-rendering: geometricPrecision;
         text-rendering: geometricPrecision;
       }
       .intro-cutout-text {
         font-family: 'Inter', sans-serif;
         font-weight: 1000;
-        font-size: 12vmin;
+        font-size: 5vmin;
         letter-spacing: 0.06em;
       }
       .intro-cutout-text-mobile {
@@ -108,6 +128,24 @@
       @keyframes reveal {
         to {
           transform: scale(150);
+        }
+      }
+      @keyframes introCutoutFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes introCutoutSvgFade {
+        from {
+          opacity: 0;
+          filter: blur(6px);
+        }
+        to {
+          opacity: 1;
+          filter: blur(0);
         }
       }
       @keyframes textFade {
@@ -133,6 +171,10 @@
         }
       }
       @media (prefers-reduced-motion: reduce) {
+        body.intro-boot-ready #starCanvas,
+        body.intro-boot-ready .auth-split-container {
+          transition: none;
+        }
         body {
           animation: none;
         }
@@ -178,7 +220,7 @@
       <svg
         class="intro-cutout-svg"
         viewBox="0 0 1000 1000"
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMid slice"
       >
         <defs>
           <mask id="introMask">
@@ -282,7 +324,11 @@
           </div>
         </div>
 
-        <button type="button" class="quick-login-refresh" id="quickLoginRefresh">
+        <button
+          type="button"
+          class="quick-login-refresh"
+          id="quickLoginRefresh"
+        >
           <i class="bx bx-refresh"></i>
           <span>Regenerate QR</span>
         </button>
@@ -517,16 +563,23 @@
     <script src="/assets/js/libraries/purify.min.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script>
+      requestAnimationFrame(() => {
+        document.body.classList.add('intro-boot-ready');
+      });
+
       const introCutout = document.getElementById('introCutout');
       if (introCutout) {
         const svg = introCutout.querySelector('.intro-cutout-svg');
         if (svg) {
-          svg.addEventListener('animationend', () => {
-            introCutout.remove();
+          svg.addEventListener('animationend', (event) => {
+            if (event.animationName !== 'reveal') return;
+            introCutout.style.opacity = '0';
+            setTimeout(() => {
+              introCutout.remove();
+            }, 160);
           });
         }
       }
     </script>
   </body>
 </html>
-
