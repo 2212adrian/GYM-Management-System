@@ -2,7 +2,6 @@ const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 exports.handler = async (event, context) => {
   // Enable CORS
@@ -25,6 +24,16 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    if (!supabaseUrl || !supabaseKey) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Missing Supabase env vars' }),
+      };
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Get client IP address
     const clientIP = event.headers['x-forwarded-for'] ||
                      event.headers['x-real-ip'] ||

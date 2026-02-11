@@ -1,22 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import crypto from 'node:crypto';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
 
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function hashOtp(userId, otp, secret) {
+  return crypto
+    .createHash('sha256')
+    .update(`${userId}:${otp}:${secret}`)
+    .digest('hex');
 }
 
 export async function handler(event, context) {
@@ -27,6 +24,18 @@ export async function handler(event, context) {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       return { statusCode: 500, body: JSON.stringify({ error: 'Missing SMTP env vars' }) };
     }
+
+    const otpHashSecret = process.env.OTP_HASH_SECRET || serviceRoleKey;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
     const { email } = JSON.parse(event.body);
     if (!email) {
@@ -44,10 +53,11 @@ export async function handler(event, context) {
     }
 
     const otp = generateOtp();
+    const otpHash = hashOtp(user.id, otp, otpHashSecret);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await supabase.from('password_reset_otp').insert([
-      { user_id: user.id, otp_code: otp, expires_at: expiresAt }
+      { user_id: user.id, otp_code: otpHash, expires_at: expiresAt }
     ]);
 
     await transporter.sendMail({

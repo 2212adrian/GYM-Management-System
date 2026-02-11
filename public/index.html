@@ -141,13 +141,27 @@
         }
       }
 
+      @media (max-width: 1023px) {
+        :root {
+          --intro-anim-delay: 0s;
+        }
+        body {
+          animation: none;
+          background: url('/assets/images/1-carousel.jpg') 50% / cover no-repeat;
+        }
+        .intro-cutout {
+          display: none;
+          animation: none;
+        }
+      }
+
       @media (max-width: 768px) {
         .intro-cutout-text {
           font-size: 35vmin;
           letter-spacing: 0.08em;
         }
         .intro-cutout-svg {
-          transform-origin: 47% 52.6%;
+          transform-origin: 47% 53.3%;
         }
         .intro-cutout-text-desktop {
           display: none;
@@ -261,27 +275,42 @@
 
               <form id="loginForm">
                 <!-- REFINED LABELS -->
-                <label><i class="bx bx-id-card"></i> Email Address</label>
-                <input
-                  type="email"
-                  id="email"
-                  placeholder="e.g: johndoe@wolfpalomar.com"
-                  required
-                />
+                <div class="field-wrap">
+                  <input
+                    type="email"
+                    id="email"
+                    class="field-input"
+                    placeholder=" "
+                    autocomplete="email"
+                    required
+                  />
+                  <label for="email" class="field-label">
+                    <i class="bx bx-id-card"></i>
+                    <span>Email Address</span>
+                  </label>
+                </div>
 
-                <label><i class="bx bx-lock-alt"></i> Password</label>
-                <input
-                  type="password"
-                  id="password"
-                  placeholder="••••••••"
-                  required
-                />
+                <div class="field-wrap">
+                  <input
+                    type="password"
+                    id="password"
+                    class="field-input"
+                    placeholder=" "
+                    autocomplete="current-password"
+                    required
+                  />
+                  <label for="password" class="field-label">
+                    <i class="bx bx-lock-alt"></i>
+                    <span>Password</span>
+                  </label>
+                </div>
 
                 <div class="checkbox-group">
                   <input type="checkbox" id="loginAgreement" checked />
-                  <label for="loginAgreement" class="checkbox-label"
-                    >I agree to keep customer data secure and safe.</label
-                  >
+                  <label for="loginAgreement" class="checkbox-label">
+                    <span class="checkbox-ui" aria-hidden="true"></span>
+                    <span>I agree to keep customer data secure and safe.</span>
+                  </label>
                 </div>
 
                 <button type="submit" id="loginBtn">LOGIN NOW</button>
@@ -322,13 +351,20 @@
                     Enter authorized email to receive security key.
                   </p>
                   <form id="otpForm">
-                    <label><i class="bx bx-id-card"></i> Email Address</label>
-                    <input
-                      type="email"
-                      id="forgotEmail"
-                      placeholder="e.g: johndoe@wolfpalomar.com"
-                      required
-                    />
+                    <div class="field-wrap">
+                      <input
+                        type="email"
+                        id="forgotEmail"
+                        class="field-input"
+                        placeholder=" "
+                        autocomplete="email"
+                        required
+                      />
+                      <label for="forgotEmail" class="field-label">
+                        <i class="bx bx-id-card"></i>
+                        <span>Email Address</span>
+                      </label>
+                    </div>
                     <button type="submit" id="sendOtpBtn">
                       SEND SECURITY OTP
                     </button>
@@ -434,3 +470,4 @@
     </script>
   </body>
 </html>
+

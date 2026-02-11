@@ -8,7 +8,18 @@
     });
 
     if (!res.ok) {
-      throw new Error('Failed to load Supabase runtime config');
+      let detail = '';
+      try {
+        const errJson = await res.json();
+        detail = errJson?.missing?.length
+          ? ` Missing: ${errJson.missing.join(', ')}`
+          : errJson?.error
+            ? ` ${errJson.error}`
+            : '';
+      } catch (_) {
+        // ignore parse errors
+      }
+      throw new Error(`Failed to load Supabase runtime config.${detail}`);
     }
 
     const { supabaseUrl, supabaseAnonKey } = await res.json();

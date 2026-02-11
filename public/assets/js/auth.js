@@ -98,6 +98,17 @@ async function getClientIP() {
   }
 }
 
+function shakeField(el) {
+  if (!el) return;
+  el.classList.remove('shake-error');
+  void el.offsetWidth;
+  el.classList.add('shake-error');
+
+  setTimeout(() => {
+    el.classList.remove('shake-error');
+  }, 420);
+}
+
 function startLoginCountdown(seconds) {
   if (loginTimerInterval) clearInterval(loginTimerInterval);
   const loginBtn = document.getElementById('loginBtn');
@@ -135,7 +146,7 @@ async function checkLoginLockoutStatus() {
     .from('login_attempts')
     .select('*')
     .eq('ip_address', userIP)
-    .single();
+    .maybeSingle();
 
   if (log) {
     const diff = (Date.now() - new Date(log.last_attempt_at).getTime()) / 60000;
@@ -192,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function handleLogin() {
     const loginBtn = document.getElementById('loginBtn');
     const loginOutput = document.getElementById('loginOutput');
+    const loginAgreement = document.getElementById('loginAgreement');
 
     if (loginBtn.disabled) return;
     loginBtn.disabled = true;
@@ -199,6 +211,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginOutput.textContent = '';
 
     try {
+      if (loginAgreement && !loginAgreement.checked) {
+        loginOutput.style.color = 'var(--wolf-red)';
+        loginOutput.textContent =
+          '[ERR_105] Please agree to the data security policy to continue.';
+        if (window.wolfAudio) window.wolfAudio.play('denied');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'AUTHORIZE ACCESS';
+        return;
+      }
+
       const userIP = await getClientIP();
       const isLocked = await checkLoginLockoutStatus();
 
@@ -213,12 +235,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (error) {
+        shakeField(document.getElementById('password'));
         wolfAudio.play('denied');
         const { data: check } = await supabaseClient
           .from('login_attempts')
           .select('*')
           .eq('ip_address', userIP)
-          .single();
+          .maybeSingle();
 
         let newCount = 1;
         if (check) {
@@ -325,6 +348,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   checkLoginLockoutStatus();
 
+  const loginAgreement = document.getElementById('loginAgreement');
+  if (loginAgreement) {
+    loginAgreement.addEventListener('change', () => {
+      if (loginAgreement.checked) {
+        const loginOutput = document.getElementById('loginOutput');
+        if (
+          loginOutput &&
+          loginOutput.textContent.includes(
+            'Please agree to the data security policy',
+          )
+        ) {
+          loginOutput.textContent = '';
+        }
+      }
+    });
+  }
+
   // --- UTILS: START COOLDOWN TIMER ---
   function startOtpCountdown(seconds) {
     if (otpTimerInterval) clearInterval(otpTimerInterval);
@@ -363,7 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .from('otp_cooldowns')
       .select('last_sent_at')
       .eq('ip_address', userIP)
-      .single();
+      .maybeSingle();
 
     if (data) {
       const diff = (Date.now() - new Date(data.last_sent_at).getTime()) / 1000;

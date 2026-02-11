@@ -18,14 +18,19 @@ exports.handler = async (event) => {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    const missing = [];
+    if (!supabaseUrl) missing.push('SUPABASE_URL');
+    if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY (or SUPABASE_KEY)');
+
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         error: 'Supabase runtime config is missing on server',
+        missing,
       }),
     };
   }
