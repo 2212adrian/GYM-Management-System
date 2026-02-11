@@ -293,6 +293,22 @@ exports.handler = async (event) => {
           previewSig = cachedPreviewSig.toLowerCase();
         }
 
+        if (!previewContext || !previewSig) {
+          const previewLocation = await resolveGeo(requesterIpRaw);
+          previewContext = normalizePreviewContext({
+            ip: requesterIpRaw,
+            city: previewLocation.city,
+            region: previewLocation.region,
+            country: previewLocation.country,
+            countryCode: previewLocation.countryCode,
+          });
+          previewSig = signPreviewContext(
+            latestPendingRequest.request_id,
+            latestPendingRequest.request_secret_hash,
+            previewContext,
+          );
+        }
+
         const createdAtMs = latestPendingRequest.created_at
           ? new Date(latestPendingRequest.created_at).getTime()
           : nowMs;
