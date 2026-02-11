@@ -747,6 +747,7 @@ window.salesManager = {
     }
     this.generateRandomID();
     modal.style.display = 'flex';
+    if (window.wolfAudio) window.wolfAudio.play('notif');
   },
 
   generateRandomID() {
