@@ -10,7 +10,7 @@ const quickLoginExpirySeconds = Number(
   process.env.QUICK_LOGIN_EXPIRES_SECONDS || 120,
 );
 const quickLoginRegenerateCooldownSeconds = Number(
-  process.env.QUICK_LOGIN_REGENERATE_COOLDOWN_SECONDS || 30,
+  process.env.QUICK_LOGIN_REGENERATE_COOLDOWN_SECONDS || 8,
 );
 
 function json(statusCode, body) {

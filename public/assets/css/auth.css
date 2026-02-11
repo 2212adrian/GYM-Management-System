@@ -947,6 +947,11 @@ button:hover:not(:disabled) {
   margin: 10px 0 18px;
 }
 
+.checkbox-group-remember {
+  margin-top: -8px;
+  margin-bottom: 20px;
+}
+
 .checkbox-group input[type='checkbox'] {
   position: absolute;
   opacity: 0;
@@ -990,23 +995,23 @@ button:hover:not(:disabled) {
   transition: all 0.18s ease;
 }
 
-#loginAgreement:checked + .checkbox-label .checkbox-ui {
+.styled-checkbox:checked + .checkbox-label .checkbox-ui {
   background: var(--wolf-red);
   border-color: var(--wolf-red);
   box-shadow: 0 0 12px rgba(166, 52, 41, 0.35);
 }
 
-#loginAgreement:checked + .checkbox-label .checkbox-ui::after {
+.styled-checkbox:checked + .checkbox-label .checkbox-ui::after {
   opacity: 1;
   transform: rotate(45deg) scale(1);
 }
 
-#loginAgreement:focus-visible + .checkbox-label .checkbox-ui {
+.styled-checkbox:focus-visible + .checkbox-label .checkbox-ui {
   outline: 2px solid rgba(77, 166, 255, 0.7);
   outline-offset: 2px;
 }
 
-#loginAgreement:not(:checked) + .checkbox-label:hover .checkbox-ui {
+.styled-checkbox:not(:checked) + .checkbox-label:hover .checkbox-ui {
   border-color: var(--text-muted);
 }
 

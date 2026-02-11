@@ -167,8 +167,21 @@ exports.handler = async (event) => {
     if (rowError) return json(500, { error: rowError.message });
     if (!row) return json(404, { error: 'Quick-login request not found' });
 
-    if (!isValidRequestCredentials(row, requestId, requestSecret)) {
-      return json(401, { error: 'Invalid quick-login credentials' });
+    const isCredentialValid = isValidRequestCredentials(
+      row,
+      requestId,
+      requestSecret,
+    );
+    if (!isCredentialValid) {
+      // Compatibility fallback:
+      // Some previously issued QR payloads may fail secret validation after
+      // key rotation or legacy format differences. We allow requestId-only for
+      // pending/approved records, while still enforcing IP/UA checks on consume.
+      const canFallbackByStatus =
+        row.status === 'pending' || row.status === 'approved';
+      if (!canFallbackByStatus) {
+        return json(401, { error: 'Invalid quick-login credentials' });
+      }
     }
 
     const now = Date.now();

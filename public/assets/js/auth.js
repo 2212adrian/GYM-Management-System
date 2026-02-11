@@ -33,6 +33,7 @@ const OTP_CLICK_SPAM_WINDOW_MS = 1000;
 const OTP_CLICK_SPAM_THRESHOLD = 3;
 const OTP_CLICK_SPAM_LOCK_SECONDS = 30;
 const OTP_COOLDOWN_STORAGE_KEY = 'wolf_otp_cooldown_ends_at';
+const REMEMBER_DEVICE_KEY = 'wolf_remember_device';
 const QUICK_LOGIN_POLL_MS = 1800;
 const QUICK_LOGIN_EXPIRE_FALLBACK_SECONDS = 120;
 const QUICK_LOGIN_REGEN_COOLDOWN_FALLBACK_SECONDS = 8;
@@ -105,6 +106,33 @@ async function getClientIP() {
     return data.ip;
   } catch {
     return 'unknown_device';
+  }
+}
+
+function isRememberDeviceEnabled() {
+  try {
+    if (window.wolfAuthStorage?.shouldRememberDevice) {
+      return Boolean(window.wolfAuthStorage.shouldRememberDevice());
+    }
+    return window.localStorage.getItem(REMEMBER_DEVICE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setRememberDeviceEnabled(enabled) {
+  try {
+    if (window.wolfAuthStorage?.setRememberDevice) {
+      window.wolfAuthStorage.setRememberDevice(Boolean(enabled));
+      return;
+    }
+    if (enabled) {
+      window.localStorage.setItem(REMEMBER_DEVICE_KEY, '1');
+    } else {
+      window.localStorage.removeItem(REMEMBER_DEVICE_KEY);
+    }
+  } catch {
+    // ignore storage failures
   }
 }
 
@@ -914,6 +942,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function handleLogin() {
     const loginBtn = document.getElementById('loginBtn');
     const loginAgreement = document.getElementById('loginAgreement');
+    const rememberDeviceCheckbox = document.getElementById('rememberDevice');
 
     if (loginBtn.disabled) return;
     loginBtn.disabled = true;
@@ -939,6 +968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
+      setRememberDeviceEnabled(Boolean(rememberDeviceCheckbox?.checked));
 
       const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
@@ -1024,6 +1054,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           hideLoginOutput(true);
         }
       }
+    });
+  }
+
+  const rememberDeviceCheckbox = document.getElementById('rememberDevice');
+  if (rememberDeviceCheckbox) {
+    rememberDeviceCheckbox.checked = isRememberDeviceEnabled();
+    rememberDeviceCheckbox.addEventListener('change', () => {
+      setRememberDeviceEnabled(Boolean(rememberDeviceCheckbox.checked));
     });
   }
 
