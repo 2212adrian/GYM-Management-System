@@ -1,11 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
-const serviceRoleKey = 'sb_secret_OdFToFL4d7I_O-XlbbGEew_FNH5sZQd';
+const supabaseUrl = process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 export async function handler(event, context) {
   try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Missing Supabase server env vars' }) };
+    }
+
     const { email, otp, newPassword } = JSON.parse(event.body);
     if (!email || !otp || !newPassword) {
       return { statusCode: 400, body: JSON.stringify({ error: "Email, OTP, and new password required" }) };

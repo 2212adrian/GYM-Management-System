@@ -1,18 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
-const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
-const serviceRoleKey = 'sb_secret_OdFToFL4d7I_O-XlbbGEew_FNH5sZQd';
+const supabaseUrl = process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
-    user: 'adrianangeles2212@gmail.com',
-    pass: 'xksp onuk ncii uyue'
-  }
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 });
 
 function generateOtp() {
@@ -21,6 +21,13 @@ function generateOtp() {
 
 export async function handler(event, context) {
   try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Missing Supabase server env vars' }) };
+    }
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Missing SMTP env vars' }) };
+    }
+
     const { email } = JSON.parse(event.body);
     if (!email) {
       return { statusCode: 400, body: JSON.stringify({ error: "Email is required" }) };

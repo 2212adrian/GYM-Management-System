@@ -12,7 +12,19 @@ function safeHTML(html) {
 }
 
 // --- 1. INITIALIZE SUPABASE ---
-const supabaseClient = window.supabaseClient;
+let supabaseClient = window.supabaseClient || null;
+
+async function ensureSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+  if (window.supabaseReady) {
+    await window.supabaseReady;
+  }
+  supabaseClient = window.supabaseClient || null;
+  if (!supabaseClient) {
+    throw new Error('Supabase client is not available');
+  }
+  return supabaseClient;
+}
 
 // --- 2. CONFIGURATION ---
 const MAX_ATTEMPTS = 5;
@@ -117,6 +129,7 @@ function startLoginCountdown(seconds) {
 
 // --- UTILS: CHECK DATABASE LOCKOUT ---
 async function checkLoginLockoutStatus() {
+  await ensureSupabaseClient();
   const userIP = await getClientIP();
   const { data: log } = await supabaseClient
     .from('login_attempts')
@@ -144,7 +157,19 @@ async function checkLoginLockoutStatus() {
   return false;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await ensureSupabaseClient();
+  } catch (err) {
+    const loginOutput = document.getElementById('loginOutput');
+    if (loginOutput) {
+      loginOutput.style.color = 'var(--wolf-red)';
+      loginOutput.textContent =
+        '[ERR_503] Secure database handshake failed. Try again later.';
+    }
+    return;
+  }
+
   const inner = document.getElementById('flipCardInner');
   const recoveryContainer = document.getElementById('recoveryContainer');
   const exitModal = document.getElementById('confirmExitModal');

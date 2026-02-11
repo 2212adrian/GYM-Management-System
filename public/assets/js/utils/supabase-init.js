@@ -1,28 +1,43 @@
 // assets/js/utils/supabase-init.js
+(function () {
+  async function bootSupabase() {
+    const res = await fetch('/.netlify/functions/supabase-config', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
 
-const supabaseUrl = 'https://xhahdzyjhwutgqfcrzfc.supabase.co';
-const supabaseKey = 'sb_publishable_mQ_GJf4mu4nC0uGpR7QkVQ_PXKlR6HT'; // This is your Anon/Publishable Key
+    if (!res.ok) {
+      throw new Error('Failed to load Supabase runtime config');
+    }
 
-/**
- * WOLF OS: SECURE CLIENT INITIALIZATION
- * We use sessionStorage instead of localStorage.
- * This prevents the session token from persisting after the tab is closed.
- */
-window.supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    storage: window.sessionStorage, // <--- THE SECURITY FIX
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-  // *** NEW: Explicitly set the API key as a global header ***
-  global: {
-    headers: {
-      apikey: supabaseKey, // Ensures the Anon Key is always sent
-    },
-  },
-});
+    const { supabaseUrl, supabaseAnonKey } = await res.json();
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase runtime config is incomplete');
+    }
 
-console.log(
-  'Wolf OS: Secure Supabase Client Initialized (Session Storage Mode) with explicit apikey header.',
-);
+    window.supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: window.sessionStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        headers: {
+          apikey: supabaseAnonKey,
+        },
+      },
+    });
+  }
+
+  window.supabaseReady = bootSupabase()
+    .then(() => {
+      console.log('Wolf OS: Supabase client initialized from runtime config.');
+      return window.supabaseClient;
+    })
+    .catch((err) => {
+      console.error('Wolf OS: Failed to initialize Supabase client.', err);
+      return null;
+    });
+})();

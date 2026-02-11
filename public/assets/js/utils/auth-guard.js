@@ -6,6 +6,11 @@
 
   // --- 1. WAIT FOR GLOBAL CLIENT ---
   const getClient = async () => {
+    if (window.supabaseReady) {
+      await window.supabaseReady;
+      if (window.supabaseClient) return window.supabaseClient;
+    }
+
     for (let i = 0; i < 20; i++) {
       if (window.supabaseClient) return window.supabaseClient;
       await new Promise((res) => setTimeout(res, 100));
