@@ -321,7 +321,6 @@ exports.handler = async (event) => {
 
         const qrPayloadData = {
           r: latestPendingRequest.request_id,
-          s: reusableRequestSecret,
           v: 1,
           ...(previewContext && previewSig
             ? {
@@ -432,7 +431,6 @@ exports.handler = async (event) => {
     const qrPayload = base64urlEncode(
       JSON.stringify({
         r: requestId,
-        s: requestSecret,
         v: 1,
         p: [
           previewContext.ip,

@@ -162,8 +162,7 @@ window.wolfScanner = {
       const data = JSON.parse(decoded);
 
       const requestId = data?.requestId || data?.r;
-      const requestSecret = data?.requestSecret || data?.s;
-      if (!requestId || !requestSecret) return null;
+      if (!requestId) return null;
 
       const compactPreview = Array.isArray(data?.p) ? data.p : null;
       const previewContextRaw =
@@ -180,7 +179,6 @@ window.wolfScanner = {
 
       return {
         requestId: String(requestId),
-        requestSecret: String(requestSecret),
         previewContext:
           previewContextRaw && typeof previewContextRaw === 'object'
             ? {
@@ -207,7 +205,6 @@ window.wolfScanner = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: payload.requestId,
-        requestSecret: payload.requestSecret,
         previewContext: payload.previewContext,
         previewSig: payload.previewSig,
         consume: false,
@@ -312,7 +309,6 @@ window.wolfScanner = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requestId: payload.requestId,
-        requestSecret: payload.requestSecret,
         accessToken: currentSession.access_token,
         refreshToken: currentSession.refresh_token,
       }),

@@ -170,8 +170,8 @@ exports.handler = async (event) => {
     const previewContextInput = normalizePreviewContext(payload.previewContext);
     const previewSigInput = String(payload.previewSig || '').trim();
 
-    if (!requestId || !requestSecret) {
-      return json(400, { error: 'requestId and requestSecret are required' });
+    if (!requestId) {
+      return json(400, { error: 'requestId is required' });
     }
 
     const { data: row, error: rowError } = await supabase
@@ -201,19 +201,18 @@ exports.handler = async (event) => {
     if (rowError) return json(500, { error: rowError.message });
     if (!row) return json(404, { error: 'Quick-login request not found' });
 
-    const isCredentialValid = isValidRequestCredentials(
-      row,
-      requestId,
-      requestSecret,
-    );
-    if (!isCredentialValid) {
-      // Compatibility fallback:
-      // Some previously issued QR payloads may fail secret validation after
-      // key rotation or legacy format differences. We allow requestId-only for
-      // pending/approved records, while still enforcing IP/UA checks on consume.
-      const canFallbackByStatus =
-        row.status === 'pending' || row.status === 'approved';
-      if (!canFallbackByStatus) {
+    // Only the requester device (consume=true) must present the request secret.
+    // Scanner preview checks (consume=false) use requestId + signed preview context.
+    if (consume) {
+      if (!requestSecret) {
+        return json(400, { error: 'requestSecret is required for consume' });
+      }
+      const isCredentialValid = isValidRequestCredentials(
+        row,
+        requestId,
+        requestSecret,
+      );
+      if (!isCredentialValid) {
         return json(401, { error: 'Invalid quick-login credentials' });
       }
     }

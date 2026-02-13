@@ -30,13 +30,6 @@ function parseBody(body) {
   return body;
 }
 
-function hashSecret(secret) {
-  return crypto
-    .createHash('sha256')
-    .update(`${secret}:${quickLoginSecret}`)
-    .digest('hex');
-}
-
 function hashWithSecret(value, prefix = '') {
   return crypto
     .createHash('sha256')
@@ -50,24 +43,6 @@ function hashIp(ip) {
 
 function hashUserAgent(userAgent) {
   return hashWithSecret(userAgent, 'ua:');
-}
-
-function deriveRequestSecret(requestId) {
-  return crypto
-    .createHmac('sha256', quickLoginSecret)
-    .update(`quick-login:${requestId}`)
-    .digest('hex');
-}
-
-function isValidRequestCredentials(row, requestId, requestSecret) {
-  const stored = String(row?.request_secret_hash || '');
-  if (!stored) return false;
-
-  const providedHash = hashSecret(requestSecret);
-  if (stored === providedHash) return true;
-
-  const deterministicHash = hashSecret(deriveRequestSecret(requestId));
-  return stored === deterministicHash;
 }
 
 function normalizeIp(rawIp) {
@@ -119,13 +94,12 @@ exports.handler = async (event) => {
     }
 
     const requestId = String(payload.requestId || '').trim();
-    const requestSecret = String(payload.requestSecret || '').trim();
     const accessToken = String(payload.accessToken || '').trim();
     const refreshToken = String(payload.refreshToken || '').trim();
 
-    if (!requestId || !requestSecret || !accessToken || !refreshToken) {
+    if (!requestId || !accessToken || !refreshToken) {
       return json(400, {
-        error: 'requestId, requestSecret, accessToken, and refreshToken are required',
+        error: 'requestId, accessToken, and refreshToken are required',
       });
     }
 
@@ -137,19 +111,6 @@ exports.handler = async (event) => {
 
     if (rowError) return json(500, { error: rowError.message });
     if (!row) return json(404, { error: 'Quick-login request not found' });
-
-    const isCredentialValid = isValidRequestCredentials(
-      row,
-      requestId,
-      requestSecret,
-    );
-    if (!isCredentialValid) {
-      // Compatibility fallback for legacy/stale secret formats.
-      // Approval still requires a valid admin session and pending status.
-      if (row.status !== 'pending') {
-        return json(401, { error: 'Invalid quick-login credentials' });
-      }
-    }
 
     if (row.status !== 'pending') {
       return json(409, { error: `Quick-login request is ${row.status}` });
