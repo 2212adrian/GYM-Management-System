@@ -1,9 +1,15 @@
 <style>
   .goal-center-wrapper {
+    --goal-accent: #ff4d3f;
+    --goal-accent-rgb: 255, 77, 63;
+    --goal-card-bg: linear-gradient(165deg, rgba(18, 19, 26, 0.94), rgba(11, 12, 17, 0.9));
+    --goal-card-border: rgba(255, 255, 255, 0.09);
+    --goal-track: rgba(255, 255, 255, 0.08);
+    --goal-muted: #94a3b8;
     width: 100%;
     margin: 0 auto;
     padding: 20px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Sora', 'Inter', sans-serif;
   }
 
   @media (min-width: 1024px) {
@@ -21,19 +27,20 @@
   }
 
   .goal-title {
-    font-size: 1.5rem;
+    font-size: 1.95rem;
     font-weight: 900;
-    letter-spacing: -1px;
+    letter-spacing: 0.8px;
     color: #fff;
     text-transform: uppercase;
+    line-height: 1;
   }
 
   .goal-subtitle {
-    font-size: 10px;
-    color: #666;
-    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--goal-muted);
+    letter-spacing: 1.8px;
     text-transform: uppercase;
-    margin-top: 4px;
+    margin-top: 8px;
   }
 
   .goal-grid {
@@ -49,9 +56,40 @@
   }
 
   .goal-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    padding: 18px 16px;
+    border-radius: 22px;
+    border: 1px solid var(--goal-card-border);
+    background: var(--goal-card-bg);
+    box-shadow:
+      0 16px 32px rgba(0, 0, 0, 0.44),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+    isolation: isolate;
+    animation: goalCardIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .goal-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(circle at 22% -10%, rgba(var(--goal-accent-rgb), 0.2), transparent 48%),
+      radial-gradient(circle at 95% 130%, rgba(var(--goal-accent-rgb), 0.12), transparent 48%);
+  }
+
+  .goal-card.goal-weekly {
+    --goal-accent: #f59e0b;
+    --goal-accent-rgb: 245, 158, 11;
+  }
+
+  .goal-card.goal-monthly {
+    --goal-accent: #22c55e;
+    --goal-accent-rgb: 34, 197, 94;
   }
 
   .goal-card .goal-meta {
@@ -61,29 +99,34 @@
   }
 
   .goal-card .goal-period {
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: #777;
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    color: #d6deec;
     text-transform: uppercase;
     font-weight: 900;
   }
 
   .goal-card .goal-status {
-    font-size: 9px;
-    color: var(--wolf-blue);
+    font-size: 10px;
+    color: color-mix(in srgb, var(--goal-accent) 68%, #fff 32%);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     font-weight: 800;
+    border: 1px solid color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: color-mix(in srgb, var(--goal-accent) 14%, transparent 86%);
   }
 
   .goal-amount {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
     font-weight: 900;
     font-style: italic;
     color: #fff;
     text-shadow:
-      0 0 15px rgba(var(--wolf-red-rgb), 0.35),
-      2px 2px 0px rgba(0, 0, 0, 0.8);
+      0 0 16px color-mix(in srgb, var(--goal-accent) 55%, transparent 45%),
+      2px 2px 0 rgba(0, 0, 0, 0.8);
+    line-height: 1;
   }
 
   .goal-input-row {
@@ -94,24 +137,25 @@
 
   .goal-input {
     flex: 1;
-    background: #0a0a0a;
-    border: 1px solid #222;
+    background: rgba(5, 8, 14, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 12px;
     color: #fff;
     padding: 12px 14px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.6px;
     outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .goal-input:focus {
-    border-color: var(--wolf-red);
-    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb), 0.2);
+    border-color: var(--goal-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--goal-accent) 24%, transparent 76%);
   }
 
   .goal-btn {
-    background: var(--wolf-red);
+    background: linear-gradient(140deg, var(--goal-accent), color-mix(in srgb, var(--goal-accent) 70%, #ffffff 30%));
     color: #fff;
     border: none;
     padding: 12px 16px;
@@ -122,10 +166,11 @@
     text-transform: uppercase;
     cursor: pointer;
     transition: 0.2s ease;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
   }
 
   .goal-btn:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.08);
     transform: translateY(-1px);
   }
 
@@ -134,46 +179,166 @@
   }
 
   .goal-progress {
-    height: 8px;
-    background: #111;
+    height: 12px;
+    background: var(--goal-track);
     border-radius: 999px;
     overflow: hidden;
-    border: 1px solid #222;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    position: relative;
+  }
+
+  .goal-progress::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.03) 50%,
+      rgba(255, 255, 255, 0.03) 75%,
+      transparent 75%
+    );
+    background-size: 18px 100%;
+    pointer-events: none;
   }
 
   .goal-progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--wolf-red), #ff6b5f);
-    box-shadow: 0 0 12px rgba(var(--wolf-red-rgb), 0.5);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--goal-accent) 85%, #ffffff 15%),
+      color-mix(in srgb, var(--goal-accent) 55%, #ffffff 45%),
+      var(--goal-accent)
+    );
+    box-shadow:
+      0 0 16px color-mix(in srgb, var(--goal-accent) 65%, transparent 35%),
+      0 0 28px color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
+    border-radius: inherit;
+    transition: width 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: goalPulse 1.8s ease-in-out infinite;
   }
 
   .goal-footnote {
-    font-size: 9px;
-    color: #666;
+    font-size: 10px;
+    color: var(--goal-muted);
     letter-spacing: 1px;
     text-transform: uppercase;
+    line-height: 1.35;
+  }
+
+  @keyframes goalCardIn {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.98);
+      filter: blur(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes goalPulse {
+    0%, 100% {
+      filter: saturate(0.94);
+    }
+    50% {
+      filter: saturate(1.14);
+    }
+  }
+
+  body.light-theme .goal-center-wrapper {
+    --goal-card-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(242, 247, 255, 0.96));
+    --goal-card-border: rgba(51, 65, 85, 0.15);
+    --goal-track: rgba(51, 65, 85, 0.1);
+    --goal-muted: #64748b;
+  }
+
+  body.light-theme .goal-title,
+  body.light-theme .goal-amount {
+    color: #0f172a;
+    text-shadow: none;
+  }
+
+  body.light-theme .goal-card .goal-period {
+    color: #1e293b;
+  }
+
+  body.light-theme .goal-input {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(51, 65, 85, 0.2);
+    color: #0f172a;
+  }
+
+  body.light-theme .goal-progress::after {
+    background-image: linear-gradient(
+      90deg,
+      rgba(15, 23, 42, 0.04) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(15, 23, 42, 0.04) 50%,
+      rgba(15, 23, 42, 0.04) 75%,
+      transparent 75%
+    );
+  }
+
+  @media (max-width: 767px) {
+    .goal-title {
+      font-size: 1.45rem;
+    }
+
+    .goal-subtitle {
+      font-size: 10px;
+      letter-spacing: 1.2px;
+    }
+
+    .goal-card {
+      padding: 14px 12px;
+      border-radius: 18px;
+    }
+
+    .goal-amount {
+      font-size: 1.75rem;
+    }
+
+    .goal-input {
+      font-size: 12px;
+      padding: 10px 12px;
+    }
+
+    .goal-btn {
+      font-size: 9px;
+      padding: 10px 12px;
+    }
+
+    .goal-progress {
+      height: 10px;
+    }
   }
 </style>
 
 <script src="/assets/js/utils/59f8f3e5e05e33a95b50d4725925d500a6079bf8d7aed8196482d09523065e9a.js"></script>
-<script src="/assets/js/utils/18f05fa5791cebad5e8cc7095af3bb4eee5760b343a9c7d5a776844fe5618d7c.js"></script>
+<script src="/assets/js/utils/acf618b0a45c1a4029b862dc58302dd3316ecf53bf3b6fb56092721bbd2cff2b.js"></script>
 
 <div class="goal-center-wrapper" id="goal-center-page">
   <div class="goal-header">
     <div>
-      <div class="goal-title">GOAL CENTER</div>
-      <div class="goal-subtitle">REVENUE TARGETS - PHP (₱)</div>
+      <div class="goal-title">Goal Center</div>
+      <div class="goal-subtitle">Revenue Targets - PHP</div>
     </div>
   </div>
 
   <div class="goal-grid">
-    <div class="hud-item goal-card" id="goal-daily-card">
+    <div class="hud-item goal-card goal-daily" id="goal-daily-card">
       <div class="goal-meta">
-        <span class="goal-period">TODAY</span>
-        <span class="goal-status">DAILY TARGET</span>
+        <span class="goal-period">Today</span>
+        <span class="goal-status">Daily Target</span>
       </div>
-      <div class="goal-amount" id="goal-daily-amount">₱0</div>
+      <div class="goal-amount" id="goal-daily-amount">PHP 0</div>
       <div class="goal-progress">
         <div class="goal-progress-fill" id="goal-daily-progress"></div>
       </div>
@@ -182,20 +347,20 @@
           type="number"
           class="goal-input"
           id="goal-daily-input"
-          placeholder="SET DAILY TARGET"
+          placeholder="Set daily target"
           min="0"
         />
-        <button class="goal-btn" id="goal-daily-save">SET</button>
+        <button class="goal-btn" id="goal-daily-save">Set</button>
       </div>
-      <div class="goal-footnote" id="goal-daily-window">ACTIVE: TODAY</div>
+      <div class="goal-footnote" id="goal-daily-window">Active: Today</div>
     </div>
 
-    <div class="hud-item goal-card" id="goal-weekly-card">
+    <div class="hud-item goal-card goal-weekly" id="goal-weekly-card">
       <div class="goal-meta">
-        <span class="goal-period">THIS WEEK</span>
-        <span class="goal-status">WEEKLY TARGET</span>
+        <span class="goal-period">This Week</span>
+        <span class="goal-status">Weekly Target</span>
       </div>
-      <div class="goal-amount" id="goal-weekly-amount">₱0</div>
+      <div class="goal-amount" id="goal-weekly-amount">PHP 0</div>
       <div class="goal-progress">
         <div class="goal-progress-fill" id="goal-weekly-progress"></div>
       </div>
@@ -204,20 +369,20 @@
           type="number"
           class="goal-input"
           id="goal-weekly-input"
-          placeholder="SET WEEKLY TARGET"
+          placeholder="Set weekly target"
           min="0"
         />
-        <button class="goal-btn" id="goal-weekly-save">SET</button>
+        <button class="goal-btn" id="goal-weekly-save">Set</button>
       </div>
-      <div class="goal-footnote" id="goal-weekly-window">ACTIVE: THIS WEEK</div>
+      <div class="goal-footnote" id="goal-weekly-window">Active: This Week</div>
     </div>
 
-    <div class="hud-item goal-card" id="goal-monthly-card">
+    <div class="hud-item goal-card goal-monthly" id="goal-monthly-card">
       <div class="goal-meta">
-        <span class="goal-period">THIS MONTH</span>
-        <span class="goal-status">MONTHLY TARGET</span>
+        <span class="goal-period">This Month</span>
+        <span class="goal-status">Monthly Target</span>
       </div>
-      <div class="goal-amount" id="goal-monthly-amount">₱0</div>
+      <div class="goal-amount" id="goal-monthly-amount">PHP 0</div>
       <div class="goal-progress">
         <div class="goal-progress-fill" id="goal-monthly-progress"></div>
       </div>
@@ -226,14 +391,12 @@
           type="number"
           class="goal-input"
           id="goal-monthly-input"
-          placeholder="SET MONTHLY TARGET"
+          placeholder="Set monthly target"
           min="0"
         />
-        <button class="goal-btn" id="goal-monthly-save">SET</button>
+        <button class="goal-btn" id="goal-monthly-save">Set</button>
       </div>
-      <div class="goal-footnote" id="goal-monthly-window">
-        ACTIVE: THIS MONTH
-      </div>
+      <div class="goal-footnote" id="goal-monthly-window">Active: This Month</div>
     </div>
   </div>
 </div>

@@ -1,36 +1,23 @@
 <script src="/assets/js/utils/gatekeeper.js"></script>
-<!-- INTERNAL VIEW GUARD -->
 <script src="/assets/js/utils/auth-guard.js"></script>
 <script>
   window.WOLF_SHELL_ACTIVE = true;
 </script>
 <div class="page-wrapper" id="page-wrapper">
   <div class="wolf-card">
-    <!-- REVENUE CARD -->
-    <div
-      style="
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-      "
-    >
+    <div style="display: flex; justify-content: space-between; align-items: flex-start">
       <div>
-        <div
-          style="
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-          "
-        >
+        <div style="color: var(--text-muted); font-size: 0.8rem; letter-spacing: 1px">
           TOTAL NET REVENUE
         </div>
-        <div style="font-size: 2.5rem; font-weight: 900; font-style: italic">
-          ₱5,980
-        </div>
         <div
-          style="color: var(--accent-red); font-size: 0.8rem; font-weight: bold"
+          id="dashboard-total-net"
+          style="font-size: 2.5rem; font-weight: 900; font-style: italic"
         >
-          <i class="bx bx-trending-down"></i> 67.7% VS YESTERDAY
+          PHP 0.00
+        </div>
+        <div id="dashboard-vs-yesterday" style="color: var(--accent-red); font-size: 0.8rem; font-weight: bold">
+          <i id="dashboard-trend-icon" class="bx bx-trending-up"></i> 0.0% VS YESTERDAY
         </div>
       </div>
       <div
@@ -51,19 +38,20 @@
     <div class="row text-center">
       <div class="col-6 border-end border-secondary">
         <div style="color: var(--text-muted); font-size: 0.7rem">PRODUCTS</div>
-        <div style="font-weight: bold">₱5,900</div>
+        <div id="dashboard-products-total" style="font-weight: bold">PHP 0.00</div>
       </div>
       <div class="col-6">
         <div style="color: var(--text-muted); font-size: 0.7rem">LOG FEES</div>
-        <div style="font-weight: bold">₱80</div>
+        <div id="dashboard-log-fees-total" style="font-weight: bold">PHP 0.00</div>
       </div>
     </div>
   </div>
 
   <div
     class="cta-card-red mb-4 d-flex align-items-center justify-content-between overflow-hidden"
+    onclick="navigateTo('hub')"
+    style="cursor: pointer"
   >
-    <!-- BIG RED CTA -->
     <div style="display: flex; align-items: center; gap: 20px">
       <div
         style="
@@ -76,14 +64,7 @@
         <i class="bx bx-grid-alt"></i>
       </div>
       <div class="text-truncate">
-        <div
-          style="
-            font-weight: 900;
-            font-style: italic;
-            font-size: 1.1rem;
-            line-height: 1;
-          "
-        >
+        <div style="font-weight: 900; font-style: italic; font-size: 1.1rem; line-height: 1">
           SHOW ALL TABS
         </div>
         <div style="font-size: 0.7rem; color: rgba(255, 255, 255, 0.7)">
@@ -95,30 +76,26 @@
   </div>
 
   <div class="row g-3">
-    <!-- GRID STATS -->
     <div class="col-6">
       <div class="wolf-card text-center">
-        <i
-          class="bx bx-user-voice"
-          style="color: var(--accent-red); font-size: 24px"
-        ></i>
-        <div
-          style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px"
-        >
+        <i class="bx bx-user-voice" style="color: var(--accent-red); font-size: 24px"></i>
+        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px">
           ACTIVE MEMBER
         </div>
-        <div style="font-size: 1.5rem; font-weight: bold">4</div>
+        <div id="dashboard-active-members" style="font-size: 1.5rem; font-weight: bold">
+          0
+        </div>
       </div>
     </div>
     <div class="col-6">
       <div class="wolf-card text-center">
         <i class="bx bx-pulse" style="color: #3b82f6; font-size: 24px"></i>
-        <div
-          style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px"
-        >
+        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px">
           FLOOR TRAFFIC
         </div>
-        <div style="font-size: 1.5rem; font-weight: bold">2/30</div>
+        <div id="dashboard-floor-traffic" style="font-size: 1.5rem; font-weight: bold">
+          0/30
+        </div>
       </div>
     </div>
   </div>

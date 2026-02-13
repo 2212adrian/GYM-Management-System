@@ -4,11 +4,13 @@
     margin: 0 auto;
     padding: 20px;
     font-family: 'Inter', sans-serif;
+    display: grid;
+    gap: 16px;
   }
 
   @media (min-width: 1024px) {
     .settings-wrapper {
-      max-width: 1300px;
+      max-width: 1320px;
       min-width: 650px;
     }
   }
@@ -17,64 +19,117 @@
     font-size: 1.2rem;
     font-weight: 900;
     text-transform: uppercase;
-    color: #fff;
+    color: var(--text-main, #fff);
     letter-spacing: 1px;
-    margin-bottom: 12px;
+  }
+
+  .settings-tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .settings-tab {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    color: #b8c0cc;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .settings-tab.is-active {
+    border-color: rgba(var(--wolf-red-rgb), 0.5);
+    color: #fff;
+    background: rgba(var(--wolf-red-rgb), 0.18);
+    box-shadow: 0 10px 28px rgba(var(--wolf-red-rgb), 0.25);
+  }
+
+  .settings-panel {
+    display: none;
+    gap: 16px;
+  }
+
+  .settings-panel.is-active {
+    display: grid;
   }
 
   .settings-card {
     background: linear-gradient(180deg, #151515, #0d0d0d);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 26px;
-    padding: 20px;
-    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75);
-    margin-bottom: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 18px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
   }
 
   .profile-banner {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
-    gap: 6px;
-    padding: 16px;
-    border-radius: 20px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    gap: 14px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .profile-avatar {
-    width: 54px;
-    height: 54px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
-    background: #1e1e1e;
-    border: 1px solid #2a2a2a;
+    background: #1d1d1d;
+    border: 1px solid #313131;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #777;
+    font-size: 24px;
+  }
+
+  .profile-meta {
+    min-width: 0;
   }
 
   .profile-name {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 900;
-    color: #fff;
+    color: var(--text-main, #fff);
     letter-spacing: 1px;
     text-transform: uppercase;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .profile-role {
     font-size: 9px;
-    color: #666;
+    color: #8c96a8;
     text-transform: uppercase;
     letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .profile-email {
+    font-size: 11px;
+    color: #aeb7c5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .settings-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .settings-row:last-child {
@@ -85,15 +140,35 @@
     font-size: 10px;
     font-weight: 900;
     letter-spacing: 1px;
-    color: #bbb;
+    color: #bcc5d3;
     text-transform: uppercase;
   }
 
   .settings-sub {
     font-size: 9px;
-    color: #666;
+    color: #7e8798;
     text-transform: uppercase;
     letter-spacing: 1px;
+  }
+
+  .settings-topline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .settings-pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.25);
+    color: #c4ccda;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
   }
 
   .toggle {
@@ -102,80 +177,83 @@
     border-radius: 999px;
     background: #333;
     position: relative;
+    cursor: pointer;
+    border: 1px solid #444;
   }
 
   .toggle::after {
     content: '';
     position: absolute;
-    top: 3px;
-    left: 3px;
+    top: 2px;
+    left: 2px;
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #ff3b3b;
+    background: #a1a1aa;
+    transition: 0.2s ease;
   }
 
   .toggle.active {
-    background: #1d2a4a;
+    background: #2b2538;
+    border-color: #52397b;
   }
 
   .toggle.active::after {
-    left: 21px;
-    background: #4da6ff;
+    left: 20px;
+    background: #f87171;
   }
 
   .range-track {
-    height: 10px;
-    background: #202020;
-    border-radius: 999px;
-    border: 1px solid #2a2a2a;
-    position: relative;
-    overflow: hidden;
+    width: 100%;
+    display: grid;
+    gap: 8px;
   }
 
-  .range-fill {
-    position: absolute;
-    height: 100%;
-    width: 40%;
-    background: var(--wolf-red);
+  .range-track input[type='range'] {
+    width: 100%;
+    accent-color: var(--wolf-red);
   }
 
   .warning-box {
-    border: 1px solid rgba(180, 112, 35, 0.4);
-    background: rgba(180, 112, 35, 0.08);
-    color: #b47023;
+    border: 1px solid rgba(180, 112, 35, 0.5);
+    background: rgba(180, 112, 35, 0.1);
+    color: #eab972;
     font-size: 9px;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 1px;
     padding: 10px;
     border-radius: 12px;
-    margin: 12px 0;
   }
 
-  .maintenance-item {
-    background: #1d1d1d;
-    border: 1px solid #2a2a2a;
-    padding: 14px;
-    border-radius: 12px;
-    font-size: 10px;
-    font-weight: 900;
-    color: #ddd;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    text-transform: uppercase;
-  }
-
-  .settings-input {
+  .settings-input,
+  .settings-select {
     width: 100%;
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    color: #fff;
-    border-radius: 12px;
-    padding: 12px 14px;
+    background: #16181d;
+    border: 1px solid #2f3440;
+    color: #f2f5fb;
+    border-radius: 10px;
+    padding: 10px 12px;
     font-size: 12px;
-    margin-top: 8px;
+    outline: none;
+  }
+
+  .settings-input:focus,
+  .settings-select:focus {
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
+    box-shadow: 0 0 0 2px rgba(var(--wolf-red-rgb), 0.15);
+  }
+
+  .settings-grid-two {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 900px) {
+    .settings-grid-two {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 
   .settings-actions {
@@ -184,106 +262,401 @@
   }
 
   .settings-btn {
-    background: var(--wolf-red);
     border: none;
-    color: #fff;
-    padding: 14px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 11px;
     font-weight: 900;
     letter-spacing: 1px;
     text-transform: uppercase;
-    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .settings-btn:active {
+    transform: translateY(1px);
+  }
+
+  .settings-btn.primary {
+    background: var(--wolf-red);
+    color: #fff;
   }
 
   .settings-btn.secondary {
-    background: #1f1f1f;
-    color: #aaa;
-    border: 1px solid #333;
+    background: #1a1d23;
+    color: #c3cad6;
+    border: 1px solid #2d3340;
+  }
+
+  .settings-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .maintenance-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .maintenance-item {
+    background: #151922;
+    border: 1px solid #2b3342;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #dce3ef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .settings-users-tools {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .settings-users-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .settings-user-row {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.22);
+    display: grid;
+    gap: 5px;
+  }
+
+  .settings-user-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .settings-user-email {
+    font-size: 11px;
+    font-weight: 800;
+    color: #f2f6ff;
+    word-break: break-word;
+  }
+
+  .settings-role-badge {
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e8edf7;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .settings-role-badge.admin {
+    border-color: rgba(239, 68, 68, 0.65);
+    color: #ffd2d2;
+    background: rgba(239, 68, 68, 0.15);
+  }
+
+  .settings-role-badge.staff {
+    border-color: rgba(59, 130, 246, 0.65);
+    color: #d5e7ff;
+    background: rgba(59, 130, 246, 0.16);
+  }
+
+  .settings-user-meta {
+    font-size: 10px;
+    color: #94a0b5;
+    letter-spacing: 0.4px;
+  }
+  .settings-user-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .settings-user-action-btn {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e7edf8;
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .settings-user-action-btn.danger {
+    border-color: rgba(239, 68, 68, 0.55);
+    color: #fecaca;
+    background: rgba(127, 29, 29, 0.34);
+  }
+  .settings-user-lock-note {
+    margin-top: 4px;
+    font-size: 9px;
+    letter-spacing: 0.7px;
+    color: #8f9bb2;
+    text-transform: uppercase;
+  }
+
+  .settings-empty {
+    color: #8e98a9;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 10px 2px;
+  }
+
+  .settings-admin-note {
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.1);
+    color: #fda4af;
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-weight: 800;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  body.light-theme .settings-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  body.light-theme .settings-tab {
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-muted);
+    border-color: var(--border-color);
+  }
+
+  body.light-theme .settings-tab.is-active {
+    color: #fff;
+    border-color: rgba(var(--wolf-red-rgb), 0.45);
+    background: rgba(var(--wolf-red-rgb), 0.9);
+  }
+
+  body.light-theme .profile-banner,
+  body.light-theme .settings-user-row,
+  body.light-theme .maintenance-item,
+  body.light-theme .settings-input,
+  body.light-theme .settings-select {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--border-color);
+    color: var(--text-main);
+  }
+
+  body.light-theme .profile-name,
+  body.light-theme .settings-user-email {
+    color: var(--text-main);
+  }
+
+  body.light-theme .profile-email,
+  body.light-theme .settings-user-meta,
+  body.light-theme .settings-sub,
+  body.light-theme .settings-empty {
+    color: var(--text-muted);
+  }
+  body.light-theme .settings-user-action-btn {
+    border-color: rgba(51, 65, 85, 0.25);
+    background: rgba(255, 255, 255, 0.8);
+    color: #1f2937;
+  }
+  body.light-theme .settings-user-action-btn.danger {
+    border-color: rgba(220, 38, 38, 0.35);
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.8);
+  }
+
+  body.light-theme .settings-label,
+  body.light-theme .settings-title {
+    color: var(--text-main);
+  }
+
+  body.light-theme .settings-btn.secondary {
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--text-main);
+    border-color: var(--border-color);
   }
 </style>
 
 <script src="/assets/js/utils/59f8f3e5e05e33a95b50d4725925d500a6079bf8d7aed8196482d09523065e9a.js"></script>
-<script src="/assets/js/utils/18f05fa5791cebad5e8cc7095af3bb4eee5760b343a9c7d5a776844fe5618d7c.js"></script>
+<script src="/assets/js/utils/acf618b0a45c1a4029b862dc58302dd3316ecf53bf3b6fb56092721bbd2cff2b.js"></script>
 
-<div class="settings-wrapper">
-  <div class="settings-title">PROFILE SETTINGS (static)</div>
+<div class="settings-wrapper" id="settings-page">
+  <div class="settings-title">Profile Settings</div>
 
-  <div class="settings-card">
-    <div class="profile-banner">
-      <div class="profile-avatar">
-        <i class="bx bx-user"></i>
+  <div class="settings-tabs" id="settings-tabs">
+    <button class="settings-tab is-active" data-settings-tab-btn data-settings-tab="personalize">
+      Personalize
+    </button>
+    <button class="settings-tab" data-settings-tab-btn data-settings-tab="users">
+      User Accounts
+    </button>
+  </div>
+
+  <div class="settings-panel is-active" data-settings-tab-panel="personalize">
+    <div class="settings-card">
+      <div class="profile-banner">
+        <div class="profile-avatar">
+          <i class="bx bx-user"></i>
+        </div>
+        <div class="profile-meta">
+          <div id="settings-profile-name" class="profile-name">PALOMAR ADMIN</div>
+          <div id="settings-profile-role" class="profile-role">ADMIN</div>
+          <div id="settings-profile-email" class="profile-email">admin@palomargym.com</div>
+        </div>
       </div>
-      <div class="profile-name">PALOMAR ADMIN</div>
-      <div class="profile-role">ADMIN</div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Action Sounds</div>
+          <div class="settings-sub">System alerts and confirmations</div>
+        </div>
+        <div class="toggle" data-setting-toggle="action-sounds" aria-pressed="false"></div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Victory Visuals</div>
+          <div class="settings-sub">Confetti on major actions</div>
+        </div>
+        <div class="toggle" data-setting-toggle="victory-visuals" aria-pressed="false"></div>
+      </div>
+      <div class="settings-row" style="flex-direction: column; gap: 8px">
+        <div style="width: 100%">
+          <div class="settings-label">Interface Scale</div>
+          <div class="settings-sub">Scale UI for quick access</div>
+        </div>
+        <div class="range-track">
+          <input id="settings-ui-scale" type="range" min="50" max="150" step="1" value="100" />
+          <div class="settings-sub">
+            Current: <span id="settings-ui-scale-value">100%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings-maintenance-card" class="settings-card">
+      <div class="settings-label" style="margin-bottom: 8px">Database Maintenance</div>
+      <div class="warning-box" style="margin-bottom: 10px">
+        WARNING: Importing data may overwrite current system state.
+      </div>
+      <div class="maintenance-list">
+        <div id="settings-export-btn" class="maintenance-item">
+          Export System Data <i class="bx bx-chevron-right"></i>
+        </div>
+        <div id="settings-restore-btn" class="maintenance-item">
+          Restore From Backup <i class="bx bx-chevron-right"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-grid-two">
+        <div>
+          <div class="settings-label">Display Name</div>
+          <input id="settings-display-name" class="settings-input" value="Palomar Admin" />
+        </div>
+        <div>
+          <div class="settings-label">New Password</div>
+          <input
+            id="settings-new-password"
+            type="password"
+            class="settings-input"
+            placeholder="Leave blank to keep current..."
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button id="settings-update-btn" class="settings-btn primary">Update Account</button>
+      <button id="settings-logout-btn" class="settings-btn secondary">Terminate Session</button>
     </div>
   </div>
 
-  <div class="settings-card">
-    <div class="settings-row">
-      <div>
-        <div class="settings-label">ACTION SOUNDS</div>
-        <div class="settings-sub">SYSTEM ALERTS AND CONFIRMATIONS</div>
+  <div class="settings-panel" data-settings-tab-panel="users">
+    <div class="settings-card">
+      <div class="settings-topline">
+        <div class="settings-label">User Accounts Provisioning</div>
+        <div id="settings-admin-count-chip" class="settings-pill">Admins: 0/3</div>
       </div>
-      <div class="toggle"></div>
+      <div class="warning-box" style="margin-bottom: 10px">
+        CAUTION: USE REAL EMAIL ADDRESSES. OTP RECOVERY KEYS ARE DELIVERED TO THE ACCOUNT EMAIL.
+      </div>
+      <div id="settings-users-permission" class="settings-sub" style="margin-bottom: 10px">
+        Superadmin can create admin/staff accounts.
+      </div>
+      <div id="settings-admin-limit-note" class="settings-sub" style="margin-bottom: 10px">
+        ADMIN LIMIT: UP TO 3 ADMIN ACCOUNTS ONLY (INCLUDING SUPERADMIN).
+      </div>
+
+      <form id="settings-create-user-form" class="settings-grid-two">
+        <div>
+          <div class="settings-label">Display Name (Optional)</div>
+          <input
+            id="settings-create-display-name"
+            class="settings-input"
+            placeholder="Example: Maria Santos"
+          />
+        </div>
+        <div>
+          <div class="settings-label">Email Address</div>
+          <input
+            id="settings-create-email"
+            type="email"
+            class="settings-input"
+            placeholder="staff@domain.com"
+            required
+          />
+        </div>
+        <div>
+          <div class="settings-label">Role</div>
+          <select id="settings-create-role" class="settings-select">
+            <option value="staff">Staff</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div>
+          <div class="settings-label">Password (Optional)</div>
+          <input
+            id="settings-create-password"
+            type="password"
+            class="settings-input"
+            placeholder="Defaults to 12345 if left blank"
+          />
+        </div>
+      </form>
+      <div style="margin-top: 10px">
+        <button id="settings-create-user-btn" class="settings-btn primary">
+          Create Account
+        </button>
+      </div>
+      <div id="settings-superadmin-note" class="settings-admin-note" style="margin-top: 10px" hidden>
+        ONLY SUPERADMIN CAN CREATE NEW ADMIN OR STAFF ACCOUNTS.
+      </div>
     </div>
-    <div class="settings-row">
-      <div>
-        <div class="settings-label">VICTORY VISUALS</div>
-        <div class="settings-sub">CONFETTI ON MAJOR ACTIONS</div>
+
+    <div class="settings-card">
+      <div class="settings-users-tools">
+        <div class="settings-label">Managed Accounts</div>
+        <button id="settings-refresh-users-btn" class="settings-btn secondary">Refresh List</button>
       </div>
-      <div class="toggle active"></div>
-    </div>
-    <div class="settings-row" style="flex-direction: column; gap: 8px">
-      <div style="width: 100%">
-        <div class="settings-label">INTERFACE SIZE</div>
-        <div class="settings-sub">SCALE UI FOR QUICK ACCESS</div>
-      </div>
-      <div class="range-track" style="width: 100%">
-        <div class="range-fill" style="width: 55%"></div>
-      </div>
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          width: 100%;
-          font-size: 9px;
-          color: #666;
-          font-weight: 900;
-        "
-      >
-        <span>SMALL</span>
-        <span>MED</span>
-        <span>BIG</span>
-      </div>
+      <div id="settings-users-empty" class="settings-empty">No managed accounts found.</div>
+      <div id="settings-users-list" class="settings-users-list"></div>
     </div>
   </div>
 
-  <div class="settings-card">
-    <div class="settings-label" style="margin-bottom: 8px">
-      DATABASE MAINTENANCE
-    </div>
-    <div class="warning-box">
-      WARNING: IMPORTING DATA WILL COMPLETELY OVERWRITE THE CURRENT SYSTEM
-      STATE.
-    </div>
-    <div style="display: grid; gap: 10px">
-      <div class="maintenance-item">
-        EXPORT SYSTEM DATA <i class="bx bx-chevron-right"></i>
-      </div>
-      <div class="maintenance-item">
-        RESTORE FROM BACKUP <i class="bx bx-chevron-right"></i>
-      </div>
-    </div>
-  </div>
-
-  <div class="settings-card">
-    <div class="settings-label">DISPLAY NAME</div>
-    <input class="settings-input" value="Palomar Admin" />
-    <div class="settings-label" style="margin-top: 12px">NEW PASSWORD</div>
-    <input class="settings-input" placeholder="Leave blank to keep current..." />
-  </div>
-
-  <div class="settings-actions">
-    <button class="settings-btn">UPDATE ACCOUNT</button>
-    <button class="settings-btn secondary">TERMINATE SESSION</button>
-  </div>
 </div>

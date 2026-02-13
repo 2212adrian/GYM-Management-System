@@ -38,12 +38,35 @@ const QUICK_LOGIN_QR_CACHE_KEY = 'wolf_quick_login_qr_cache';
 const QUICK_LOGIN_POLL_MS = 1800;
 const QUICK_LOGIN_EXPIRE_FALLBACK_SECONDS = 120;
 const QUICK_LOGIN_REGEN_COOLDOWN_FALLBACK_SECONDS = 8;
+const WOLF_ADMIN_EMAILS = new Set([
+  'adrianangeles2212@gmail.com',
+  'ktorrazo123@gmail.com',
+]);
+const WOLF_STAFF_EMAILS = new Set(['adrianangeles2213@gmail.com']);
 const typewriterWords = [
   'Beyond Strength',
   'Beyond Limit',
   'Wolf Palomar',
   'Secure. Reliable. Fast.',
 ];
+
+function normalizeRoleEmail(email) {
+  return String(email || '')
+    .trim()
+    .toLowerCase();
+}
+
+function resolveRoleFromUser(user) {
+  const normalizedEmail = normalizeRoleEmail(user?.email);
+  if (!normalizedEmail) return null;
+  if (WOLF_ADMIN_EMAILS.has(normalizedEmail)) return 'admin';
+  if (WOLF_STAFF_EMAILS.has(normalizedEmail)) return 'staff';
+  const appRole = String(user?.app_metadata?.role || '')
+    .trim()
+    .toLowerCase();
+  if (appRole === 'admin' || appRole === 'staff') return appRole;
+  return null;
+}
 
 let wordIdx = 0;
 let charIdx = 0;
@@ -924,9 +947,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const user = sessionData?.user;
-      if (!user || user.user_metadata?.role !== 'admin') {
+      if (!user || resolveRoleFromUser(user) !== 'admin') {
         await supabaseClient.auth.signOut();
-        throw new Error('Quick-login approved by a non-admin account');
+        throw new Error('Quick-login approval requires an admin account');
       }
 
       if (window.wolfAudio) window.wolfAudio.play('success');
@@ -1138,11 +1161,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           loginBtn.disabled = false;
           loginBtn.textContent = 'AUTHORIZE ACCESS';
         }
-      } else if (data.user.user_metadata.role === 'admin') {
+      } else if (resolveRoleFromUser(data?.user)) {
         await runAdminBootSequence();
       } else {
         wolfAudio.play('error');
-        showLoginOutput('[ERR_102] Unauthorized role.');
+        showLoginOutput('[ERR_102] ACCESS_DENIED: Account is not authorized.');
         await supabaseClient.auth.signOut();
         loginBtn.disabled = false;
         loginBtn.textContent = 'AUTHORIZE ACCESS';

@@ -1,7 +1,7 @@
 const WOLF_CONFIG = {
   noLoadingScreen: false,
-  VERSION: 'v0.6.62',
-  FULL_VERSION: 'GYM V0.6.62',
+  VERSION: 'v0.8.0',
+  FULL_VERSION: 'GYM V0.8.0',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',
@@ -35,6 +35,8 @@ const WOLF_PWA_TOUCH_HELP_HIDE_MS = 2200;
 const WOLF_PWA_INLINE_HELP_DURATION_MS = 2800;
 const WOLF_SW_UPDATE_CHECK_INTERVAL_MS = 60000;
 const WOLF_PWA_PROMPT_RECHECK_MS = 1200;
+const WOLF_PWA_INSTALLED_FLAG_KEY = 'wolf_pwa_installed_flag';
+const WOLF_UI_SCALE_KEY = 'wolf_ui_scale_percent';
 let wolfUpdateCheckTimer = null;
 let wolfKnownPageSignature = null;
 let wolfPendingUpdateSignature = null;
@@ -53,6 +55,31 @@ let wolfPwaTouchHelpTimer = null;
 let wolfPwaSuppressNextInstallClick = false;
 let wolfPwaBeforeInstallSeen = false;
 let wolfPwaSwReady = false;
+
+function applyGlobalUiScaleFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(WOLF_UI_SCALE_KEY);
+    const parsed = Number(raw || 100);
+    const normalized = Math.min(
+      150,
+      Math.max(50, Number.isFinite(parsed) ? parsed : 100),
+    );
+    const scale = normalized / 100;
+    document.documentElement.style.fontSize = `${(16 * scale).toFixed(2)}px`;
+    document.documentElement.style.setProperty(
+      '--wolf-ui-scale-factor',
+      String(scale),
+    );
+    return normalized;
+  } catch (_) {
+    document.documentElement.style.fontSize = '16px';
+    document.documentElement.style.setProperty('--wolf-ui-scale-factor', '1');
+    return 100;
+  }
+}
+
+// Apply as early as possible so all pages respect the saved Interface Scale.
+applyGlobalUiScaleFromStorage();
 
 // Make this globally accessible
 window.applyVersioning = function () {
@@ -133,6 +160,10 @@ async function fetchRemoteSystemConfigSource() {
     // Fallback to manifest-resolved hashed path.
   }
 
+  const host = String(window.location.hostname || '').toLowerCase();
+  const shouldProbeManifest = host !== 'localhost' && host !== '127.0.0.1';
+  if (!shouldProbeManifest) return null;
+
   try {
     const manifestText = await fetchNoStoreText('/asset-manifest.json');
     const manifest = JSON.parse(manifestText);
@@ -166,12 +197,15 @@ function buildUpdateBannerMessage(currentVersion, latestVersion) {
 }
 
 async function fetchCurrentPageSignature() {
+  const host = String(window.location.hostname || '').toLowerCase();
   const probes = [
-    '/asset-manifest.json',
     '/assets/js/utils/system-config.js',
     `${window.location.pathname}${window.location.search}`,
     '/index.html',
   ];
+  if (host !== 'localhost' && host !== '127.0.0.1') {
+    probes.push('/asset-manifest.json');
+  }
 
   for (const probe of probes) {
     try {
@@ -196,41 +230,90 @@ function ensureUpdateBannerStyle() {
   left: 50%;
   transform: translateX(-50%);
   z-index: 99999;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 12px;
-  max-width: min(92vw, 640px);
-  background: linear-gradient(120deg, #101010, #191919);
+  gap: 10px 12px;
+  width: min(94vw, 560px);
+  background: linear-gradient(135deg, #0f1012, #171a20);
   color: #f2f2f2;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-left: 4px solid #f5b22a;
-  border-radius: 10px;
-  padding: 12px 14px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
-  font-size: 13px;
+  border-radius: 12px;
+  padding: 12px 13px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36);
+}
+#${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-text {
+  display: block;
+  margin: 0;
+  font-size: 14px;
   line-height: 1.4;
+  letter-spacing: 0.1px;
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
 }
 #${WOLF_UPDATE_BANNER_ID} button {
-  border: none;
+  border: 1px solid transparent;
   background: #f5b22a;
   color: #1b1b1b;
-  border-radius: 7px;
-  padding: 8px 10px;
-  font-weight: 700;
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-weight: 800;
   font-size: 12px;
+  letter-spacing: 0.15px;
   cursor: pointer;
+  white-space: nowrap;
+  transition:
+    filter 160ms ease,
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 #${WOLF_UPDATE_BANNER_ID} button:hover {
   filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 #${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-dismiss {
-  background: transparent;
-  color: #bfc3ca;
-  border: 1px solid rgba(191, 195, 202, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: #c8cfda;
+  border-color: rgba(200, 207, 218, 0.3);
 }
 #${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-dismiss:hover {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+}
+@media (max-width: 640px) {
+  #${WOLF_UPDATE_BANNER_ID} {
+    width: calc(100vw - 12px);
+    top: calc(6px + env(safe-area-inset-top, 0px));
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 11px 10px;
+  }
+  #${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-text {
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  #${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  #${WOLF_UPDATE_BANNER_ID} button {
+    width: 100%;
+    min-height: 40px;
+    font-size: 13px;
+  }
 }
   `;
   document.head.appendChild(style);
@@ -254,8 +337,10 @@ function showUpdateBanner(message, onRefresh, onDismiss = null) {
   banner.id = WOLF_UPDATE_BANNER_ID;
   banner.innerHTML = `
     <span class="wolf-update-banner-text"></span>
-    <button type="button" class="wolf-update-banner-refresh">Refresh Now</button>
-    <button type="button" class="wolf-update-banner-dismiss">Dismiss</button>
+    <div class="wolf-update-banner-actions">
+      <button type="button" class="wolf-update-banner-refresh">Refresh Now</button>
+      <button type="button" class="wolf-update-banner-dismiss">Dismiss</button>
+    </div>
   `;
   banner.querySelector('.wolf-update-banner-text').textContent = message;
   const refreshButton = banner.querySelector('.wolf-update-banner-refresh');
@@ -383,15 +468,21 @@ function ensureNetworkMonitorStyle() {
   transform: translateX(-50%) translateY(-12px);
   z-index: 100000;
   pointer-events: none;
+  visibility: hidden;
   opacity: 0;
-  transition: opacity 180ms ease, transform 220ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease,
+    visibility 0s linear 220ms;
 }
 #${WOLF_NETWORK_OVERLAY_ID}.is-active {
+  visibility: visible;
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+  transition-delay: 0s, 0s, 0s;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-card {
-  pointer-events: auto;
+  pointer-events: none;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-left: 4px solid rgba(255, 98, 83, 0.96);
@@ -400,6 +491,9 @@ function ensureNetworkMonitorStyle() {
   padding: 10px 12px;
   color: #edf3ff;
   position: relative;
+}
+#${WOLF_NETWORK_OVERLAY_ID}.is-active .wolf-net-card {
+  pointer-events: auto;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-head {
   display: flex;
@@ -866,6 +960,55 @@ function isIosSafariBrowser() {
   const isWebkit = /WebKit/i.test(ua);
   const excluded = /CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser|DuckDuckGo/i.test(ua);
   return isIos && isWebkit && !excluded;
+}
+
+function setPwaInstalledFlag(value) {
+  try {
+    if (value) {
+      window.localStorage.setItem(WOLF_PWA_INSTALLED_FLAG_KEY, '1');
+      return;
+    }
+    window.localStorage.removeItem(WOLF_PWA_INSTALLED_FLAG_KEY);
+  } catch (_) {
+    // ignore local storage failures
+  }
+}
+
+function getPwaInstalledFlag() {
+  try {
+    return window.localStorage.getItem(WOLF_PWA_INSTALLED_FLAG_KEY) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+async function hasInstalledRelatedApp() {
+  if (
+    !window.navigator ||
+    typeof window.navigator.getInstalledRelatedApps !== 'function'
+  ) {
+    return false;
+  }
+
+  try {
+    const apps = await window.navigator.getInstalledRelatedApps();
+    if (!Array.isArray(apps) || !apps.length) return false;
+    return apps.some((app) => {
+      const platform = String(app?.platform || '').toLowerCase();
+      const id = String(app?.id || '').toLowerCase();
+      const url = String(app?.url || '').toLowerCase();
+      if (platform === 'webapp') return true;
+      if (id === '/' || id === window.location.origin.toLowerCase())
+        return true;
+      return Boolean(
+        url &&
+        window.location.origin &&
+        url.includes(window.location.origin.toLowerCase()),
+      );
+    });
+  } catch (_) {
+    return false;
+  }
 }
 
 function ensurePwaInstallStyle() {
@@ -1346,40 +1489,60 @@ function registerPwaServiceWorker() {
     });
 }
 
-function startPwaInstallWatch() {
+async function startPwaInstallWatch() {
   if (wolfPwaInstallWatchBound) return;
   wolfPwaInstallWatchBound = true;
 
   registerPwaServiceWorker();
 
+  setPwaInstallButtonVisible(false);
+
   if (isStandaloneAppMode()) {
+    setPwaInstalledFlag(true);
     setPwaInstallButtonVisible(false);
     return;
   }
 
+  if (getPwaInstalledFlag()) {
+    setPwaInstallButtonVisible(false);
+  }
+
+  const installedRelatedApp = await hasInstalledRelatedApp();
+  if (installedRelatedApp) {
+    setPwaInstalledFlag(true);
+    setPwaInstallButtonVisible(false);
+    return;
+  }
+
+  setPwaInstalledFlag(false);
+
   if (isIosSafariBrowser()) {
     setPwaInstallButtonLabel(WOLF_PWA_IOS_LABEL);
+    setPwaInstallButtonVisible(true);
   } else {
     setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL);
+    setPwaInstallButtonVisible(false);
   }
-  setPwaInstallButtonVisible(true);
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     wolfPwaPromptEvent = event;
     wolfPwaBeforeInstallSeen = true;
+    setPwaInstalledFlag(false);
     setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL);
     setPwaInstallButtonVisible(true);
   });
 
   window.addEventListener('appinstalled', () => {
     wolfPwaPromptEvent = null;
+    setPwaInstalledFlag(true);
     setPwaInstallButtonVisible(false);
   });
 }
 
 // Run once on initial load
 document.addEventListener('DOMContentLoaded', () => {
+  applyGlobalUiScaleFromStorage();
   window.applyVersioning();
   startVersionWatch();
   startNetworkMonitor();

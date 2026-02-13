@@ -530,7 +530,11 @@
   }
 
   .snap-today-btn {
-    width: 0;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
     opacity: 0;
     padding: 0;
     margin-left: 0;
@@ -543,20 +547,30 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 0 0 0;
+    pointer-events: none;
     cursor: pointer;
     transition:
       width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+      max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
       margin 0.4s ease,
+      height 0.2s ease,
       opacity 0.2s ease,
       padding 0.4s ease;
   }
 
   .snap-today-btn.visible {
-    width: 105px; /* Enough to fit "TODAY" and Icon */
+    width: 105px !important; /* Enough to fit "TODAY" and Icon */
+    max-width: 105px !important;
+    min-width: 105px !important;
+    height: 50px !important;
+    min-height: 50px !important;
     opacity: 1;
     margin-left: 12px;
     padding: 10px 18px; /* EXACT MATCH to your reference */
     border: 1px solid #222; /* EXACT MATCH to your reference */
+    flex: 0 0 105px;
+    pointer-events: auto;
   }
 
   /* Icons & Labels (Exact Match) */

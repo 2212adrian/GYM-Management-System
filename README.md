@@ -41,3 +41,31 @@ To enable OTP anti-spam cooldown persistence (3 attempts then 30s lock), run:
 To enable QR quick-login request storage and locking, run:
 
 - `docs/sql/quick_login_requests.sql`
+
+To enable member lifecycle actions (renew/deactivate/change plan), run:
+
+- `docs/sql/members_membership_fields.sql`
+
+To enable dashboard goals, run:
+
+- `docs/sql/goal_target_table.sql`
+
+If goal writes/reads are blocked by RLS, also run:
+
+- `docs/sql/goal_target_rls_policy.sql`
+
+To enable equipment management, run:
+
+- `docs/sql/equipments_table.sql`
+
+To enable feedback management, run:
+
+- `docs/sql/feedback_entries_table.sql`
+
+To enable system audit log page, run:
+
+- `docs/sql/audit_log_table.sql`
+
+To seed default flexible subscription plans (Monthly/Yearly), run:
+
+- `docs/sql/membership_plans_defaults.sql`

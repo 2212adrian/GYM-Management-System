@@ -12,12 +12,20 @@ window.logbookManager = {
   memberSearchTimer: null,
   clockInterval: null,
   serverOffset: 0,
+  membershipSnapshotCache: new Map(),
+  membershipSnapshotTtlMs: 30000,
+  pricing: {
+    regular: 80,
+    student: 50,
+    memberDefault: 0,
+    yearlyDiscountedEntry: 60,
+  },
 
   getEntryFeeByType(type) {
     const t = String(type || '').toLowerCase();
-    if (t === 'member') return 0;
-    if (t === 'student') return 50;
-    return 80;
+    if (t === 'member') return this.pricing.memberDefault;
+    if (t === 'student') return this.pricing.student;
+    return this.pricing.regular;
   },
 
   getEntryLabelByType(type) {
@@ -32,6 +40,211 @@ window.logbookManager = {
     if (t === 'member') return 'MEMBER';
     if (t === 'student') return 'STUDENT';
     return 'REGULAR';
+  },
+
+  isMissingRelationError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+      code === '42P01' ||
+      /relation .* does not exist/.test(msg) ||
+      /table .* does not exist/.test(msg)
+    );
+  },
+
+  isMissingColumnError(error) {
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+      String(error?.code || '').toUpperCase() === 'PGRST204' ||
+      /column .* does not exist/.test(msg) ||
+      /schema cache/.test(msg)
+    );
+  },
+
+  getPlanKind(plan) {
+    const name = String(plan?.name || '').toLowerCase();
+    const unit = String(plan?.billing_period_unit || '').toLowerCase();
+    const interval = Number(plan?.billing_period_interval || 0);
+
+    if (
+      /month/.test(name) ||
+      /month/.test(unit) ||
+      (!unit && interval === 1 && /monthly/.test(name))
+    ) {
+      return 'monthly';
+    }
+
+    if (
+      /year|annual/.test(name) ||
+      /year/.test(unit) ||
+      (!unit && /year|annual/.test(name))
+    ) {
+      return 'yearly';
+    }
+
+    return 'custom';
+  },
+
+  isMembershipActive(row, nowMs) {
+    if (!row) return false;
+    const status = String(row.status || '').toLowerCase();
+    if (status && status !== 'active') return false;
+
+    const startsAt = row.started_at ? new Date(row.started_at).getTime() : null;
+    const expiresAt = row.expires_at ? new Date(row.expires_at).getTime() : null;
+
+    if (Number.isFinite(startsAt) && startsAt > nowMs) return false;
+    if (Number.isFinite(expiresAt) && expiresAt < nowMs) return false;
+    return true;
+  },
+
+  async fetchMembershipSnapshot(profileId) {
+    if (!profileId || !window.supabaseClient) {
+      return { supported: false, activeMembership: null, plan: null, planKind: null };
+    }
+
+    const cacheKey = String(profileId);
+    const cached = this.membershipSnapshotCache.get(cacheKey);
+    const nowMs = Date.now() + Number(this.serverOffset || 0);
+    if (cached && cached.expiresAt > nowMs) return cached.value;
+
+    let response = await window.supabaseClient
+      .from('memberships')
+      .select('id, profile_id, plan_id, status, started_at, expires_at, created_at')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(12);
+
+    if (response.error && this.isMissingColumnError(response.error)) {
+      response = await window.supabaseClient
+        .from('memberships')
+        .select('id, profile_id, plan_id, status, started_at, expires_at')
+        .eq('profile_id', profileId)
+        .order('started_at', { ascending: false })
+        .limit(12);
+    }
+
+    if (response.error) {
+      const unsupported = this.isMissingRelationError(response.error);
+      const value = {
+        supported: !unsupported ? true : false,
+        activeMembership: null,
+        plan: null,
+        planKind: null,
+      };
+      this.membershipSnapshotCache.set(cacheKey, {
+        value,
+        expiresAt: nowMs + this.membershipSnapshotTtlMs,
+      });
+      return value;
+    }
+
+    const rows = Array.isArray(response.data) ? response.data : [];
+    const activeMembership = rows.find((row) => this.isMembershipActive(row, nowMs)) || null;
+
+    if (!activeMembership || !activeMembership.plan_id) {
+      const value = {
+        supported: true,
+        activeMembership: null,
+        plan: null,
+        planKind: null,
+      };
+      this.membershipSnapshotCache.set(cacheKey, {
+        value,
+        expiresAt: nowMs + this.membershipSnapshotTtlMs,
+      });
+      return value;
+    }
+
+    const planResponse = await window.supabaseClient
+      .from('membership_plans')
+      .select('id, name, price, billing_period_interval, billing_period_unit')
+      .eq('id', activeMembership.plan_id)
+      .maybeSingle();
+
+    if (planResponse.error) {
+      const value = {
+        supported: !this.isMissingRelationError(planResponse.error),
+        activeMembership,
+        plan: null,
+        planKind: null,
+      };
+      this.membershipSnapshotCache.set(cacheKey, {
+        value,
+        expiresAt: nowMs + this.membershipSnapshotTtlMs,
+      });
+      return value;
+    }
+
+    const plan = planResponse.data || null;
+    const value = {
+      supported: true,
+      activeMembership,
+      plan,
+      planKind: this.getPlanKind(plan),
+    };
+    this.membershipSnapshotCache.set(cacheKey, {
+      value,
+      expiresAt: nowMs + this.membershipSnapshotTtlMs,
+    });
+    return value;
+  },
+
+  async resolveCheckInPricing(resolvedMember, requestedType) {
+    const normalized = String(requestedType || '').toLowerCase();
+    const entryType = ['member', 'student', 'regular'].includes(normalized)
+      ? normalized
+      : 'regular';
+
+    if (!resolvedMember || !resolvedMember.profile_id) {
+      return {
+        entryType,
+        entryFee: this.getEntryFeeByType(entryType),
+        membershipLabel: this.getEntryLabelByType(entryType),
+      };
+    }
+
+    const snapshot = await this.fetchMembershipSnapshot(resolvedMember.profile_id);
+    const planName = String(snapshot?.plan?.name || '').trim().toUpperCase();
+
+    if (!snapshot.supported) {
+      return {
+        entryType: 'member',
+        entryFee: this.getEntryFeeByType('member'),
+        membershipLabel: this.getEntryLabelByType('member'),
+      };
+    }
+
+    if (!snapshot.activeMembership) {
+      return {
+        entryType: 'member',
+        entryFee: this.pricing.regular,
+        membershipLabel: 'MEMBER (NO ACTIVE SUBSCRIPTION)',
+      };
+    }
+
+    if (snapshot.planKind === 'monthly') {
+      return {
+        entryType: 'member',
+        entryFee: 0,
+        membershipLabel: planName || 'MONTHLY SUBSCRIPTION (FREE ENTRY)',
+      };
+    }
+
+    if (snapshot.planKind === 'yearly') {
+      return {
+        entryType: 'member',
+        entryFee: this.pricing.yearlyDiscountedEntry,
+        membershipLabel:
+          planName || 'YEARLY SUBSCRIPTION (REGULAR ENTRY DISCOUNT)',
+      };
+    }
+
+    return {
+      entryType: 'member',
+      entryFee: this.getEntryFeeByType('member'),
+      membershipLabel: planName || 'ACTIVE MEMBERSHIP',
+    };
   },
 
   hideMemberSearchResults(modal) {
@@ -559,12 +772,17 @@ window.logbookManager = {
       const requestedType = String(
         options.entryType || this.selectedEntryType || 'regular',
       ).toLowerCase();
-      const entryType = resolvedMember
+      const fallbackEntryType = resolvedMember
         ? 'member'
         : ['member', 'student', 'regular'].includes(requestedType)
           ? requestedType
           : 'regular';
-      const entryFee = this.getEntryFeeByType(entryType);
+      const pricing = await this.resolveCheckInPricing(
+        resolvedMember,
+        fallbackEntryType,
+      );
+      const entryType = pricing.entryType;
+      const entryFee = Number(pricing.entryFee || 0);
       const isPaid = Boolean(options.isPaid);
       const paidAmount = isPaid ? entryFee : 0;
 
@@ -574,7 +792,8 @@ window.logbookManager = {
       )
         .trim()
         .toUpperCase();
-      const membershipLabel = this.getEntryLabelByType(entryType);
+      const membershipLabel =
+        pricing.membershipLabel || this.getEntryLabelByType(entryType);
 
       const memberIdentity = [memberCode, resolvedName.toUpperCase()]
         .filter(Boolean)

@@ -6,6 +6,29 @@
 const MemberManager = {
   allMembers: [],
   trashData: [],
+  currentPage: 1,
+  pageSize: 9,
+  currentFilterList: [],
+  getAccessContext() {
+    const context = window.WOLF_ACCESS_CONTEXT || {};
+    const role = String(context.role || window.WOLF_USER_ROLE || '')
+      .trim()
+      .toLowerCase();
+    const email = String(context.email || window.WOLF_USER_EMAIL || '')
+      .trim()
+      .toLowerCase();
+    return { role, email };
+  },
+
+  canHardDelete() {
+    const { role, email } = this.getAccessContext();
+    return (
+      role === 'admin' ||
+      email === 'adrianangeles2212@gmail.com' ||
+      email === 'ktorrazo123@gmail.com'
+    );
+  },
+
   getAccentColor() {
     return (
       getComputedStyle(document.body).getPropertyValue('--wolf-red').trim() ||
@@ -26,31 +49,221 @@ const MemberManager = {
     return `ME-${fallback.padEnd(4, '0')}`;
   },
 
-  // Add these inside the MemberManager object
-  viewProfile(id) {
-    console.log('Protocol: Viewing Profile for', id);
+  isMissingLifecycleColumnError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    return (
+      error?.code === 'PGRST204' ||
+      /column .* does not exist/.test(message) ||
+      /schema cache/.test(message) ||
+      /could not find the .* column/.test(message)
+    );
   },
-  attendance(id) {
-    console.log('Protocol: Loading Attendance for', id);
+
+  async fetchMemberById(id) {
+    const { data, error } = await window.supabaseClient
+      .from('members')
+      .select('*')
+      .eq('member_id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data || null;
   },
-  changePlan(id) {
-    console.log('Protocol: Opening Plan Manager for', id);
+
+  async updateLifecycleFields(id, updates = {}) {
+    let response = await window.supabaseClient
+      .from('members')
+      .update(updates)
+      .eq('member_id', id)
+      .select('*')
+      .maybeSingle();
+
+    if (response.error && this.isMissingLifecycleColumnError(response.error)) {
+      return { data: null, error: response.error, missingColumns: true };
+    }
+
+    return {
+      data: response.data || null,
+      error: response.error || null,
+      missingColumns: false,
+    };
   },
-  deactivate(id) {
+
+  async viewProfile(id) {
+    try {
+      const member = await this.fetchMemberById(id);
+      if (!member || !window.Swal) return;
+
+      const memberCode = this.getMemberCode(member);
+      const status = String(member.membership_status || 'ACTIVE').toUpperCase();
+      const plan = member.membership_plan || 'STANDARD MEMBERSHIP';
+      const expiry = member.membership_expires_at
+        ? new Date(member.membership_expires_at).toLocaleDateString()
+        : 'NOT SET';
+
+      await window.Swal.fire({
+        title: 'MEMBER PROFILE',
+        background: '#0d0d0d',
+        color: '#fff',
+        confirmButtonText: 'CLOSE',
+        html: `
+          <div style="text-align:left; font-size:12px; line-height:1.6; text-transform:uppercase;">
+            <div><strong>Name:</strong> ${WOLF_PURIFIER(member.full_name || 'N/A')}</div>
+            <div><strong>Member ID:</strong> ${WOLF_PURIFIER(memberCode)}</div>
+            <div><strong>Contact:</strong> ${WOLF_PURIFIER(member.contact_number || 'N/A')}</div>
+            <div><strong>Email:</strong> ${WOLF_PURIFIER(member.email_address || 'N/A')}</div>
+            <div><strong>Status:</strong> ${WOLF_PURIFIER(status)}</div>
+            <div><strong>Plan:</strong> ${WOLF_PURIFIER(plan)}</div>
+            <div><strong>Expiry:</strong> ${WOLF_PURIFIER(expiry)}</div>
+          </div>
+        `,
+      });
+    } catch (err) {
+      console.error('Member Profile Load Failed:', err);
+      if (window.salesManager) {
+        window.salesManager.showSystemAlert('DATABASE_REJECTED_ENTRY', 'error');
+      }
+    }
+  },
+
+  async attendance(id) {
+    try {
+      const member = await this.fetchMemberById(id);
+      if (!member || !window.Swal) return;
+
+      let logs = [];
+      if (member.profile_id) {
+        const { data, error } = await window.supabaseClient
+          .from('check_in_logs')
+          .select('time_in,time_out,notes,is_paid,paid_amount')
+          .eq('profile_id', member.profile_id)
+          .order('time_in', { ascending: false })
+          .limit(8);
+        if (!error) logs = data || [];
+      }
+
+      const rows = logs.length
+        ? logs
+            .map((log) => {
+              const timeIn = log.time_in
+                ? new Date(log.time_in).toLocaleString()
+                : 'N/A';
+              const timeOut = log.time_out
+                ? new Date(log.time_out).toLocaleString()
+                : 'ACTIVE SESSION';
+              return `<div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                <div><strong>IN:</strong> ${WOLF_PURIFIER(timeIn)}</div>
+                <div><strong>OUT:</strong> ${WOLF_PURIFIER(timeOut)}</div>
+              </div>`;
+            })
+            .join('')
+        : '<div style="padding:10px 0;">NO ATTENDANCE LOGS FOUND.</div>';
+
+      await window.Swal.fire({
+        title: 'ATTENDANCE SNAPSHOT',
+        background: '#0d0d0d',
+        color: '#fff',
+        confirmButtonText: 'CLOSE',
+        html: `<div style="text-align:left; font-size:12px; max-height:320px; overflow:auto;">${rows}</div>`,
+      });
+    } catch (err) {
+      console.error('Attendance Lookup Failed:', err);
+      if (window.salesManager) {
+        window.salesManager.showSystemAlert('DATABASE_REJECTED_ENTRY', 'error');
+      }
+    }
+  },
+
+  async changePlan(id) {
+    if (!window.Swal) return;
     const accent = this.getAccentColor();
-    Swal.fire({
+
+    const result = await window.Swal.fire({
+      title: 'CHANGE PLAN',
+      background: '#0d0d0d',
+      color: '#fff',
+      showCancelButton: true,
+      confirmButtonColor: accent,
+      confirmButtonText: 'APPLY',
+      html: `
+        <input id="member-plan-input" class="swal2-input" placeholder="Plan Name (e.g. Monthly Premium)" />
+        <input id="member-expiry-input" class="swal2-input" type="date" />
+      `,
+      preConfirm: () => {
+        const plan = document.getElementById('member-plan-input')?.value?.trim();
+        if (!plan) {
+          window.Swal.showValidationMessage('Plan is required.');
+          return null;
+        }
+        const expiry = document.getElementById('member-expiry-input')?.value || null;
+        return { plan, expiry };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    const updates = {
+      membership_plan: result.value.plan,
+      membership_status: 'ACTIVE',
+      membership_expires_at: result.value.expiry || null,
+      is_active: true,
+    };
+
+    const { error, missingColumns } = await this.updateLifecycleFields(id, updates);
+    if (error) {
+      if (missingColumns) {
+        window.Swal.fire(
+          'MISSING COLUMNS',
+          'Run docs/sql/members_membership_fields.sql in Supabase then retry.',
+          'warning',
+        );
+      } else {
+        window.Swal.fire('ERROR', error.message || 'Failed to update plan.', 'error');
+      }
+      return;
+    }
+
+    if (window.salesManager) window.salesManager.showSystemAlert('PLAN UPDATED', 'success');
+    await this.fetchMembers();
+  },
+
+  async deactivate(id) {
+    if (!window.Swal) return;
+    const accent = this.getAccentColor();
+    const result = await window.Swal.fire({
       title: 'DEACTIVATE MEMBER?',
-      text: 'They will lose access to the gym immediately.',
+      text: 'They will lose access until renewed.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: accent,
       background: '#0d0d0d',
       color: '#fff',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        console.log('Protocol: Deactivating', id);
-      }
     });
+
+    if (!result.isConfirmed) return;
+
+    const { error, missingColumns } = await this.updateLifecycleFields(id, {
+      membership_status: 'INACTIVE',
+      is_active: false,
+    });
+
+    if (error) {
+      if (missingColumns) {
+        window.Swal.fire(
+          'MISSING COLUMNS',
+          'Run docs/sql/members_membership_fields.sql in Supabase then retry.',
+          'warning',
+        );
+      } else {
+        window.Swal.fire('ERROR', error.message || 'Failed to deactivate member.', 'error');
+      }
+      return;
+    }
+
+    if (window.salesManager) {
+      window.salesManager.showSystemAlert('MEMBER DEACTIVATED', 'warning');
+    }
+    await this.fetchMembers();
   },
 
   getMainSkeleton() {
@@ -96,11 +309,9 @@ const MemberManager = {
     if (container) container.innerHTML = this.getMainSkeleton(); // Show Skeleton
 
     try {
-      const { data, error } = await window.supabaseClient
+      let { data, error } = await window.supabaseClient
         .from('members')
-        .select(
-          'member_id, profile_id, member_code, sku, full_name, contact_number, email_address, created_at',
-        )
+        .select('*')
         .order('full_name', { ascending: true });
 
       if (error) throw error;
@@ -111,7 +322,12 @@ const MemberManager = {
         email: row.email_address,
         member_code: this.getMemberCode(row),
         sku: row.sku,
+        membership_status: String(row.membership_status || 'ACTIVE').toUpperCase(),
+        membership_plan: row.membership_plan || 'STANDARD MEMBERSHIP',
+        membership_expires_at: row.membership_expires_at || null,
       }));
+      this.currentFilterList = [...this.allMembers];
+      this.currentPage = 1;
       this.render(this.allMembers);
 
       const countEl =
@@ -166,6 +382,7 @@ const MemberManager = {
     const container = document.getElementById('members-list');
     if (!container) return;
 
+    this.currentFilterList = Array.isArray(list) ? [...list] : [];
     container.innerHTML = '';
     container.style.opacity = '1';
     container.className = 'row g-4 wolf-page-intro';
@@ -176,7 +393,13 @@ const MemberManager = {
       return;
     }
 
-    container.innerHTML = list
+    const totalItems = list.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / this.pageSize));
+    if (this.currentPage > totalPages) this.currentPage = totalPages;
+    const start = (this.currentPage - 1) * this.pageSize;
+    const visible = list.slice(start, start + this.pageSize);
+
+    container.innerHTML = visible
       .map((m, index) => {
         const rawMemberCode = this.getMemberCode(m);
         const shortId = WOLF_PURIFIER(rawMemberCode);
@@ -227,6 +450,7 @@ const MemberManager = {
                     <div class="info-group"><label>SKU IDENTIFIER</label><div class="value">${memberCode}</div></div>
                     <div class="info-group"><label>ISSUE DATE</label><div class="value">${issueDate}</div></div>
                     <div class="info-group"><label>CONTACT</label><div class="value">${WOLF_PURIFIER(m.phone || 'N/A')}</div></div>
+                    <div class="info-group"><label>STATUS</label><div class="value">${WOLF_PURIFIER(m.membership_status || 'ACTIVE')}</div></div>
                   </div>
                 </div>
                 <div class="card-footer">
@@ -257,6 +481,14 @@ const MemberManager = {
                     <i class="bx bx-user-x"></i>
                     <span class="btn-label">Deactivate</span>
                   </button>
+                  <button class="action-item" onclick="event.stopPropagation(); MemberManager.checkIn('${m.id}')">
+                    <i class="bx bx-log-in-circle"></i>
+                    <span class="btn-label">Check-In</span>
+                  </button>
+                  <button class="action-item" onclick="event.stopPropagation(); MemberManager.renew('${m.id}')">
+                    <i class="bx bx-reset"></i>
+                    <span class="btn-label">Renew</span>
+                  </button>
                 </div>
                 
                 <div class="back-footer"> < < < CLICK ME TO FLIP BACK > > > </div>
@@ -267,6 +499,23 @@ const MemberManager = {
         </div>`;
       })
       .join('');
+
+    if (totalItems > this.pageSize) {
+      container.innerHTML += `
+        <div class="col-12" style="display:flex; justify-content:center; align-items:center; gap:10px; margin-top:8px;">
+          <button onclick="MemberManager.setPage(${this.currentPage - 1})" ${this.currentPage <= 1 ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-left'></i></button>
+          <span style="font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#97a4ba;">Page ${this.currentPage} of ${totalPages}</span>
+          <button onclick="MemberManager.setPage(${this.currentPage + 1})" ${this.currentPage >= totalPages ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-right'></i></button>
+        </div>
+      `;
+    }
+  },
+
+  setPage(page) {
+    const nextPage = Number(page);
+    if (!Number.isFinite(nextPage) || nextPage < 1) return;
+    this.currentPage = nextPage;
+    this.render(this.currentFilterList.length ? this.currentFilterList : this.allMembers);
   },
 
   renderTrash() {
@@ -290,6 +539,7 @@ const MemberManager = {
     // We wait for the browser to acknowledge the empty container before filling it
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        const canHardDelete = this.canHardDelete();
         container.innerHTML = this.trashData
           .map((item, index) => {
             const p = item.deleted_data || {};
@@ -311,7 +561,11 @@ const MemberManager = {
               </div>
               <div class="trash-action-group">
                 <button class="btn-trash-action restore" onclick="MemberManager.restore('${item.id}')"><i class="bx bx-undo"></i></button>
-                <button class="btn-trash-action purge" onclick="MemberManager.wipePermanent('${item.id}')"><i class="bx bx-shield-x"></i></button>
+                ${
+                  canHardDelete
+                    ? `<button class="btn-trash-action purge" onclick="MemberManager.wipePermanent('${item.id}')"><i class="bx bx-shield-x"></i></button>`
+                    : ''
+                }
               </div>
             </div>`;
           })
@@ -362,6 +616,7 @@ const MemberManager = {
             (m.email && String(m.email).toLowerCase().includes(term)) ||
             (m.id && String(m.id).toLowerCase().includes(term)),
         );
+        this.currentPage = 1;
         this.render(filtered);
       };
     }
@@ -370,6 +625,7 @@ const MemberManager = {
       clearBtn.onclick = () => {
         searchInput.value = '';
         clearBtn.style.display = 'none';
+        this.currentPage = 1;
         this.render(this.allMembers);
       };
     }
@@ -467,6 +723,12 @@ const MemberManager = {
   },
 
   async wipePermanent(trashId) {
+    if (!this.canHardDelete()) {
+      if (window.wolfAudio) window.wolfAudio.play('denied');
+      await Swal.fire('ACCESS DENIED', 'Only admin can hard delete records.', 'warning');
+      return;
+    }
+
     const { isConfirmed } = await Swal.fire({
       title: 'TERMINATE RECORD?',
       text: 'This action cannot be undone. Data will be purged.',
@@ -562,8 +824,36 @@ const MemberManager = {
     }
   },
 
-  checkIn(id) {
-    console.log('Protocol: Member Check-In', id);
+  async checkIn(id) {
+    try {
+      const member = await this.fetchMemberById(id);
+      if (!member) return;
+
+      const fullName = String(member.full_name || '').trim();
+      if (!fullName) return;
+
+      if (
+        window.logbookManager &&
+        typeof window.logbookManager.processCheckIn === 'function'
+      ) {
+        await window.logbookManager.processCheckIn(fullName, {
+          entryType: 'member',
+          isPaid: false,
+        });
+      } else if (typeof navigateTo === 'function') {
+        window.WOLF_PENDING_MEMBER_ID = id;
+        navigateTo('logbook');
+      }
+
+      if (window.salesManager) {
+        window.salesManager.showSystemAlert(`ACCESS GRANTED: ${fullName}`, 'success');
+      }
+    } catch (err) {
+      console.error('Member Check-In Failed:', err);
+      if (window.salesManager) {
+        window.salesManager.showSystemAlert('DATABASE_REJECTED_ENTRY', 'error');
+      }
+    }
   },
   edit(id) {
     if (window.wolfAudio) window.wolfAudio.play('notif');
@@ -581,8 +871,60 @@ const MemberManager = {
 
     window.location.href = '/pages/main.html?p=id-maker';
   },
-  renew(id) {
-    console.log('Protocol: Process Renewal', id);
+  async renew(id) {
+    if (!window.Swal) return;
+
+    const now = new Date();
+    const defaultExpiry = new Date(now);
+    defaultExpiry.setDate(defaultExpiry.getDate() + 30);
+
+    const result = await window.Swal.fire({
+      title: 'RENEW MEMBERSHIP',
+      background: '#0d0d0d',
+      color: '#fff',
+      showCancelButton: true,
+      confirmButtonText: 'RENEW',
+      html: `
+        <input id="renew-plan" class="swal2-input" placeholder="Membership Plan" value="MONTHLY MEMBERSHIP" />
+        <input id="renew-expiry" class="swal2-input" type="date" value="${defaultExpiry.toISOString().slice(0, 10)}" />
+      `,
+      preConfirm: () => {
+        const plan = document.getElementById('renew-plan')?.value?.trim();
+        const expiry = document.getElementById('renew-expiry')?.value || null;
+        if (!plan) {
+          window.Swal.showValidationMessage('Plan is required.');
+          return null;
+        }
+        return { plan, expiry };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    const { error, missingColumns } = await this.updateLifecycleFields(id, {
+      membership_plan: result.value.plan,
+      membership_status: 'ACTIVE',
+      membership_expires_at: result.value.expiry,
+      is_active: true,
+    });
+
+    if (error) {
+      if (missingColumns) {
+        window.Swal.fire(
+          'MISSING COLUMNS',
+          'Run docs/sql/members_membership_fields.sql in Supabase then retry.',
+          'warning',
+        );
+      } else {
+        window.Swal.fire('ERROR', error.message || 'Renewal failed.', 'error');
+      }
+      return;
+    }
+
+    if (window.salesManager) {
+      window.salesManager.showSystemAlert('MEMBERSHIP RENEWED', 'success');
+    }
+    await this.fetchMembers();
   },
 
   renderSkeleton() {

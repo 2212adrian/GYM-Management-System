@@ -18,6 +18,10 @@ const quickLoginQrEncryptionKey = crypto
   .createHash('sha256')
   .update(String(quickLoginQrSecret || ''))
   .digest();
+const WOLF_ADMIN_EMAILS = new Set([
+  'adrianangeles2212@gmail.com',
+  'ktorrazo123@gmail.com',
+]);
 
 function json(statusCode, body) {
   return {
@@ -31,6 +35,21 @@ function json(statusCode, body) {
     },
     body: JSON.stringify(withErrorCode(statusCode, body)),
   };
+}
+
+function normalizeRoleEmail(email) {
+  return String(email || '')
+    .trim()
+    .toLowerCase();
+}
+
+function resolveRoleFromUser(user) {
+  const normalizedEmail = normalizeRoleEmail(user?.email);
+  if (normalizedEmail && WOLF_ADMIN_EMAILS.has(normalizedEmail)) return 'admin';
+  const appRole = String(user?.app_metadata?.role || '')
+    .trim()
+    .toLowerCase();
+  return appRole === 'admin' ? 'admin' : null;
 }
 
 function parseBody(body) {
@@ -260,7 +279,7 @@ exports.handler = async (event) => {
     }
 
     const approverUser = approverSession.user;
-    if (approverUser.user_metadata?.role !== 'admin') {
+    if (resolveRoleFromUser(approverUser) !== 'admin') {
       return json(403, {
         error: 'Only admin accounts can approve quick-login',
         errorKey: 'ACCESS_DENIED',

@@ -116,6 +116,32 @@
     background: #111;
     border-left: 1px solid #222;
   }
+  .qty-stepper {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+    align-items: center;
+  }
+  .qty-step-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid #2d3340;
+    background: linear-gradient(160deg, #171b24, #0f1219);
+    color: #dbe5f9;
+    font-size: 22px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  }
+  .qty-step-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  .qty-step-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 
   /* Locked State UI */
   .search-input-wrapper.is-locked {
@@ -1061,13 +1087,17 @@
 
         <div class="terminal-section">
           <label class="field-label">Quantity to Authorize</label>
-          <input
-            type="number"
-            id="sale-qty"
-            class="terminal-input"
-            placeholder="0"
-            min="1"
-          />
+          <div class="qty-stepper">
+            <button type="button" id="sale-qty-dec" class="qty-step-btn" aria-label="Decrease quantity">-</button>
+            <input
+              type="number"
+              id="sale-qty"
+              class="terminal-input"
+              placeholder="0"
+              min="1"
+            />
+            <button type="button" id="sale-qty-inc" class="qty-step-btn" aria-label="Increase quantity">+</button>
+          </div>
         </div>
 
         <!-- ENHANCED TOTAL PAYABLE DESIGN -->

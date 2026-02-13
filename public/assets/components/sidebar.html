@@ -39,16 +39,44 @@
       width: var(--expanded-width);
     }
 
-    /* HIDE CONTENT IN MINI-RAIL MODE (When .active is NOT present) */
-    .sidebar-panel:not(.active) .profile-area,
-    .sidebar-panel:not(.active) .target-box,
+    /* MINI-RAIL MODE */
+    .sidebar-panel:not(.active) .target-box {
+      display: none !important;
+    }
     .sidebar-panel:not(.active) .nav-text,
-    .sidebar-panel:not(.active) .sidebar-section-label,
     .sidebar-panel:not(.active) .chevron-icon {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
       transition: opacity 0.2s ease;
+    }
+    .sidebar-panel:not(.active) .nav-list {
+      padding-top: 8px;
+    }
+    .sidebar-panel:not(.active) .sidebar-divider {
+      margin: 10px 16px;
+    }
+    .sidebar-panel:not(.active) .sidebar-section-label {
+      opacity: 1;
+      visibility: visible;
+      display: block;
+      pointer-events: none;
+      font-size: 0.56rem;
+      font-weight: 900;
+      letter-spacing: 1.1px;
+      text-align: center;
+      padding: 7px 6px;
+      margin: 6px 8px;
+      border-radius: 999px;
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      text-transform: uppercase;
+    }
+    body.light-theme .sidebar-panel:not(.active) .sidebar-section-label {
+      border-color: rgba(56, 45, 34, 0.2);
+      background: rgba(255, 255, 255, 0.38);
+      color: rgba(56, 45, 34, 0.86);
     }
     /* Hide sub-item primary icons when minimized (keep sub-bg-icon) */
     .sidebar-panel:not(.active) .sub-item i:first-child {
@@ -256,6 +284,301 @@
     pointer-events: none;
     display: none;
   }
+  .target-box {
+    margin: 0 20px 16px;
+    padding: 13px 12px 12px;
+    border-radius: 14px;
+    background:
+      radial-gradient(circle at top right, rgba(var(--wolf-red-rgb), 0.12), transparent 52%),
+      var(--shell-sidebar-card-bg);
+    border: 1px solid var(--shell-sidebar-card-border);
+    box-shadow:
+      0 12px 26px rgba(0, 0, 0, 0.28),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+  }
+  .target-box-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+  .target-box-head-left {
+    min-width: 0;
+    flex: 1;
+  }
+  .target-box-head-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+  }
+  #sidebar-target-label {
+    letter-spacing: 0.95px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  #sidebar-target-percent {
+    color: var(--text-main);
+    font-weight: 900;
+    letter-spacing: 0.6px;
+  }
+  #sidebar-target-state {
+    margin-top: 9px;
+    font-size: 0.64rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  #sidebar-target-amount {
+    margin-top: 3px;
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: var(--text-main);
+    letter-spacing: 0.4px;
+  }
+  #sidebar-target-select {
+    width: 118px;
+    max-width: 100%;
+    background: rgba(8, 12, 20, 0.9);
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 5px 8px;
+    font-size: 0.56rem;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    text-align: right;
+  }
+  #sidebar-target-select:focus {
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
+    box-shadow: 0 0 0 2px rgba(var(--wolf-red-rgb), 0.15);
+  }
+  body.light-theme #sidebar-target-select {
+    background: rgba(255, 255, 255, 0.86);
+    color: #1f2937;
+    border-color: rgba(51, 65, 85, 0.22);
+  }
+  body.light-theme .target-box {
+    background:
+      radial-gradient(circle at top right, rgba(42, 141, 255, 0.13), transparent 52%),
+      var(--shell-sidebar-card-bg);
+    box-shadow:
+      0 10px 22px rgba(30, 41, 59, 0.12),
+      inset 0 0 0 1px rgba(51, 65, 85, 0.05);
+  }
+
+  .target-box {
+    --target-active-color: #ff3b30;
+    --target-glow-color: rgba(255, 59, 48, 0.75);
+    --target-warn-color: #ff2d2d;
+  }
+  body.light-theme .target-box {
+    --target-active-color: #2a8dff;
+    --target-glow-color: rgba(42, 141, 255, 0.62);
+    --target-warn-color: #ff2d2d;
+  }
+  .target-track {
+    position: relative;
+    height: 6px;
+    background: var(--shell-sidebar-track);
+    margin-top: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    transition: height 0.2s ease;
+  }
+  .target-fill,
+  .target-ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    will-change: width, opacity, transform, filter;
+  }
+  .target-ghost {
+    z-index: 1;
+    opacity: 0;
+    background: color-mix(in srgb, var(--target-active-color) 74%, #ffffff 26%);
+    box-shadow: 0 0 10px var(--target-glow-color);
+  }
+  .target-fill {
+    z-index: 2;
+    background: var(--target-active-color);
+    box-shadow:
+      0 0 8px var(--target-glow-color),
+      0 0 16px color-mix(in srgb, var(--target-active-color) 55%, transparent 45%);
+    transition:
+      width 0.56s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.26s ease,
+      box-shadow 0.35s ease,
+      background-color 0.35s ease,
+      filter 0.35s ease;
+    transform-origin: center;
+  }
+  .target-box.target-gaining .target-fill {
+    transform: scaleY(1.28);
+    box-shadow:
+      0 0 12px var(--target-glow-color),
+      0 0 22px color-mix(in srgb, var(--target-active-color) 75%, transparent 25%);
+    filter: saturate(1.18);
+  }
+  .target-box.target-changing .target-track {
+    height: 12px;
+  }
+  .target-box.target-changing .target-fill,
+  .target-box.target-changing .target-ghost {
+    transform: scaleY(1.08);
+  }
+  .target-box.target-dropping .target-fill {
+    transition: width 0.2s cubic-bezier(0.2, 0.95, 0.28, 1);
+  }
+  .target-box.target-drop-warning .target-fill {
+    background: var(--target-warn-color) !important;
+    box-shadow:
+      0 0 10px rgba(255, 45, 45, 0.75),
+      0 0 20px rgba(255, 45, 45, 0.45);
+  }
+
+  #wolf-target-cinematic {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(92vw, 760px);
+    padding: 18px 20px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(165deg, rgba(14, 14, 16, 0.94), rgba(9, 9, 12, 0.86));
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.62),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    z-index: 16050;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  #wolf-target-cinematic.is-active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #wolf-target-cinematic .wtc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  #wolf-target-cinematic .wtc-label {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #f0f4ff;
+  }
+  #wolf-target-cinematic .wtc-value {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    color: #f0f4ff;
+    text-align: right;
+    line-height: 1.25;
+  }
+  #wolf-target-cinematic .wtc-track {
+    position: relative;
+    height: 22px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  #wolf-target-cinematic .wtc-ghost,
+  #wolf-target-cinematic .wtc-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+  }
+  #wolf-target-cinematic .wtc-ghost {
+    opacity: 0;
+    background: rgba(255, 80, 65, 0.75);
+    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1), opacity 1s ease;
+  }
+  #wolf-target-cinematic .wtc-fill {
+    background:
+      linear-gradient(90deg, #ff2d2d 0%, #ff5a2b 38%, #ffd166 72%, #ff2d2d 100%);
+    background-size: 220% 100%;
+    animation: wolfFireFlow 0.85s linear infinite;
+    box-shadow:
+      0 0 18px rgba(255, 80, 65, 0.76),
+      0 0 32px rgba(255, 80, 65, 0.44);
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s ease;
+  }
+  #wolf-target-cinematic.is-light .wtc-fill {
+    background:
+      linear-gradient(90deg, #1e40ff 0%, #2a8dff 34%, #7dd3fc 68%, #1e40ff 100%);
+    box-shadow:
+      0 0 18px rgba(42, 141, 255, 0.74),
+      0 0 32px rgba(42, 141, 255, 0.42);
+  }
+  #wolf-target-cinematic.is-gain .wtc-fill {
+    transform: scaleY(1.22);
+  }
+  #wolf-target-cinematic.is-drop .wtc-fill {
+    filter: saturate(1.25) brightness(1.12);
+  }
+  #wolf-target-cinematic .wtc-state {
+    margin-top: 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(233, 240, 252, 0.8);
+  }
+  @keyframes wolfFireFlow {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 220% 50%;
+    }
+  }
+  @media (max-width: 767px) {
+    #wolf-target-cinematic {
+      width: min(94vw, 560px);
+      top: 44%;
+      padding: 12px 12px;
+      border-radius: 14px;
+    }
+    #wolf-target-cinematic .wtc-head {
+      margin-bottom: 8px;
+    }
+    #wolf-target-cinematic .wtc-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+    #wolf-target-cinematic .wtc-value {
+      font-size: 10px;
+      letter-spacing: 0.4px;
+    }
+    #wolf-target-cinematic .wtc-track {
+      height: 16px;
+    }
+    #wolf-target-cinematic .wtc-state {
+      margin-top: 6px;
+      font-size: 9px;
+      letter-spacing: 0.8px;
+    }
+  }
 </style>
 
 <div class="sidebar-panel" id="wolfSidebar">
@@ -274,57 +597,33 @@
     </button>
   </div>
 
-  <!-- PROFILE AREA -->
-  <div class="profile-area" style="padding: 0 25px 15px">
-    <div
-      class="user-name"
-      style="font-weight: 800; color: var(--text-main); white-space: nowrap"
-    >
-      PALOMAR ADMIN
-    </div>
-    <div
-      class="user-email"
-      style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap"
-    >
-      admin@palomargym.com
-    </div>
-  </div>
-
   <!-- TARGET BOX -->
-  <div
-    class="target-box"
-    style="
-      background: var(--shell-sidebar-card-bg);
-      border-radius: 12px;
-      padding: 12px;
-      margin: 0 20px 20px;
-      border: 1px solid var(--shell-sidebar-card-border);
-    "
-  >
-    <div
-      style="
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.65rem;
-        color: var(--text-muted);
-      "
-    >
-      <span>TARGET</span>
-      <b id="sidebar-target-percent" style="color: var(--text-main)">0%</b>
+  <div id="sidebar-target-box" class="target-box">
+    <div class="target-box-head">
+      <div class="target-box-head-left">
+        <span id="sidebar-target-label">TODAY TARGET</span>
+      </div>
+      <div class="target-box-head-right">
+        <select id="sidebar-target-select" aria-label="Select goal target type">
+          <option value="DAILY">Daily</option>
+          <option value="WEEKLY">Weekly</option>
+          <option value="MONTHLY">Monthly</option>
+          <option value="QUARTERLY">Quarterly</option>
+          <option value="YEARLY">Yearly</option>
+          <option value="CUSTOM">Custom</option>
+        </select>
+        <b id="sidebar-target-percent">0%</b>
+      </div>
     </div>
-    <div
-      style="
-        height: 4px;
-        background: var(--shell-sidebar-track);
-        margin-top: 8px;
-        border-radius: 5px;
-        overflow: hidden;
-      "
-    >
-      <div
-        id="sidebar-target-bar"
-        style="height: 100%; background: var(--accent-red); width: 0%"
-      ></div>
+    <div class="target-track">
+      <div id="sidebar-target-ghost" class="target-ghost"></div>
+      <div id="sidebar-target-bar" class="target-fill"></div>
+    </div>
+    <div id="sidebar-target-state">
+      ACTIVE: DAILY
+    </div>
+    <div id="sidebar-target-amount">
+      PHP 0.00 / PHP 0.00
     </div>
   </div>
 
@@ -402,7 +701,7 @@
 
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">System</div>
-    <a href="#" class="nav-item-side" data-page="audit">
+    <a href="#" class="nav-item-side" data-page="audit-log">
       <div class="nav-icon"><i class="bx bx-file"></i></div>
       <span class="nav-text">AUDIT LOG</span>
     </a>

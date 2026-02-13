@@ -1,4 +1,4 @@
-// Add this to your wolfData or a global utility
+﻿// Add this to your wolfData or a global utility
 async function moveToTrash(tableName, id, data) {
   console.log(`Wolf OS: Moving ${id} from ${tableName} to Trash...`);
 
@@ -21,6 +21,9 @@ const wolfData = {
   activeMode: 'sales',
   isFetching: false,
   allSales: [],
+  currentLedgerPage: 1,
+  ledgerPageSize: 12,
+  currentLedgerRows: [],
   lastTotal: 0,
   activeAF: null, // store active auto-filter
   lastTraffic: 0,
@@ -31,12 +34,127 @@ const wolfData = {
     DAILY: 0,
     WEEKLY: 0,
     MONTHLY: 0,
+    QUARTERLY: 0,
+    YEARLY: 0,
+    CUSTOM: 0,
   },
+  goalActuals: {
+    DAILY: 0,
+    WEEKLY: 0,
+    MONTHLY: 0,
+    QUARTERLY: 0,
+    YEARLY: 0,
+    CUSTOM: 0,
+  },
+  targetCycle: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'CUSTOM'],
+  targetModeIndex: 0,
+  targetBoxBound: false,
+  targetDisplayPct: {
+    DAILY: 0,
+    WEEKLY: 0,
+    MONTHLY: 0,
+    QUARTERLY: 0,
+    YEARLY: 0,
+    CUSTOM: 0,
+  },
+  targetLastActual: {
+    DAILY: null,
+    WEEKLY: null,
+    MONTHLY: null,
+    QUARTERLY: null,
+    YEARLY: null,
+    CUSTOM: null,
+  },
+  targetSyncTimer: null,
+  targetFxTimers: [],
+  targetValueAF: null,
+  targetDisplayedActual: {
+    DAILY: 0,
+    WEEKLY: 0,
+    MONTHLY: 0,
+    QUARTERLY: 0,
+    YEARLY: 0,
+    CUSTOM: 0,
+  },
+  goalReachedCelebrated: {
+    DAILY: false,
+    WEEKLY: false,
+    MONTHLY: false,
+    QUARTERLY: false,
+    YEARLY: false,
+    CUSTOM: false,
+  },
+  targetThemeWatchBound: false,
+  targetThemeObserver: null,
+  targetCinematicHideTimer: null,
+  targetCinematicStartTimer: null,
+  targetCinematicAF: null,
   formatCurrency(value = 0) {
     return `${this.currencySymbol}${Number(value || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+  },
+  getLocalGoalTargetMap() {
+    const map = {};
+    try {
+      const raw = localStorage.getItem('wolf_local_goal_targets');
+      const list = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(list)) return map;
+      list.forEach((row) => {
+        const period = String(row?.period_type || '')
+          .trim()
+          .toUpperCase();
+        if (!period) return;
+        map[period] = Number(row?.target_amount || 0);
+      });
+    } catch (_) {
+      return map;
+    }
+    return map;
+  },
+  getCustomGoalConfig() {
+    const now = new Date();
+    const end = new Date(now);
+    end.setHours(0, 0, 0, 0);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 14);
+    try {
+      const raw = localStorage.getItem('wolf_local_goal_custom_config');
+      const parsed = raw ? JSON.parse(raw) : {};
+      const targetAmount = Number(parsed?.target_amount || 0);
+      const startDate = String(parsed?.start_date || start.toISOString().slice(0, 10));
+      const endDate = String(parsed?.end_date || end.toISOString().slice(0, 10));
+      return {
+        target_amount: targetAmount > 0 ? targetAmount : 50000,
+        start_date: startDate,
+        end_date: endDate,
+      };
+    } catch (_) {
+      return {
+        target_amount: 50000,
+        start_date: start.toISOString().slice(0, 10),
+        end_date: end.toISOString().slice(0, 10),
+      };
+    }
+  },
+  isoDate(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+  formatServerClock(value) {
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return '--:--';
+    return new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Manila',
+    }).format(date);
   },
   isMoneyMode() {
     return this.activeMode === 'sales' || this.activeMode === 'logbook';
@@ -138,14 +256,17 @@ const wolfData = {
     this.animateValue(el, this.lastTotal, targetValue, 800);
     this.lastTotal = targetValue;
 
-    // Update sidebar target box using DAILY target (sales mode only)
-    if (this.activeMode === 'sales') {
-      this.updateTargetBox(targetValue);
-    }
+    // Keep sidebar target widget in sync with the current rotation mode.
+    this.updateTargetBox();
   },
 
   async loadGoalTargets() {
     if (!window.supabaseClient) return;
+
+    const localTargetMap = this.getLocalGoalTargetMap();
+    Object.keys(localTargetMap).forEach((period) => {
+      this.goalTargets[period] = Number(localTargetMap[period] || 0);
+    });
 
     const periods = ['DAILY', 'WEEKLY', 'MONTHLY'];
     for (const period of periods) {
@@ -153,33 +274,564 @@ const wolfData = {
         .from('goal_target')
         .select('*')
         .eq('period_type', period)
-        .order('start_date', { ascending: false })
-        .limit(1);
+        .limit(200);
 
-      if (!error && data && data.length > 0) {
-        this.goalTargets[period] = Number(data[0].target_amount || 0);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const latest = data
+          .slice()
+          .sort((a, b) => {
+            const aStart = new Date(a?.start_date || 0).getTime();
+            const bStart = new Date(b?.start_date || 0).getTime();
+            const aUpdated = new Date(
+              a?.updated_at || a?.created_at || 0,
+            ).getTime();
+            const bUpdated = new Date(
+              b?.updated_at || b?.created_at || 0,
+            ).getTime();
+            return (
+              (Number.isFinite(bStart) ? bStart : 0) -
+                (Number.isFinite(aStart) ? aStart : 0) ||
+              (Number.isFinite(bUpdated) ? bUpdated : 0) -
+                (Number.isFinite(aUpdated) ? aUpdated : 0)
+            );
+          })[0];
+        this.goalTargets[period] = Number(latest?.target_amount || 0);
       }
     }
 
-    // Sync sidebar target box
-    this.updateTargetBox(this.lastTotal);
+    const monthly = Number(this.goalTargets.MONTHLY || 0);
+    const weekly = Number(this.goalTargets.WEEKLY || 0);
+    if (!Number(this.goalTargets.QUARTERLY || 0)) {
+      this.goalTargets.QUARTERLY = monthly > 0 ? monthly * 3 : weekly * 13;
+    }
+    if (!Number(this.goalTargets.YEARLY || 0)) {
+      this.goalTargets.YEARLY = monthly > 0 ? monthly * 12 : weekly * 52;
+    }
+    const customCfg = this.getCustomGoalConfig();
+    this.goalTargets.CUSTOM = Number(customCfg.target_amount || 0);
+
+    await this.loadGoalActuals();
+    this.bindTargetBoxSelector();
+    this.bindTargetThemeObserver();
+    this.ensureTargetCinematicOverlay();
+    this.updateTargetBox();
   },
 
-  updateTargetBox(currentValue = 0) {
-    const target = Number(this.goalTargets?.DAILY || 0);
-    const percentEl = document.getElementById('sidebar-target-percent');
-    const barEl = document.getElementById('sidebar-target-bar');
-    if (!percentEl || !barEl) return;
+  async loadGoalActuals() {
+    if (!window.supabaseClient) return;
+    const now = new Date();
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(dayStart);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (target <= 0) {
-      percentEl.textContent = '0%';
-      barEl.style.width = '0%';
+    const weekStart = new Date(dayStart);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+
+    const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1);
+    const quarterStart = new Date(
+      dayStart.getFullYear(),
+      Math.floor(dayStart.getMonth() / 3) * 3,
+      1,
+    );
+    const yearStart = new Date(dayStart.getFullYear(), 0, 1);
+    const customCfg = this.getCustomGoalConfig();
+    const customStart = new Date(customCfg.start_date);
+    customStart.setHours(0, 0, 0, 0);
+    const customEnd = new Date(customCfg.end_date);
+    customEnd.setHours(0, 0, 0, 0);
+    if (customEnd.getTime() < customStart.getTime()) {
+      customEnd.setTime(customStart.getTime());
+    }
+    const customEndExclusive = new Date(customEnd);
+    customEndExclusive.setDate(customEndExclusive.getDate() + 1);
+    const ranges = {
+      DAILY: [dayStart.toISOString(), tomorrow.toISOString()],
+      WEEKLY: [weekStart.toISOString(), tomorrow.toISOString()],
+      MONTHLY: [monthStart.toISOString(), tomorrow.toISOString()],
+      QUARTERLY: [quarterStart.toISOString(), tomorrow.toISOString()],
+      YEARLY: [yearStart.toISOString(), tomorrow.toISOString()],
+      CUSTOM: [customStart.toISOString(), customEndExclusive.toISOString()],
+    };
+
+    const sumSales = async (startIso, endIso) => {
+      const { data, error } = await supabaseClient
+        .from('sales')
+        .select('total_amount,qty,unit_price,created_at')
+        .gte('created_at', startIso)
+        .lt('created_at', endIso);
+      if (error || !Array.isArray(data)) return 0;
+      return data.reduce((sum, row) => {
+        const total = Number(row.total_amount || 0);
+        if (total > 0) return sum + total;
+        return sum + Number(row.qty || 0) * Number(row.unit_price || 0);
+      }, 0);
+    };
+
+    const sumLogbook = async (startIso, endIso) => {
+      const { data, error } = await supabaseClient
+        .from('check_in_logs')
+        .select('entry_fee,paid_amount,is_paid,time_in')
+        .gte('time_in', startIso)
+        .lt('time_in', endIso);
+      if (error || !Array.isArray(data)) return 0;
+      return data.reduce((sum, row) => {
+        const paidAmount = Number(row.paid_amount || 0);
+        if (paidAmount > 0) return sum + paidAmount;
+        if (row.is_paid) return sum + Number(row.entry_fee || 0);
+        return sum;
+      }, 0);
+    };
+
+    for (const period of this.targetCycle) {
+      const [startIso, endIso] = ranges[period];
+      const [salesTotal, logbookTotal] = await Promise.all([
+        sumSales(startIso, endIso),
+        sumLogbook(startIso, endIso),
+      ]);
+      this.goalActuals[period] = Number(salesTotal || 0) + Number(logbookTotal || 0);
+    }
+  },
+
+  getCurrentTargetPeriod() {
+    return this.targetCycle[this.targetModeIndex] || 'DAILY';
+  },
+
+  setTargetPeriod(period) {
+    const normalized = String(period || '')
+      .trim()
+      .toUpperCase();
+    const idx = this.targetCycle.indexOf(normalized);
+    if (idx < 0) return;
+    this.targetModeIndex = idx;
+    this.updateTargetBox({ animate: false });
+  },
+
+  bindTargetBoxSelector() {
+    if (this.targetBoxBound) return;
+    const select = document.getElementById('sidebar-target-select');
+    if (!select) return;
+    this.targetBoxBound = true;
+    select.addEventListener('change', (event) => {
+      const next = String(event?.target?.value || '').toUpperCase();
+      this.setTargetPeriod(next);
+    });
+  },
+
+  clearTargetFxTimers() {
+    if (!Array.isArray(this.targetFxTimers)) return;
+    this.targetFxTimers.forEach((id) => clearTimeout(id));
+    this.targetFxTimers = [];
+  },
+
+  getTargetThemePalette() {
+    const isLight = document.body.classList.contains('light-theme');
+    if (isLight) {
+      return {
+        active: '#2a8dff',
+        glow: 'rgba(42, 141, 255, 0.62)',
+      };
+    }
+    return {
+      active: '#ff3b30',
+      glow: 'rgba(255, 59, 48, 0.75)',
+    };
+  },
+
+  bindTargetThemeObserver() {
+    if (this.targetThemeWatchBound) return;
+    this.targetThemeWatchBound = true;
+    const body = document.body;
+    if (!body || typeof MutationObserver === 'undefined') return;
+    this.targetThemeObserver = new MutationObserver(() => {
+      this.updateTargetBox({ animate: false });
+    });
+    this.targetThemeObserver.observe(body, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+  },
+
+  ensureTargetCinematicOverlay() {
+    let el = document.getElementById('wolf-target-cinematic');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'wolf-target-cinematic';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `
+      <div class="wtc-head">
+        <div class="wtc-label" id="wolf-target-cinematic-label">TARGET UPDATE</div>
+        <div class="wtc-value" id="wolf-target-cinematic-value">0%</div>
+      </div>
+      <div class="wtc-track">
+        <div class="wtc-ghost" id="wolf-target-cinematic-ghost"></div>
+        <div class="wtc-fill" id="wolf-target-cinematic-fill"></div>
+      </div>
+      <div class="wtc-state" id="wolf-target-cinematic-state">SYNCHRONIZING</div>
+    `;
+    document.body.appendChild(el);
+    return el;
+  },
+
+  renderTargetCinematic({
+    period,
+    pct,
+    previousPct,
+    actual,
+    previousActual = actual,
+    target,
+    isGain,
+    isDrop,
+    animate = true,
+  }) {
+    const overlay = this.ensureTargetCinematicOverlay();
+    if (!overlay) return;
+    const labelEl = document.getElementById('wolf-target-cinematic-label');
+    const valueEl = document.getElementById('wolf-target-cinematic-value');
+    const stateEl = document.getElementById('wolf-target-cinematic-state');
+    const fillEl = document.getElementById('wolf-target-cinematic-fill');
+    const ghostEl = document.getElementById('wolf-target-cinematic-ghost');
+    if (!valueEl || !fillEl || !ghostEl) return;
+
+    const labelMap = {
+      DAILY: 'TODAY TARGET',
+      WEEKLY: 'THIS WEEK TARGET',
+      MONTHLY: 'THIS MONTH TARGET',
+      QUARTERLY: 'THIS QUARTER TARGET',
+      YEARLY: 'THIS YEAR TARGET',
+      CUSTOM: 'CUSTOM TARGET',
+    };
+    if (labelEl) labelEl.textContent = `${labelMap[period] || 'TARGET'} UPDATE`;
+    valueEl.textContent = `${Math.round(previousPct)}% -> ${Math.round(pct)}%  |  ${this.formatCurrency(previousActual)} -> ${this.formatCurrency(actual)}`;
+    if (stateEl) {
+      stateEl.textContent = isGain
+        ? 'INCOME RISING'
+        : isDrop
+          ? 'INCOME DROP DETECTED'
+          : 'SYNCHRONIZED';
+    }
+
+    overlay.classList.toggle('is-light', document.body.classList.contains('light-theme'));
+    overlay.classList.toggle('is-gain', Boolean(isGain));
+    overlay.classList.toggle('is-drop', Boolean(isDrop));
+
+    if (!animate) {
+      fillEl.style.width = `${pct}%`;
+      ghostEl.style.width = `${pct}%`;
+      ghostEl.style.opacity = '0';
       return;
     }
 
-    const pct = Math.min(100, Math.max(0, (currentValue / target) * 100));
-    percentEl.textContent = `${Math.round(pct)}%`;
-    barEl.style.width = `${pct}%`;
+    if (this.targetCinematicStartTimer) clearTimeout(this.targetCinematicStartTimer);
+    if (this.targetCinematicHideTimer) clearTimeout(this.targetCinematicHideTimer);
+    if (this.targetCinematicAF) {
+      cancelAnimationFrame(this.targetCinematicAF);
+      this.targetCinematicAF = null;
+    }
+    overlay.classList.add('is-active');
+
+    const fromPct = Number.isFinite(Number(previousPct)) ? Number(previousPct) : pct;
+    const toPct = Number.isFinite(Number(pct)) ? Number(pct) : fromPct;
+    fillEl.style.transition = 'none';
+    fillEl.style.width = `${fromPct}%`;
+    ghostEl.style.transition = 'none';
+    ghostEl.style.width = `${fromPct}%`;
+    ghostEl.style.opacity = isDrop ? '0.92' : '0';
+    void fillEl.offsetWidth;
+
+    const duration = isDrop ? 1250 : 1100;
+    const delay = 180;
+    const startTs = performance.now() + delay;
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+    this.targetCinematicStartTimer = setTimeout(() => {
+      const tick = (ts) => {
+        const t = Math.min(1, (ts - startTs) / duration);
+        const eased = easeOut(Math.max(0, t));
+        const currentPct = fromPct + (toPct - fromPct) * eased;
+        fillEl.style.width = `${currentPct}%`;
+        if (isDrop) {
+          ghostEl.style.width = `${fromPct + (toPct - fromPct) * eased}%`;
+          ghostEl.style.opacity = `${0.92 * (1 - eased)}`;
+        }
+        const currentActual = previousActual + (actual - previousActual) * eased;
+        valueEl.textContent = `${Math.round(fromPct + (toPct - fromPct) * eased)}% -> ${Math.round(toPct)}%  |  ${this.formatCurrency(currentActual)} -> ${this.formatCurrency(actual)}`;
+
+        if (t < 1) {
+          this.targetCinematicAF = requestAnimationFrame(tick);
+        } else {
+          this.targetCinematicAF = null;
+          ghostEl.style.opacity = '0';
+        }
+      };
+      this.targetCinematicAF = requestAnimationFrame(tick);
+    }, delay);
+
+    this.targetCinematicHideTimer = setTimeout(() => {
+      overlay.classList.remove('is-active', 'is-gain', 'is-drop');
+    }, duration + delay + 700);
+  },
+
+  scheduleGoalActualsSync(delayMs = 260) {
+    if (this.targetSyncTimer) clearTimeout(this.targetSyncTimer);
+    this.targetSyncTimer = setTimeout(async () => {
+      try {
+        await this.loadGoalActuals();
+        this.updateTargetBox({ animate: true });
+      } catch (err) {
+        console.error('Wolf OS Target Sync Fault:', err);
+      }
+    }, delayMs);
+  },
+
+  clearTargetValueAnimation() {
+    if (this.targetValueAF) {
+      cancelAnimationFrame(this.targetValueAF);
+      this.targetValueAF = null;
+    }
+  },
+
+  animateTargetReadout({
+    fromActual,
+    toActual,
+    fromPct,
+    toPct,
+    target,
+    percentEl,
+    amountEl,
+    duration = 520,
+  }) {
+    this.clearTargetValueAnimation();
+    const startTs = performance.now();
+    const easeOut = (t) => 1 - (1 - t) * (1 - t);
+
+    const frame = (ts) => {
+      const t = Math.min(1, (ts - startTs) / duration);
+      const eased = easeOut(t);
+      const shownActual = fromActual + (toActual - fromActual) * eased;
+      const shownPct = fromPct + (toPct - fromPct) * eased;
+      if (percentEl) percentEl.textContent = `${Math.round(shownPct)}%`;
+      if (amountEl) {
+        amountEl.textContent = `${this.formatCurrency(shownActual)} / ${this.formatCurrency(target)}`;
+      }
+      if (t < 1) {
+        this.targetValueAF = requestAnimationFrame(frame);
+      } else {
+        this.targetValueAF = null;
+      }
+    };
+
+    this.targetValueAF = requestAnimationFrame(frame);
+  },
+
+  updateTargetBox(options = {}) {
+    const { animate = true } = options;
+    const period = this.getCurrentTargetPeriod();
+    const target = Number(this.goalTargets?.[period] || 0);
+    const actual = Number(this.goalActuals?.[period] || 0);
+    const percentEl = document.getElementById('sidebar-target-percent');
+    const barEl = document.getElementById('sidebar-target-bar');
+    const ghostEl = document.getElementById('sidebar-target-ghost');
+    const boxEl = document.getElementById('sidebar-target-box');
+    const labelEl = document.getElementById('sidebar-target-label');
+    const stateEl = document.getElementById('sidebar-target-state');
+    const amountEl = document.getElementById('sidebar-target-amount');
+    if (!percentEl || !barEl || !boxEl) return;
+
+    const labelMap = {
+      DAILY: 'TODAY TARGET',
+      WEEKLY: 'THIS WEEK TARGET',
+      MONTHLY: 'THIS MONTH TARGET',
+      QUARTERLY: 'THIS QUARTER TARGET',
+      YEARLY: 'THIS YEAR TARGET',
+      CUSTOM: 'CUSTOM TARGET',
+    };
+    if (labelEl) labelEl.textContent = labelMap[period] || 'TARGET';
+    const selectEl = document.getElementById('sidebar-target-select');
+    if (selectEl && selectEl.value !== period) selectEl.value = period;
+
+    const palette = this.getTargetThemePalette();
+    boxEl.style.setProperty('--target-active-color', palette.active);
+    boxEl.style.setProperty('--target-glow-color', palette.glow);
+    boxEl.style.setProperty('--target-warn-color', '#ff2d2d');
+    boxEl.classList.remove(
+      'target-gaining',
+      'target-dropping',
+      'target-drop-warning',
+      'target-changing',
+    );
+    this.clearTargetFxTimers();
+
+    if (target <= 0) {
+      this.clearTargetValueAnimation();
+      percentEl.textContent = '0%';
+      barEl.style.width = '0%';
+      if (ghostEl) {
+        ghostEl.style.width = '0%';
+        ghostEl.style.opacity = '0';
+      }
+      if (stateEl) stateEl.textContent = `ACTIVE: ${period}`;
+      if (amountEl) {
+        amountEl.textContent = `${this.formatCurrency(actual)} / ${this.formatCurrency(0)}`;
+      }
+      this.targetDisplayPct[period] = 0;
+      this.targetLastActual[period] = actual;
+      this.targetDisplayedActual[period] = actual;
+      this.renderTargetCinematic({
+        period,
+        pct: 0,
+        previousPct: 0,
+        actual,
+        previousActual: actual,
+        target: 0,
+        isGain: false,
+        isDrop: false,
+        animate: false,
+      });
+      return;
+    }
+
+    const pct = Math.min(100, Math.max(0, (actual / target) * 100));
+    const previousActual =
+      this.targetLastActual?.[period] === null ||
+      this.targetLastActual?.[period] === undefined
+        ? actual
+        : Number(this.targetLastActual[period]);
+    const previousPct =
+      this.targetDisplayPct?.[period] === null ||
+      this.targetDisplayPct?.[period] === undefined
+        ? pct
+        : Number(this.targetDisplayPct[period]);
+    const crossedGoal = previousPct < 100 && pct >= 100;
+
+    if (stateEl) {
+      stateEl.textContent = `${pct >= 100 ? 'REACHED' : 'ACTIVE'}: ${period}`;
+    }
+    const previousShownActual =
+      this.targetDisplayedActual?.[period] === null ||
+      this.targetDisplayedActual?.[period] === undefined
+        ? previousActual
+        : Number(this.targetDisplayedActual[period]);
+
+    if (!animate || actual === previousActual) {
+      this.clearTargetValueAnimation();
+      percentEl.textContent = `${Math.round(pct)}%`;
+      if (amountEl) {
+        amountEl.textContent = `${this.formatCurrency(actual)} / ${this.formatCurrency(target)}`;
+      }
+      barEl.style.width = `${pct}%`;
+      if (ghostEl) {
+        ghostEl.style.width = `${pct}%`;
+        ghostEl.style.opacity = '0';
+      }
+      this.targetDisplayPct[period] = pct;
+      this.targetLastActual[period] = actual;
+      this.targetDisplayedActual[period] = actual;
+      this.renderTargetCinematic({
+        period,
+        pct,
+        previousPct: pct,
+        actual,
+        previousActual: actual,
+        target,
+        isGain: false,
+        isDrop: false,
+        animate: false,
+      });
+      return;
+    }
+
+    this.animateTargetReadout({
+      fromActual: previousShownActual,
+      toActual: actual,
+      fromPct: previousPct,
+      toPct: pct,
+      target,
+      percentEl,
+      amountEl,
+      duration: actual > previousActual ? 560 : 520,
+    });
+    boxEl.classList.add('target-changing');
+    const changeTimer = setTimeout(() => {
+      boxEl.classList.remove('target-changing');
+    }, 720);
+    this.targetFxTimers.push(changeTimer);
+
+    if (actual > previousActual) {
+      if (ghostEl) {
+        ghostEl.style.width = `${pct}%`;
+        ghostEl.style.opacity = '0';
+      }
+      barEl.style.width = `${pct}%`;
+      boxEl.classList.add('target-gaining');
+      const gainTimer = setTimeout(() => {
+        boxEl.classList.remove('target-gaining');
+      }, 520);
+      this.targetFxTimers.push(gainTimer);
+      this.renderTargetCinematic({
+        period,
+        pct,
+        previousPct,
+        actual,
+        previousActual,
+        target,
+        isGain: true,
+        isDrop: false,
+        animate: true,
+      });
+    } else {
+      boxEl.classList.add('target-dropping', 'target-drop-warning');
+      if (ghostEl) {
+        ghostEl.style.transition = 'none';
+        ghostEl.style.width = `${previousPct}%`;
+        ghostEl.style.opacity = '0.95';
+        void ghostEl.offsetWidth;
+      }
+
+      barEl.style.width = `${pct}%`;
+
+      const warnTimer = setTimeout(() => {
+        boxEl.classList.remove('target-drop-warning');
+      }, 220);
+      this.targetFxTimers.push(warnTimer);
+
+      if (ghostEl) {
+        const driftTimer = setTimeout(() => {
+          ghostEl.style.transition =
+            'width 0.95s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.95s ease';
+          ghostEl.style.width = `${pct}%`;
+          ghostEl.style.opacity = '0';
+        }, 26);
+        this.targetFxTimers.push(driftTimer);
+      }
+
+      const dropTimer = setTimeout(() => {
+        boxEl.classList.remove('target-dropping');
+      }, 980);
+      this.targetFxTimers.push(dropTimer);
+      this.renderTargetCinematic({
+        period,
+        pct,
+        previousPct,
+        actual,
+        previousActual,
+        target,
+        isGain: false,
+        isDrop: true,
+        animate: true,
+      });
+    }
+
+    this.targetDisplayPct[period] = pct;
+    this.targetLastActual[period] = actual;
+    this.targetDisplayedActual[period] = actual;
+
+    if (pct < 100) {
+      this.goalReachedCelebrated[period] = false;
+    } else if (crossedGoal && !this.goalReachedCelebrated[period]) {
+      this.goalReachedCelebrated[period] = true;
+      if (window.wolfAudio) window.wolfAudio.play('confetti');
+    }
   },
 
   // --- UI methods ---
@@ -192,6 +844,7 @@ const wolfData = {
     // The refreshSummaryHUD handles the math
     const newRowHTML = this.renderSingleSaleCard(sale, 0); // index 0 for instant pop
     container.insertAdjacentHTML('afterbegin', newRowHTML);
+    this.scheduleGoalActualsSync();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -300,6 +953,7 @@ const wolfData = {
 
     // 3. Trigger HUD Rolling Animation (Red Glow)
     this.refreshSummaryHUD();
+    this.scheduleGoalActualsSync();
     alert('test');
   },
 
@@ -570,8 +1224,12 @@ const wolfData = {
 
     const snapBtn = document.getElementById('snap-today-btn');
     if (snapBtn) {
-      if (viewSunISO < realSunISO) snapBtn.classList.add('visible');
-      else snapBtn.classList.remove('visible');
+      const shouldShowSnap = viewSunISO < realSunISO;
+      snapBtn.classList.toggle('visible', shouldShowSnap);
+      snapBtn.disabled = !shouldShowSnap;
+      snapBtn.tabIndex = shouldShowSnap ? 0 : -1;
+      snapBtn.setAttribute('aria-hidden', shouldShowSnap ? 'false' : 'true');
+      snapBtn.style.pointerEvents = shouldShowSnap ? '' : 'none';
     }
 
     const buttons = document.querySelectorAll(`#ledger-day-picker .day-btn`);
@@ -651,7 +1309,7 @@ const wolfData = {
   // ==========================================
   // 1. LOGBOOK ENGINE (FIXED)
   // ==========================================
-  async loadLogbook() {
+  async loadLogbook(options = {}) {
     if (window.salesManager) window.salesManager.currentTrashMode = 'logbook';
     const container = document.getElementById('ledger-list-container');
     if (!container) return;
@@ -663,6 +1321,9 @@ const wolfData = {
     const localDay = this.selectedDate.toLocaleDateString('en-CA');
 
     try {
+      if (!options?.preservePage) {
+        this.currentLedgerPage = 1;
+      }
       const { data, error } = await supabaseClient
         .from('check_in_logs')
         .select('*')
@@ -784,23 +1445,26 @@ const wolfData = {
         return;
       }
 
-      container.innerHTML = filtered
+      this.currentLedgerRows = filtered;
+      const totalItems = filtered.length;
+      const totalPages = Math.max(
+        1,
+        Math.ceil(totalItems / this.ledgerPageSize),
+      );
+      if (this.currentLedgerPage > totalPages) this.currentLedgerPage = totalPages;
+      const start = (this.currentLedgerPage - 1) * this.ledgerPageSize;
+      const pageRows = filtered.slice(start, start + this.ledgerPageSize);
+
+      container.innerHTML = pageRows
         .map((log, index) => {
           const isClosed = log.time_out !== null;
-          const time = new Date(log.time_in).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          const outTime = isClosed
-            ? new Date(log.time_out).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : '--:--';
+          const time = this.formatServerClock(log.time_in);
+          const outTime = isClosed ? this.formatServerClock(log.time_out) : '--:--';
           const paidBadgeClass = log.isPaid ? 'badge-paid' : 'badge-unpaid';
           const paidBadgeText = log.isPaid ? 'PAID' : 'UNPAID';
 
           const checkoutLabel = isClosed ? 'UNDO CHECK OUT' : 'CHECK OUT';
+          const checkoutMeta = isClosed ? `OUT ${outTime}` : 'ACTIVE';
           const checkoutClass = isClosed ? 'btn-logbook-neutral' : 'btn-logbook-danger';
 
           const paidLabel = log.isPaid
@@ -811,45 +1475,53 @@ const wolfData = {
 
           return `
           <div class="list-item-card" id="row-${log.id}" style="animation-delay: ${index * 0.04}s;">
-            <div class="card-header" style="margin-bottom:0;">
-              <div class="status-icon ${!isClosed ? 'active' : ''}" style="background:var(--bg-dark); color:var(--wolf-red);">
+            <div class="card-header logbook-card-header" style="margin-bottom:0;">
+              <div class="status-icon logbook-status-icon ${!isClosed ? 'active' : ''}" style="background:var(--bg-dark); color:var(--wolf-red);">
                 <i class='bx ${isClosed ? 'bx-check' : 'bx-time-five'}'></i>
               </div>
-              <div class="item-info">
-                <h4 style="font-size:13px; font-weight:800;">${log.resolvedName}</h4>
-                <div class="sub" style="font-size:11px;">${log.membershipLabel}${log.memberCode ? ` • ${log.memberCode}` : ''}</div>
-                <div class="time" style="font-size:10px; color:#555;">IN: ${time}</div>
+              <div class="item-info logbook-item-info">
+                <h4>${log.resolvedName}</h4>
+                <div class="sub">${log.memberCode ? `MEMBER • ${log.memberCode}` : log.membershipLabel}</div>
+                <div class="time">IN: ${time}</div>
               </div>
-              <div class="card-actions">
-                <span class="${paidBadgeClass}">${paidBadgeText}</span>
-                ${!this.isReadOnly ? `<i class='bx bx-trash action-small' style="cursor:pointer;" onclick="wolfData.deleteLog('${log.id}')"></i>` : ''}
+              <div class="logbook-inline-kpis">
+                <div class="kpi-item">
+                  <span class="kpi-label">CHECK-IN</span>
+                  <span class="kpi-val">${time}</span>
+                </div>
+                <div class="kpi-item">
+                  <span class="kpi-label">ENTRY FEE</span>
+                  <span class="kpi-val">${this.formatCurrency(log.entryFee)}</span>
+                </div>
+              </div>
+              <div class="card-actions logbook-card-actions" style="display:flex; align-items:center; gap:8px;">
+                <span class="status-badge ${paidBadgeClass}">${paidBadgeText}</span>
+                ${
+                  !this.isReadOnly
+                    ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteLog('${log.id}')"></i>`
+                    : ''
+                }
               </div>
             </div>
-            <div class="card-details logbook-details">
-              <div class="detail-group">
-                <label>ENTRY FEE</label>
-                <div class="val">${this.formatCurrency(log.entryFee)}</div>
-              </div>
-              <div class="detail-group" style="text-align:right;">
-                <label>SESSION END</label>
-                <div class="val" style="font-size:1rem;">${outTime}</div>
-              </div>
-            </div>
-            <div class="logbook-action-row">
-              <button class="logbook-action-btn ${checkoutClass}" ${actionDisabled} onclick="wolfData.toggleLogCheckout('${log.id}', ${isClosed})">${checkoutLabel}</button>
-              <button class="logbook-action-btn ${paidClass}" ${actionDisabled} onclick="wolfData.toggleLogPaid('${log.id}', ${log.isPaid}, ${log.entryFee})">${paidLabel}</button>
+            <div class="logbook-actions">
+              <button class="logbook-action-btn ${checkoutClass}" ${actionDisabled} onclick="wolfData.toggleLogCheckout('${log.id}', ${isClosed})">
+                <span class="btn-main">${checkoutLabel}</span>
+                <span class="btn-sub">${checkoutMeta}</span>
+              </button>
+              <button class="logbook-action-btn ${paidClass}" ${actionDisabled} onclick="wolfData.toggleLogPaid('${log.id}', ${log.isPaid}, ${log.entryFee})">
+                <span class="btn-main">${paidLabel}</span>
+                <span class="btn-sub">${log.isPaid ? 'SET UNPAID' : 'MARK AS PAID'}</span>
+              </button>
             </div>
           </div>`;
         })
         .join('');
+      container.innerHTML += this.renderLedgerPagination(totalItems, totalPages);
     } catch (err) {
       console.error('Wolf OS Logbook Fault:', err);
     }
   },
 
-  // ==========================================
-  // 2. SALES ENGINE
-  // ==========================================
   async loadSales() {
     if (window.salesManager) window.salesManager.currentTrashMode = 'sales';
     if (this.isFetching) return;
@@ -858,7 +1530,6 @@ const wolfData = {
     const container = document.getElementById('ledger-list-container');
     if (!container) return;
 
-    // Show loader ONLY if the screen is currently empty
     if (container.children.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:50px; opacity:0.3;"><i class='bx bx-loader-alt bx-spin' style='font-size:2rem;'></i></div>`;
     }
@@ -866,22 +1537,22 @@ const wolfData = {
     const localDay = this.selectedDate.toLocaleDateString('en-CA');
 
     try {
+      this.currentLedgerPage = 1;
       const { data, error } = await supabaseClient
         .from('sales')
-        .select('*, products(name, sku)')
+        .select('*, products(name, sku, image_url, brand)')
         .gte('created_at', `${localDay}T00:00:00+08:00`)
         .lte('created_at', `${localDay}T23:59:59+08:00`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // SAVE TO MEMORY
       this.allSales = data || [];
 
-      // TRIGGER RENDER
       const searchInp = document.getElementById('ledger-main-search');
       const currentTerm = searchInp ? searchInp.value : '';
       this.renderSales(this.selectedDate.getDay(), currentTerm);
+      this.scheduleGoalActualsSync();
     } catch (err) {
       console.error('Wolf OS Sales Fault:', err);
     } finally {
@@ -915,7 +1586,6 @@ const wolfData = {
       });
     }
 
-    // UPDATE THE TOP HUD (ANIMATED)
     const totalIncome = filtered.reduce(
       (sum, s) => sum + Number(s.total_amount || 0),
       0,
@@ -927,35 +1597,77 @@ const wolfData = {
       return;
     }
 
-    // RENDER ROWS WITH EPIC INTRO
-    container.innerHTML = filtered
+    this.currentLedgerRows = filtered;
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / this.ledgerPageSize));
+    if (this.currentLedgerPage > totalPages) this.currentLedgerPage = totalPages;
+    const start = (this.currentLedgerPage - 1) * this.ledgerPageSize;
+    const pageRows = filtered.slice(start, start + this.ledgerPageSize);
+
+    container.innerHTML = pageRows
       .map((sale, index) => {
         const amount = Number(sale.total_amount || 0);
         const safeName = DOMPurify.sanitize(sale.products?.name || 'Item');
         const safeSKU = DOMPurify.sanitize(sale.products?.sku || 'N/A');
+        const safeBrand = DOMPurify.sanitize(sale.products?.brand || '');
+        const thumbSrc = DOMPurify.sanitize(
+          String(sale.products?.image_url || '/assets/images/placeholder.png'),
+        );
         const time = new Date(sale.created_at).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
         });
 
         return `
-        <div class="list-item-card" id="row-${sale.id}" style="animation-delay: ${index * 0.06}s;">
-          <div class="card-header" style="margin-bottom: 0;">
-            <div class="status-icon" style="background: var(--bg-dark); color: var(--wolf-red);"><i class='bx bx-shopping-bag'></i></div>
-            <div class="item-info">
-              <h4 style="font-size:13px; font-weight:800;">${safeName.toUpperCase()}</h4>
-              <div class="time" style="font-size:10px; color:#555;">${time} • x${sale.qty} • ${safeSKU}</div>
+        <div class="list-item-card sale-row-card" id="row-${sale.id}" style="animation-delay: ${index * 0.06}s;">
+          <div class="card-header sale-card-header" style="margin-bottom: 0;">
+            <div class="status-icon sale-thumb" style="background: var(--bg-dark); color: var(--wolf-red); overflow:hidden;">
+              <img src="${thumbSrc}" alt="${safeName}" onerror="this.onerror=null;this.src='/assets/images/placeholder.png';" />
             </div>
-            <div class="card-actions" style="text-align:right;">
-              <div style="color: var(--wolf-red); font-weight: 900; font-family: 'JetBrains Mono'; font-size:14px;">
-                ${this.formatCurrency(amount)}
-              </div>
-              ${!this.isReadOnly ? `<i class='bx bx-trash' style="cursor:pointer; color:#333; font-size:14px;" onclick="wolfData.deleteSale('${sale.id}')"></i>` : ''}
+            <div class="item-info sale-item-info">
+              <h4>${safeName.toUpperCase()}</h4>
+              <div class="sub">${safeSKU.toUpperCase()}${safeBrand ? ` • ${safeBrand.toUpperCase()}` : ''}</div>
+              <div class="time">${time} • x${sale.qty}</div>
+            </div>
+            <div class="card-actions sale-card-actions">
+              <div class="sale-price-chip">${this.formatCurrency(amount)}</div>
+              ${
+                !this.isReadOnly
+                  ? `<button type="button" class="sale-delete-btn" onclick="wolfData.deleteSale('${sale.id}')" aria-label="Delete sale"><i class='bx bxs-trash'></i></button>`
+                  : ''
+              }
             </div>
           </div>
         </div>`;
       })
       .join('');
+    container.innerHTML += this.renderLedgerPagination(totalItems, totalPages);
+  },
+
+  renderLedgerPagination(totalItems, totalPages) {
+    if (totalItems <= this.ledgerPageSize) return '';
+    return `
+      <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-top:10px;">
+        <button onclick="wolfData.setLedgerPage(${this.currentLedgerPage - 1})" ${this.currentLedgerPage <= 1 ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-left'></i></button>
+        <span style="font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#97a4ba;">Page ${this.currentLedgerPage} of ${totalPages}</span>
+        <button onclick="wolfData.setLedgerPage(${this.currentLedgerPage + 1})" ${this.currentLedgerPage >= totalPages ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-right'></i></button>
+      </div>
+    `;
+  },
+
+  setLedgerPage(page) {
+    const nextPage = Number(page);
+    if (!Number.isFinite(nextPage) || nextPage < 1) return;
+    this.currentLedgerPage = nextPage;
+    if (this.activeMode === 'sales') {
+      const searchInp = document.getElementById('ledger-main-search');
+      this.renderSales(
+        this.selectedDate.getDay(),
+        searchInp ? searchInp.value : '',
+      );
+      return;
+    }
+    this.loadLogbook({ preservePage: true });
   },
 
   // ==========================================
@@ -1033,7 +1745,28 @@ const wolfData = {
     if (this.isReadOnly) return;
 
     try {
-      const nextTimeOut = currentlyClosed ? null : new Date().toISOString();
+      let serverNowIso = new Date().toISOString();
+      try {
+        const { data: serverNow, error: serverErr } =
+          await supabaseClient.rpc('get_server_time');
+        if (!serverErr && serverNow) {
+          const raw = Array.isArray(serverNow) ? serverNow[0] : serverNow;
+          if (typeof raw === 'string') {
+            serverNowIso = new Date(raw).toISOString();
+          } else if (raw && typeof raw === 'object') {
+            const candidate =
+              raw.server_iso_timestamp ||
+              raw.server_time ||
+              raw.now ||
+              raw.timestamp;
+            if (candidate) serverNowIso = new Date(candidate).toISOString();
+          }
+        }
+      } catch (_) {
+        // Non-blocking fallback to local clock if RPC is temporarily unavailable.
+      }
+
+      const nextTimeOut = currentlyClosed ? null : serverNowIso;
       const { error } = await supabaseClient
         .from('check_in_logs')
         .update({ time_out: nextTimeOut })
@@ -1180,6 +1913,79 @@ const wolfData = {
     }
   },
 
+  async adjustSaleQty(id, delta = 0) {
+    if (this.isReadOnly) return;
+    const step = Number(delta);
+    if (step !== 1 && step !== -1) return;
+
+    try {
+      const cached = (this.allSales || []).find((row) => row.id === id);
+      const { data: saleData, error: saleErr } = await supabaseClient
+        .from('sales')
+        .select('id, product_id, qty, unit_price, total_amount')
+        .eq('id', id)
+        .single();
+      if (saleErr || !saleData) throw saleErr || new Error('SALE_NOT_FOUND');
+
+      const currentQty = Number(saleData.qty || 0);
+      const nextQty = currentQty + step;
+      if (nextQty < 1) {
+        window.salesManager?.showSystemAlert(
+          'MINIMUM QTY IS 1. USE DELETE TO REMOVE ITEM.',
+          'warning',
+        );
+        return;
+      }
+
+      const { data: product, error: productErr } = await supabaseClient
+        .from('products')
+        .select('qty, name')
+        .eq('productid', saleData.product_id)
+        .single();
+      if (productErr || !product) throw productErr || new Error('PRODUCT_NOT_FOUND');
+
+      const stockNow = Number(product.qty || 0);
+      const limitedStock = stockNow < 999999;
+
+      if (step > 0 && limitedStock && stockNow < 1) {
+        window.salesManager?.showSystemAlert(
+          `OUT OF STOCK: ${String(product.name || cached?.products?.name || 'PRODUCT').toUpperCase()}`,
+          'error',
+        );
+        return;
+      }
+
+      if (limitedStock) {
+        const nextStock = step > 0 ? stockNow - 1 : stockNow + 1;
+        const { error: stockUpdateErr } = await supabaseClient
+          .from('products')
+          .update({ qty: nextStock })
+          .eq('productid', saleData.product_id);
+        if (stockUpdateErr) throw stockUpdateErr;
+      }
+
+      const unitPrice = Number(
+        saleData.unit_price ||
+          (currentQty > 0 ? Number(saleData.total_amount || 0) / currentQty : 0),
+      );
+      const nextTotal = unitPrice * nextQty;
+
+      const { error: saleUpdateErr } = await supabaseClient
+        .from('sales')
+        .update({ qty: nextQty, total_amount: nextTotal })
+        .eq('id', id);
+      if (saleUpdateErr) throw saleUpdateErr;
+
+      if (window.wolfAudio) window.wolfAudio.play('click');
+      await this.loadSales();
+      this.scheduleGoalActualsSync();
+    } catch (err) {
+      console.error('Sale qty adjust fault:', err);
+      if (window.wolfAudio) window.wolfAudio.play('error');
+      window.salesManager?.showSystemAlert('FAILED TO UPDATE SALE QTY', 'error');
+    }
+  },
+
   async deleteSale(id) {
     if (!window.Swal) return;
 
@@ -1261,6 +2067,7 @@ const wolfData = {
         0,
       );
       this.refreshSummaryHUD(newTotal);
+      this.scheduleGoalActualsSync();
 
       // --- 7. SHOW NOTIFICATION ---
       const message = `${product?.name || 'Product'}, X${saleData.qty} WAS REMOVED`;
@@ -1338,6 +2145,7 @@ wolfData.addSaleRow = function (sale) {
 
   // Recalculate totals safely
   this.updateLedgerRevenue();
+  this.scheduleGoalActualsSync();
 };
 
 wolfData.removeSaleRow = function (id) {
@@ -1350,11 +2158,13 @@ wolfData.removeSaleRow = function (id) {
 
   // Update Total
   this.updateLedgerRevenue();
+  this.scheduleGoalActualsSync();
 };
 
 wolfData.initRealtime = async function () {
   // Safety: update totals immediately
   this.updateLedgerRevenue();
+  this.scheduleGoalActualsSync(50);
 
   if (this.realtimeChannel) return; // Prevent duplicate connections
 
@@ -1371,6 +2181,7 @@ wolfData.initRealtime = async function () {
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'sales' },
       (payload) => {
+        this.scheduleGoalActualsSync(80);
         if (this.activeMode !== 'sales') return;
 
         const sale = payload.new;
@@ -1384,6 +2195,7 @@ wolfData.initRealtime = async function () {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sales' },
       (payload) => {
+        this.scheduleGoalActualsSync(80);
         if (this.activeMode !== 'sales') return;
         this.updateSaleRow(payload.new);
         this.updateLedgerRevenue();
@@ -1395,6 +2207,15 @@ wolfData.initRealtime = async function () {
         }).showToast();
       },
     )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'sales' },
+      (payload) => {
+        this.scheduleGoalActualsSync(80);
+        if (this.activeMode !== 'sales') return;
+        this.removeSaleRow(payload.old.id);
+      },
+    )
 
     /* =======================
        LOGBOOK (ROW-LEVEL)
@@ -1403,6 +2224,7 @@ wolfData.initRealtime = async function () {
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'check_in_logs' },
       (payload) => {
+        this.scheduleGoalActualsSync(80);
         if (this.activeMode !== 'logbook') return;
         this.addLogbookRow(payload.new);
         Toastify({
@@ -1425,6 +2247,7 @@ wolfData.initRealtime = async function () {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'check_in_logs' },
       (payload) => {
+        this.scheduleGoalActualsSync(80);
         if (this.activeMode !== 'logbook') return;
         this.updateLogbookRow(payload.new);
         Toastify({
@@ -1447,6 +2270,7 @@ wolfData.initRealtime = async function () {
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'check_in_logs' },
       (payload) => {
+        this.scheduleGoalActualsSync(80);
         if (this.activeMode !== 'logbook') return;
         this.removeLogbookRow(payload.old.id);
         Toastify({
@@ -1531,6 +2355,7 @@ document.addEventListener('input', (e) => {
     const clearBtn = document.getElementById('search-clear-btn');
 
     if (clearBtn) clearBtn.style.display = val.length > 0 ? 'block' : 'none';
+    wolfData.currentLedgerPage = 1;
     // Call the respective load function based on mode
     if (wolfData.activeMode === 'sales') {
       // For sales, we can just call renderSales to avoid a DB hit while typing
@@ -1712,6 +2537,7 @@ document.addEventListener('click', async (e) => {
 
   const snapBtn = e.target.closest('#snap-today-btn');
   if (snapBtn) {
+    if (!snapBtn.classList.contains('visible') || snapBtn.disabled) return;
     console.log('WolfChrono: Snap-to-Today triggered.');
     await wolfData.syncServerTime();
     if (wolfData.fp) {
@@ -1751,6 +2577,9 @@ window.addEventListener('load', () => {
   const p = urlParams.get('p') || 'home';
 
   wolfData.syncNavigationUI(p);
+  setTimeout(() => {
+    wolfData.loadGoalTargets().catch(() => {});
+  }, 300);
   if (p === 'sales' || p === 'logbook') {
     setTimeout(async () => {
       if (document.getElementById('ledger-page')) {
@@ -1765,4 +2594,6 @@ window.addEventListener('load', () => {
     }, 500);
   }
 });
+
+
 

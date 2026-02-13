@@ -31,6 +31,25 @@ window.salesManager = {
   allProducts: [],
   selectedProductId: null,
   placeholderImg: '/assets/images/placeholder.png',
+  getAccessContext() {
+    const context = window.WOLF_ACCESS_CONTEXT || {};
+    const role = String(context.role || window.WOLF_USER_ROLE || '')
+      .trim()
+      .toLowerCase();
+    const email = String(context.email || window.WOLF_USER_EMAIL || '')
+      .trim()
+      .toLowerCase();
+    return { role, email };
+  },
+
+  canHardDelete() {
+    const { role, email } = this.getAccessContext();
+    return (
+      role === 'admin' ||
+      email === 'adrianangeles2212@gmail.com' ||
+      email === 'ktorrazo123@gmail.com'
+    );
+  },
   // ==========================================
   // SECTION 1: SALE TRANSACTION (POS) LOGIC
   // ==========================================
@@ -362,6 +381,8 @@ window.salesManager = {
     const searchInput = modal.querySelector('#sale-product-search');
     const resultsDiv = modal.querySelector('#custom-search-results');
     const qtyInput = modal.querySelector('#sale-qty');
+    const qtyDecBtn = modal.querySelector('#sale-qty-dec');
+    const qtyIncBtn = modal.querySelector('#sale-qty-inc');
     const qrBtn = modal.querySelector('#qrScanTrigger');
     const clearBtn = modal.querySelector('#clearSearchBtn');
     const closeBtn = modal.querySelector('#closeSaleModal');
@@ -386,14 +407,15 @@ window.salesManager = {
 
       if (matches.length > 0) {
         resultsDiv.innerHTML = matches
-          .map(
-            (prod) => `
+          .map((prod) => {
+            const displayName = String(prod.name || 'UNKNOWN ASSET').toUpperCase();
+            return `
             <div class="dropdown-item" data-id="${prod.productid}">
-                <span class="item-name">${prod.name}</span>
+                <span class="item-name">${displayName}</span>
                 <span class="item-sku">SKU: ${prod.sku}</span>
             </div>
-        `,
-          )
+        `;
+          })
           .join('');
         resultsDiv.classList.add('active');
       } else {
@@ -458,14 +480,7 @@ window.salesManager = {
 
     // --- 3. UNLOCK / CLEAR ---
     clearBtn.onclick = () => {
-      const searchWrapper = modal.querySelector('#searchWrapper');
-      searchWrapper.classList.remove('is-locked');
-      clearBtn.style.display = 'none';
-      qrBtn.style.display = 'flex';
-      searchInput.readOnly = false;
-      searchInput.value = '';
-      this.selectedProductId = null;
-      this.resetPreview();
+      this.unlockProductSelection();
       if (window.wolfAudio) window.wolfAudio.play('notif');
       searchInput.focus();
     };
@@ -478,6 +493,46 @@ window.salesManager = {
       this.selectedProductId = null;
     };
     // --- 5. VALIDATION ---
+    const syncQtyStepperState = () => {
+      const val = parseInt(qtyInput?.value, 10) || 0;
+      const prod = this.allProducts.find(
+        (p) => p.productid === this.selectedProductId,
+      );
+      const available = Number(prod?.qty || 0);
+      const isLimited = available < 999999;
+      if (qtyDecBtn) qtyDecBtn.disabled = !prod || val <= 1;
+      if (qtyIncBtn)
+        qtyIncBtn.disabled =
+          !prod || qtyInput?.disabled || (isLimited && val >= available);
+    };
+
+    if (qtyDecBtn) {
+      qtyDecBtn.onclick = () => {
+        if (!qtyInput || qtyInput.disabled) return;
+        const current = parseInt(qtyInput.value, 10) || 0;
+        qtyInput.value = String(Math.max(1, current - 1));
+        this.validateTransaction();
+        syncQtyStepperState();
+      };
+    }
+
+    if (qtyIncBtn) {
+      qtyIncBtn.onclick = () => {
+        if (!qtyInput || qtyInput.disabled) return;
+        const prod = this.allProducts.find(
+          (p) => p.productid === this.selectedProductId,
+        );
+        if (!prod) return;
+        const current = parseInt(qtyInput.value, 10) || 0;
+        const next = current + 1;
+        const available = Number(prod.qty || 0);
+        if (available < 999999 && next > available) return;
+        qtyInput.value = String(Math.max(1, next));
+        this.validateTransaction();
+        syncQtyStepperState();
+      };
+    }
+
     qtyInput.oninput = () => {
       const val = parseInt(qtyInput.value) || 0;
       // Auto-filled class for the flash effect
@@ -486,12 +541,15 @@ window.salesManager = {
         setTimeout(() => qtyInput.classList.remove('auto-filled'), 500);
       }
       this.validateTransaction();
+      syncQtyStepperState();
     };
 
     form.onsubmit = async (e) => {
       e.preventDefault();
       this.processTransaction();
     };
+
+    syncQtyStepperState();
 
     // Close dropdown on outside click
     document.addEventListener('click', (e) => {
@@ -509,6 +567,8 @@ window.salesManager = {
     const qrBtn = document.getElementById('qrScanTrigger');
     const clearBtn = document.getElementById('clearSearchBtn');
     const qtyInput = document.getElementById('sale-qty');
+    const qtyDecBtn = document.getElementById('sale-qty-dec');
+    const qtyIncBtn = document.getElementById('sale-qty-inc');
 
     this.selectedProductId = prod.productid;
 
@@ -526,8 +586,12 @@ window.salesManager = {
         qtyInput.classList.add('auto-filled');
         setTimeout(() => qtyInput.classList.remove('auto-filled'), 500);
       }
+      if (qtyDecBtn) qtyDecBtn.disabled = true;
+      if (qtyIncBtn) qtyIncBtn.disabled = available <= 1;
     } else {
       if (qtyInput) qtyInput.value = 0;
+      if (qtyDecBtn) qtyDecBtn.disabled = true;
+      if (qtyIncBtn) qtyIncBtn.disabled = true;
       this.showSystemAlert(`OUT OF STOCK: ${prod.name}`, 'error');
     }
 
@@ -535,8 +599,37 @@ window.salesManager = {
     if (window.wolfAudio) window.wolfAudio.play('success');
   },
 
+  unlockProductSelection() {
+    const searchInput = document.getElementById('sale-product-search');
+    const searchWrapper = document.getElementById('searchWrapper');
+    const qrBtn = document.getElementById('qrScanTrigger');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const qtyInput = document.getElementById('sale-qty');
+    const qtyDecBtn = document.getElementById('sale-qty-dec');
+    const qtyIncBtn = document.getElementById('sale-qty-inc');
+
+    this.selectedProductId = null;
+    if (searchInput) {
+      searchInput.readOnly = false;
+      searchInput.value = '';
+    }
+    if (searchWrapper) searchWrapper.classList.remove('is-locked');
+    if (qrBtn) qrBtn.style.display = 'flex';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (qtyInput) {
+      qtyInput.value = '';
+      qtyInput.disabled = true;
+      qtyInput.style.opacity = '0.3';
+    }
+    if (qtyDecBtn) qtyDecBtn.disabled = true;
+    if (qtyIncBtn) qtyIncBtn.disabled = true;
+    this.resetPreview();
+  },
+
   updatePreview(prod) {
     const qtyInput = document.getElementById('sale-qty');
+    const qtyDecBtn = document.getElementById('sale-qty-dec');
+    const qtyIncBtn = document.getElementById('sale-qty-inc');
     const priceMeta = document.getElementById('meta-price');
     const stockMeta = document.getElementById('meta-stock');
     const imgPreview = document.getElementById('asset-preview-img');
@@ -555,10 +648,18 @@ window.salesManager = {
       if (available <= 0) {
         qtyInput.disabled = true;
         qtyInput.style.opacity = '0.3';
+        if (qtyDecBtn) qtyDecBtn.disabled = true;
+        if (qtyIncBtn) qtyIncBtn.disabled = true;
         this.showSystemAlert(`OUT OF STOCK: ${prod.name}`, 'error');
       } else {
         qtyInput.disabled = false;
         qtyInput.style.opacity = '1';
+        const currentQty = parseInt(qtyInput.value || '1', 10) || 1;
+        if (qtyDecBtn) qtyDecBtn.disabled = currentQty <= 1;
+        if (qtyIncBtn) {
+          const isLimited = available < 999999;
+          qtyIncBtn.disabled = isLimited && currentQty >= available;
+        }
       }
     }
 
@@ -622,11 +723,15 @@ window.salesManager = {
     const stockMeta = document.getElementById('meta-stock');
     const submitBtn = document.getElementById('sale-submit-btn');
     const qtyInput = document.getElementById('sale-qty');
+    const qtyDecBtn = document.getElementById('sale-qty-dec');
+    const qtyIncBtn = document.getElementById('sale-qty-inc');
     if (qtyInput) {
       qtyInput.value = '';
       qtyInput.disabled = true;
       qtyInput.style.opacity = '0.3';
     }
+    if (qtyDecBtn) qtyDecBtn.disabled = true;
+    if (qtyIncBtn) qtyIncBtn.disabled = true;
     if (imgPreview) imgPreview.src = this.placeholderImg;
     if (descPreview)
       descPreview.innerText =
@@ -726,12 +831,9 @@ window.salesManager = {
       }).showToast();
       if (window.wolfData) window.wolfData.loadSales();
       const modal = document.getElementById('sale-terminal-overlay');
+      this.unlockProductSelection();
       if (modal) modal.style.display = 'none';
-
-      // Reset Modal UI
-      document.getElementById('sale-terminal-overlay').style.display = 'none';
       if (form) form.reset();
-      this.selectedProductId = null;
 
       if (window.wolfData && typeof window.wolfData.loadSales === 'function') {
         window.wolfData.loadSales();
@@ -1024,6 +1126,7 @@ window.salesManager = {
     }
 
     // 4. RENDER (FORCED UPPERCASE)
+    const canHardDelete = this.canHardDelete();
     container.innerHTML = data
       .map((item) => {
         const d = item.deleted_data;
@@ -1077,9 +1180,13 @@ window.salesManager = {
                 <button class="btn-restore" title="RESTORE" onclick="salesManager.restoreSale('${item.id}', '${mode}')">
                     <i class='bx bx-undo'></i>
                 </button>
-                <button class="btn-purge" title="DELETE_PERMANENT" onclick="salesManager.purgeSale('${item.id}', '${mode}')">
+                ${
+                  canHardDelete
+                    ? `<button class="btn-purge" title="DELETE_PERMANENT" onclick="salesManager.purgeSale('${item.id}', '${mode}')">
                     <i class='bx bx-trash'></i>
-                </button>
+                </button>`
+                    : ''
+                }
             </div>
         </div>`;
       })
@@ -1088,6 +1195,11 @@ window.salesManager = {
 
   // --- NEW: PERMANENT PURGE FUNCTION ---
   async purgeSale(trashId, mode) {
+    if (!this.canHardDelete()) {
+      this.showSystemAlert('ACCESS_DENIED: ONLY ADMIN CAN HARD DELETE', 'error');
+      return;
+    }
+
     if (!window.Swal) return;
 
     // 1. CONFIRMATION (Industrial Orange Style)
@@ -1239,6 +1351,9 @@ window.salesManager = {
         } else {
           // For Logbook, trigger the background refresh
           await window.wolfData.loadLogbook();
+        }
+        if (typeof window.wolfData.scheduleGoalActualsSync === 'function') {
+          window.wolfData.scheduleGoalActualsSync(40);
         }
       }
       if (isSales && productInfo) {

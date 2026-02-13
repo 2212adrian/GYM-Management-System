@@ -103,12 +103,18 @@
   .id-qr {
     background: #fff;
     border-radius: 10px;
+    width: 90px;
     height: 90px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 900;
-    color: #000;
+    overflow: hidden;
+  }
+
+  .id-qr img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .id-meta {
@@ -143,31 +149,52 @@
     color: #aaa;
     border: 1px solid #2a2a2a;
   }
+
+  body.light-theme .id-title,
+  body.light-theme .id-brand,
+  body.light-theme .id-meta {
+    color: var(--text-main);
+  }
+
+  body.light-theme .id-panel,
+  body.light-theme .id-preview,
+  body.light-theme .id-field input {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  body.light-theme .id-badge {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #166534;
+  }
 </style>
 
 <script src="/assets/js/utils/59f8f3e5e05e33a95b50d4725925d500a6079bf8d7aed8196482d09523065e9a.js"></script>
-<script src="/assets/js/utils/18f05fa5791cebad5e8cc7095af3bb4eee5760b343a9c7d5a776844fe5618d7c.js"></script>
+<script src="/assets/js/utils/acf618b0a45c1a4029b862dc58302dd3316ecf53bf3b6fb56092721bbd2cff2b.js"></script>
 
 <div class="id-maker-wrapper">
-  <div class="id-title">ID MAKER (static)</div>
+  <div class="id-title">ID Maker</div>
 
   <div class="id-grid">
     <div class="id-panel">
       <div class="id-field">
-        <label>MEMBER NAME</label>
-        <input placeholder="TYPE OR SEARCH EXISTING..." />
+        <label>Member Name</label>
+        <input id="id-member-search" list="id-member-options" placeholder="Type or search existing..." />
+        <datalist id="id-member-options"></datalist>
       </div>
       <div class="id-field">
-        <label>CONTACT #</label>
-        <input value="0917-XXX-XXXX" />
+        <label>Contact #</label>
+        <input id="id-contact" placeholder="Member contact number" />
       </div>
       <div class="id-field">
-        <label>STATUS</label>
-        <input value="ONGOING" />
+        <label>Status</label>
+        <input id="id-status" value="ACTIVE" />
       </div>
       <div class="id-field">
-        <label>SUBSCRIPTION TIER</label>
-        <input value="Monthly Membership (Free)" />
+        <label>Subscription Tier</label>
+        <input id="id-tier" value="STANDARD MEMBERSHIP" />
       </div>
     </div>
 
@@ -178,15 +205,18 @@
       <div class="id-preview">
         <div class="id-preview-top">
           <div class="id-brand">WOLFPALOMAR</div>
-          <div class="id-badge">ONGOING STATUS</div>
+          <div id="id-preview-badge" class="id-badge">ACTIVE STATUS</div>
         </div>
         <div class="id-preview-body">
-          <div class="id-qr">QR</div>
+          <div class="id-qr">
+            <img id="id-preview-qr" src="/assets/images/placeholder.png" alt="Member QR" />
+          </div>
           <div class="id-meta">
-            <div>NAME: JUAN DELA CRUZ</div>
-            <div>ID: TG-5200</div>
-            <div>ISSUE DATE: 2026-02-05</div>
-            <div>MEMBERSHIP: MONTHLY MEMBERSHIP</div>
+            <div>NAME: <span id="id-preview-name">N/A</span></div>
+            <div>ID: <span id="id-preview-code">N/A</span></div>
+            <div>ISSUE DATE: <span id="id-preview-date">N/A</span></div>
+            <div>MEMBERSHIP: <span id="id-preview-tier">N/A</span></div>
+            <div>STATUS: <span id="id-preview-status">ACTIVE</span></div>
           </div>
         </div>
         <div
@@ -205,8 +235,8 @@
     </div>
 
     <div class="id-actions">
-      <button class="id-btn secondary">SAVE ASSET</button>
-      <button class="id-btn">PRINT CARD</button>
+      <button id="id-save-asset-btn" class="id-btn secondary">Save Asset</button>
+      <button id="id-print-card-btn" class="id-btn">Print Card</button>
     </div>
   </div>
 </div>

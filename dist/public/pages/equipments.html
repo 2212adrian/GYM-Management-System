@@ -34,7 +34,7 @@
 
   .equip-card {
     background: linear-gradient(180deg, #171717, #0f0f0f);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 22px;
     padding: 14px;
     display: flex;
@@ -50,8 +50,8 @@
   }
 
   .equip-thumb {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
     background: #222;
     border: 1px solid #2a2a2a;
@@ -81,8 +81,8 @@
   .equip-status {
     font-size: 9px;
     font-weight: 900;
-    color: #f0b429;
     letter-spacing: 1px;
+    text-transform: uppercase;
   }
 
   .equip-actions {
@@ -108,64 +108,44 @@
     justify-content: center;
     cursor: pointer;
   }
+
+  body.light-theme .equip-title,
+  body.light-theme .equip-name {
+    color: var(--text-main);
+  }
+
+  body.light-theme .equip-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  body.light-theme .equip-thumb {
+    background: var(--surface-elevated);
+    border-color: var(--border-color);
+  }
+
+  body.light-theme .equip-sub {
+    color: var(--text-muted);
+  }
+
+  body.light-theme .equip-actions {
+    color: var(--text-muted);
+  }
 </style>
 
 <script src="/assets/js/utils/59f8f3e5e05e33a95b50d4725925d500a6079bf8d7aed8196482d09523065e9a.js"></script>
-<script src="/assets/js/utils/18f05fa5791cebad5e8cc7095af3bb4eee5760b343a9c7d5a776844fe5618d7c.js"></script>
+<script src="/assets/js/utils/acf618b0a45c1a4029b862dc58302dd3316ecf53bf3b6fb56092721bbd2cff2b.js"></script>
 
 <div class="equip-wrapper">
   <div class="equip-header">
-    <div class="equip-title">EQUIPMENT DATABASE (static)</div>
-    <button class="equip-add"><i class="bx bx-plus"></i></button>
+    <div class="equip-title">Equipment Database</div>
+    <button id="equip-add-btn" class="equip-add"><i class="bx bx-plus"></i></button>
   </div>
 
-  <div class="equip-list">
-    <div class="equip-card">
-      <div class="equip-info">
-        <div class="equip-thumb">
-          <img src="/assets/images/placeholder.png" alt="Treadmill" />
-        </div>
-        <div>
-          <div class="equip-name">TREADMILL X-PRO</div>
-          <div class="equip-sub">EQ-001 · EXCELLENT</div>
-        </div>
-      </div>
-      <div class="equip-actions">
-        <i class="bx bx-edit"></i>
-        <i class="bx bx-trash"></i>
-      </div>
-    </div>
-
-    <div class="equip-card">
-      <div class="equip-info">
-        <div class="equip-thumb">
-          <img src="/assets/images/placeholder.png" alt="Power Rack" />
-        </div>
-        <div>
-          <div class="equip-name">OLYMPIC POWER RACK</div>
-          <div class="equip-sub">EQ-002 · EXCELLENT</div>
-        </div>
-      </div>
-      <div class="equip-actions">
-        <i class="bx bx-edit"></i>
-        <i class="bx bx-trash"></i>
-      </div>
-    </div>
-
-    <div class="equip-card">
-      <div class="equip-info">
-        <div class="equip-thumb">
-          <img src="/assets/images/placeholder.png" alt="Bench" />
-        </div>
-        <div>
-          <div class="equip-name">ADJUSTABLE BENCH FB1</div>
-          <div class="equip-sub">EQ-003 · GOOD</div>
-        </div>
-      </div>
-      <div class="equip-actions">
-        <i class="bx bx-edit"></i>
-        <i class="bx bx-trash"></i>
-      </div>
+  <div id="equip-list" class="equip-list">
+    <div class="equip-card" style="justify-content: center">
+      <div class="equip-sub">Loading equipment records...</div>
     </div>
   </div>
 </div>

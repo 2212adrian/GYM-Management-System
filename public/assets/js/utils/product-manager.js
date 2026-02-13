@@ -294,6 +294,28 @@ document.addEventListener('click', (e) => {
 const ProductManager = {
   allProducts: [],
   trashData: [],
+  currentPage: 1,
+  pageSize: 9,
+  currentFilterList: [],
+  getAccessContext() {
+    const context = window.WOLF_ACCESS_CONTEXT || {};
+    const role = String(context.role || window.WOLF_USER_ROLE || '')
+      .trim()
+      .toLowerCase();
+    const email = String(context.email || window.WOLF_USER_EMAIL || '')
+      .trim()
+      .toLowerCase();
+    return { role, email };
+  },
+
+  canHardDelete() {
+    const { role, email } = this.getAccessContext();
+    return (
+      role === 'admin' ||
+      email === 'adrianangeles2212@gmail.com' ||
+      email === 'ktorrazo123@gmail.com'
+    );
+  },
 
   async init() {
     console.log('Wolf OS: Product Manager Initializing...');
@@ -1910,6 +1932,8 @@ const ProductManager = {
 
       if (error) throw error;
       this.allProducts = data;
+      this.currentFilterList = [...(data || [])];
+      this.currentPage = 1;
 
       const totalCountEl = document.getElementById('total-products-count');
       const lowStockEl = document.getElementById('low-stock-count');
@@ -1946,7 +1970,14 @@ const ProductManager = {
     const container = document.getElementById('products-list');
     if (!container) return;
 
-    container.innerHTML = list
+    this.currentFilterList = Array.isArray(list) ? [...list] : [];
+    const totalItems = list.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / this.pageSize));
+    if (this.currentPage > totalPages) this.currentPage = totalPages;
+    const start = (this.currentPage - 1) * this.pageSize;
+    const visibleList = list.slice(start, start + this.pageSize);
+
+    container.innerHTML = visibleList
       .map((p, index) => {
         const stockStatus = p.qty <= 5 ? 'status-critical' : 'status-good';
         const stockLabel = p.qty <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
@@ -2036,6 +2067,16 @@ const ProductManager = {
       })
       .join('');
 
+    if (totalItems > this.pageSize) {
+      container.innerHTML += `
+        <div class="col-12" style="display:flex; justify-content:center; align-items:center; gap:10px; margin-top:8px;">
+          <button onclick="ProductManager.setPage(${this.currentPage - 1})" ${this.currentPage <= 1 ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-left'></i></button>
+          <span style="font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#97a4ba;">Page ${this.currentPage} of ${totalPages}</span>
+          <button onclick="ProductManager.setPage(${this.currentPage + 1})" ${this.currentPage >= totalPages ? 'disabled' : ''} style="width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e7edf8;"><i class='bx bx-chevron-right'></i></button>
+        </div>
+      `;
+    }
+
     // Initialize Pixabay API key
     window.PIXABAY_KEY = '54360015-81e98130630ae3ed1faf5a9b9';
 
@@ -2123,6 +2164,13 @@ const ProductManager = {
     });
   },
 
+  setPage(page) {
+    const nextPage = Number(page);
+    if (!Number.isFinite(nextPage) || nextPage < 1) return;
+    this.currentPage = nextPage;
+    this.render(this.currentFilterList.length ? this.currentFilterList : this.allProducts);
+  },
+
   renderTrash() {
     const container = document.getElementById('trash-list');
     if (!container) return;
@@ -2150,6 +2198,7 @@ const ProductManager = {
     };
 
     try {
+      const canHardDelete = this.canHardDelete();
       container.innerHTML = this.trashData
         .map((item, index) => {
           const p =
@@ -2184,9 +2233,13 @@ const ProductManager = {
               <button class="btn-trash-action restore" onclick="ProductManager.restoreFromTrash('${item.id}')" title="Restore product">
                 <i class="bx bx-undo"></i>
               </button>
-              <button class="btn-trash-action purge" onclick="ProductManager.wipePermanent('${item.id}')" title="Delete permanently">
+              ${
+                canHardDelete
+                  ? `<button class="btn-trash-action purge" onclick="ProductManager.wipePermanent('${item.id}')" title="Delete permanently">
                 <i class="bx bx-shield-x"></i>
-              </button>
+              </button>`
+                  : ''
+              }
             </div>
           </div>`;
         })
@@ -2334,6 +2387,11 @@ const ProductManager = {
   },
 
   async wipePermanent(trashId) {
+    if (!this.canHardDelete()) {
+      await Swal.fire('ACCESS DENIED', 'Only admin can hard delete records.', 'warning');
+      return;
+    }
+
     const item = this.trashData.find((t) => t.id === trashId);
     if (!item) return;
 
@@ -2670,6 +2728,7 @@ const ProductManager = {
           // closing: reset search
           searchInput.value = '';
           if (clearBtn) clearBtn.style.display = 'none';
+          this.currentPage = 1;
           this.render?.(this.allProducts || []);
         }
       };
@@ -2689,6 +2748,7 @@ const ProductManager = {
             (p.sku && p.sku.toLowerCase().includes(term)),
         );
 
+        this.currentPage = 1;
         this.render?.(filtered);
       };
     }
@@ -2697,6 +2757,7 @@ const ProductManager = {
       clearBtn.onclick = () => {
         searchInput.value = '';
         clearBtn.style.display = 'none';
+        this.currentPage = 1;
         this.render?.(this.allProducts || []);
       };
     }
