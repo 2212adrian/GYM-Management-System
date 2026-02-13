@@ -80,6 +80,60 @@ async function fetchNoStoreText(url, timeoutMs = 5000) {
   }
 }
 
+function normalizeVersionLabel(value) {
+  return String(value || '').trim();
+}
+
+function extractVersionFromSystemConfigSource(source) {
+  const raw = String(source || '');
+  if (!raw) return null;
+
+  const versionMatch = raw.match(/VERSION\s*:\s*['"]([^'"]+)['"]/i);
+  if (versionMatch && versionMatch[1]) {
+    return normalizeVersionLabel(versionMatch[1]);
+  }
+  return null;
+}
+
+async function fetchRemoteSystemConfigSource() {
+  try {
+    return await fetchNoStoreText('/assets/js/utils/system-config.js');
+  } catch (_) {
+    // Fallback to manifest-resolved hashed path.
+  }
+
+  try {
+    const manifestText = await fetchNoStoreText('/asset-manifest.json');
+    const manifest = JSON.parse(manifestText);
+    const resolvedPath =
+      manifest &&
+      typeof manifest === 'object' &&
+      manifest['/assets/js/utils/system-config.js'];
+    if (!resolvedPath) return null;
+    return await fetchNoStoreText(String(resolvedPath));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function fetchLatestVersionLabel() {
+  const source = await fetchRemoteSystemConfigSource();
+  return extractVersionFromSystemConfigSource(source);
+}
+
+function buildUpdateBannerMessage(currentVersion, latestVersion) {
+  const current = normalizeVersionLabel(currentVersion);
+  const latest = normalizeVersionLabel(latestVersion);
+
+  if (current && latest && current !== latest) {
+    return `A newer version is available (${current} -> ${latest}). Click to refresh.`;
+  }
+  if (latest) {
+    return `A newer version (${latest}) is available. Click to refresh.`;
+  }
+  return 'A newer version is available. Click to refresh.';
+}
+
 async function fetchCurrentPageSignature() {
   const probes = [
     '/asset-manifest.json',
@@ -188,6 +242,31 @@ function showUpdateBanner(message, onRefresh, onDismiss = null) {
 
 window.showUpdateBanner = showUpdateBanner;
 window.newVersionAvailable = false;
+window.currentAppVersion = WOLF_CONFIG.VERSION;
+window.latestAvailableVersion = null;
+window.forceShowUpdateNotification = function (forcedLatestVersion = null) {
+  window.newVersionAvailable = true;
+  const latestLabel = normalizeVersionLabel(forcedLatestVersion);
+  if (latestLabel) {
+    window.latestAvailableVersion = latestLabel;
+  }
+  showUpdateBanner(
+    buildUpdateBannerMessage(
+      WOLF_CONFIG.VERSION,
+      window.latestAvailableVersion,
+    ),
+    () => {
+      window.location.reload();
+    },
+    () => {
+      window.newVersionAvailable = false;
+    },
+  );
+};
+window.hideUpdateNotification = function () {
+  dismissUpdateBanner();
+  window.newVersionAvailable = false;
+};
 
 async function checkForNewVersion() {
   try {
@@ -202,10 +281,13 @@ async function checkForNewVersion() {
     window.newVersionAvailable = hasNewVersion;
     if (!hasNewVersion) {
       wolfPendingUpdateSignature = null;
+      window.latestAvailableVersion = null;
       dismissUpdateBanner();
       return;
     }
 
+    const latestVersion = await fetchLatestVersionLabel();
+    window.latestAvailableVersion = normalizeVersionLabel(latestVersion) || null;
     wolfPendingUpdateSignature = latestSignature;
     let dismissedSignature = '';
     try {
@@ -221,7 +303,10 @@ async function checkForNewVersion() {
 
     if (window.newVersionAvailable) {
       showUpdateBanner(
-        'A newer version is available. Click to refresh.',
+        buildUpdateBannerMessage(
+          WOLF_CONFIG.VERSION,
+          window.latestAvailableVersion,
+        ),
         () => {
           window.location.reload();
         },
