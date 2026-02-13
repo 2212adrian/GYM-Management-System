@@ -6,6 +6,17 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const quickLoginSecret = process.env.QUICK_LOGIN_SECRET || serviceRoleKey;
 const quickLoginHashSecret =
   process.env.QUICK_LOGIN_HASH_SECRET || quickLoginSecret || serviceRoleKey;
+const quickLoginQrSecret =
+  process.env.QUICK_LOGIN_QR_SECRET ||
+  process.env.QUICK_LOGIN_ENCRYPTION_SECRET ||
+  quickLoginHashSecret ||
+  quickLoginSecret ||
+  serviceRoleKey;
+const quickLoginQrPrefix = 'WOLFQL2.';
+const quickLoginQrEncryptionKey = crypto
+  .createHash('sha256')
+  .update(String(quickLoginQrSecret || ''))
+  .digest();
 
 function json(statusCode, body) {
   return {
@@ -144,6 +155,78 @@ function verifyPreviewContext(
   return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
+function isEmptyPreviewContext(previewContext) {
+  if (!previewContext || typeof previewContext !== 'object') return true;
+  return !(
+    String(previewContext.ip || '').trim() ||
+    String(previewContext.city || '').trim() ||
+    String(previewContext.region || '').trim() ||
+    String(previewContext.country || '').trim()
+  );
+}
+
+function decryptQrPayload(qrToken) {
+  const raw = String(qrToken || '').trim();
+  if (!raw) {
+    throw new Error('Missing quick-login QR token');
+  }
+
+  const encoded = raw.startsWith(quickLoginQrPrefix)
+    ? raw.slice(quickLoginQrPrefix.length)
+    : raw;
+  if (!encoded) {
+    throw new Error('Malformed quick-login QR token');
+  }
+
+  const packed = Buffer.from(encoded, 'base64url');
+  if (packed.length < 29) {
+    throw new Error('Malformed quick-login QR token');
+  }
+
+  const iv = packed.subarray(0, 12);
+  const authTag = packed.subarray(12, 28);
+  const ciphertext = packed.subarray(28);
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    quickLoginQrEncryptionKey,
+    iv,
+  );
+  decipher.setAuthTag(authTag);
+  const plaintext = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString('utf8');
+
+  return JSON.parse(plaintext);
+}
+
+function extractQuickLoginQrDetails(qrToken) {
+  const payload = decryptQrPayload(qrToken);
+  const requestId = String(payload?.requestId || payload?.r || '').trim();
+  if (!requestId) throw new Error('QR token missing requestId');
+
+  const compactPreview = Array.isArray(payload?.p) ? payload.p : null;
+  const previewContextRaw =
+    payload?.previewContext && typeof payload.previewContext === 'object'
+      ? payload.previewContext
+      : compactPreview && compactPreview.length >= 4
+        ? {
+            ip: compactPreview[0],
+            city: compactPreview[1],
+            region: compactPreview[2],
+            country: compactPreview[3],
+          }
+        : null;
+
+  return {
+    requestId,
+    previewContext: previewContextRaw
+      ? normalizePreviewContext(previewContextRaw)
+      : null,
+    previewSig: String(payload?.previewSig || payload?.g || '').trim(),
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
   if (event.httpMethod !== 'POST') {
@@ -164,11 +247,28 @@ exports.handler = async (event) => {
       return json(400, { error: 'Invalid request body JSON' });
     }
 
-    const requestId = String(payload.requestId || '').trim();
+    const qrToken = String(payload.qrToken || '').trim();
+    let requestId = String(payload.requestId || '').trim();
     const requestSecret = String(payload.requestSecret || '').trim();
     const consume = Boolean(payload.consume);
-    const previewContextInput = normalizePreviewContext(payload.previewContext);
-    const previewSigInput = String(payload.previewSig || '').trim();
+    let previewContextInput = normalizePreviewContext(payload.previewContext);
+    let previewSigInput = String(payload.previewSig || '').trim();
+
+    if (qrToken) {
+      let qrDetails = null;
+      try {
+        qrDetails = extractQuickLoginQrDetails(qrToken);
+      } catch (err) {
+        return json(400, { error: err.message || 'Invalid quick-login QR token' });
+      }
+      if (!requestId) requestId = qrDetails.requestId;
+      if (isEmptyPreviewContext(previewContextInput) && qrDetails.previewContext) {
+        previewContextInput = qrDetails.previewContext;
+      }
+      if (!previewSigInput && qrDetails.previewSig) {
+        previewSigInput = qrDetails.previewSig;
+      }
+    }
 
     if (!requestId) {
       return json(400, { error: 'requestId is required' });
@@ -251,6 +351,7 @@ exports.handler = async (event) => {
         .eq('status', 'pending');
 
       return json(410, {
+        requestId,
         status: 'expired',
         error: 'Quick-login request expired',
       });
@@ -343,6 +444,7 @@ exports.handler = async (event) => {
       }
 
       return json(200, {
+        requestId,
         status: 'approved',
         accessToken,
         refreshToken,
@@ -351,6 +453,7 @@ exports.handler = async (event) => {
     }
 
     return json(200, {
+      requestId,
       status: row.status,
       expiresAt: row.expires_at,
       remainingSeconds:

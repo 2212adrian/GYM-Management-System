@@ -6,6 +6,17 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const quickLoginSecret = process.env.QUICK_LOGIN_SECRET || serviceRoleKey;
 const quickLoginHashSecret =
   process.env.QUICK_LOGIN_HASH_SECRET || quickLoginSecret || serviceRoleKey;
+const quickLoginQrSecret =
+  process.env.QUICK_LOGIN_QR_SECRET ||
+  process.env.QUICK_LOGIN_ENCRYPTION_SECRET ||
+  quickLoginHashSecret ||
+  quickLoginSecret ||
+  serviceRoleKey;
+const quickLoginQrVersion = 'WOLFQL2';
+const quickLoginQrEncryptionKey = crypto
+  .createHash('sha256')
+  .update(String(quickLoginQrSecret || ''))
+  .digest();
 const quickLoginExpirySeconds = Number(
   process.env.QUICK_LOGIN_EXPIRES_SECONDS || 120,
 );
@@ -130,8 +141,113 @@ function verifyPreviewContext(
   return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
-function base64urlEncode(value) {
-  return Buffer.from(value, 'utf8').toString('base64url');
+function encryptQrPayload(payload) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(
+    'aes-256-gcm',
+    quickLoginQrEncryptionKey,
+    iv,
+  );
+  const plaintext = Buffer.from(JSON.stringify(payload), 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, ciphertext]).toString('base64url');
+}
+
+function buildQrValue(payload) {
+  return `${quickLoginQrVersion}.${encryptQrPayload(payload)}`;
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 3500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'WOLF-QuickLogin/1.0',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`GeoIP request failed (${res.status})`);
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeGeoResult(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const city = String(source.city || '').trim();
+  const region = String(source.region || source.regionCode || '').trim();
+  const country = String(source.country || '').trim();
+  const countryCode = String(source.countryCode || '').trim().toUpperCase();
+
+  return {
+    city: city || 'Unknown city',
+    region: region || 'Unknown region',
+    country: country || 'Unknown country',
+    countryCode: countryCode || 'UN',
+  };
+}
+
+function hasKnownGeoValue(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return Boolean(raw && raw !== 'unknown city' && raw !== 'unknown region' && raw !== 'unknown country');
+}
+
+function hasUsefulGeoData(geo) {
+  return (
+    hasKnownGeoValue(geo?.city) ||
+    hasKnownGeoValue(geo?.region) ||
+    hasKnownGeoValue(geo?.country)
+  );
+}
+
+async function resolveGeoViaIpwhoisApp(ip) {
+  const data = await fetchJsonWithTimeout(
+    `https://ipwhois.app/json/${encodeURIComponent(ip)}`,
+  );
+  if (data?.success === false) {
+    throw new Error(String(data?.message || 'ipwhois.app lookup failed'));
+  }
+  return normalizeGeoResult({
+    city: data?.city,
+    region: data?.region,
+    country: data?.country,
+    countryCode: data?.country_code,
+  });
+}
+
+async function resolveGeoViaIpapiCo(ip) {
+  const data = await fetchJsonWithTimeout(
+    `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
+  );
+  if (data?.error) {
+    throw new Error(String(data?.reason || 'ipapi.co lookup failed'));
+  }
+  return normalizeGeoResult({
+    city: data?.city,
+    region: data?.region || data?.region_code,
+    country: data?.country_name,
+    countryCode: data?.country_code,
+  });
+}
+
+async function resolveGeoViaIpwhoIs(ip) {
+  const data = await fetchJsonWithTimeout(
+    `https://ipwho.is/${encodeURIComponent(ip)}`,
+  );
+  if (data?.success === false) {
+    throw new Error(String(data?.message || 'ipwho.is lookup failed'));
+  }
+  return normalizeGeoResult({
+    city: data?.city,
+    region: data?.region || data?.region_code,
+    country: data?.country,
+    countryCode: data?.country_code,
+  });
 }
 
 async function resolveGeo(ip) {
@@ -144,27 +260,31 @@ async function resolveGeo(ip) {
     };
   }
 
-  try {
-    const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) throw new Error('GeoIP request failed');
-    const data = await res.json();
-    return {
-      city: data?.city || 'Unknown city',
-      region: data?.region || data?.region_code || 'Unknown region',
-      country: data?.country || 'Unknown country',
-      countryCode: data?.country_code || 'UN',
-    };
-  } catch (_) {
-    return {
+  let fallbackGeo = null;
+  const providers = [
+    resolveGeoViaIpwhoisApp,
+    resolveGeoViaIpapiCo,
+    resolveGeoViaIpwhoIs,
+  ];
+
+  for (const provider of providers) {
+    try {
+      const resolved = await provider(ip);
+      if (!fallbackGeo) fallbackGeo = resolved;
+      if (hasUsefulGeoData(resolved)) return resolved;
+    } catch (_) {
+      // Move to next provider silently.
+    }
+  }
+
+  return (
+    fallbackGeo || {
       city: 'Unknown city',
       region: 'Unknown region',
       country: 'Unknown country',
       countryCode: 'UN',
-    };
-  }
+    }
+  );
 }
 
 async function findLatestPendingByIdentity(supabase, requesterIpHash, requesterUserAgentHash) {
@@ -321,7 +441,7 @@ exports.handler = async (event) => {
 
         const qrPayloadData = {
           r: latestPendingRequest.request_id,
-          v: 1,
+          v: 2,
           ...(previewContext && previewSig
             ? {
                 p: [
@@ -334,7 +454,6 @@ exports.handler = async (event) => {
               }
             : {}),
         };
-        const qrPayload = base64urlEncode(JSON.stringify(qrPayloadData));
 
         return json(200, {
           requestId: latestPendingRequest.request_id,
@@ -343,7 +462,7 @@ exports.handler = async (event) => {
           regenerateCooldownSeconds: quickLoginRegenerateCooldownSeconds,
           regenerateRemainingSeconds,
           reusedPending: true,
-          qrValue: `WOLFQL1.${qrPayload}`,
+          qrValue: buildQrValue(qrPayloadData),
           location:
             previewContext && previewSig
               ? previewContext
@@ -428,19 +547,17 @@ exports.handler = async (event) => {
       return json(500, { error: error.message });
     }
 
-    const qrPayload = base64urlEncode(
-      JSON.stringify({
-        r: requestId,
-        v: 1,
-        p: [
-          previewContext.ip,
-          previewContext.city,
-          previewContext.region,
-          previewContext.country,
-        ],
-        g: previewSig,
-      }),
-    );
+    const qrPayloadData = {
+      r: requestId,
+      v: 2,
+      p: [
+        previewContext.ip,
+        previewContext.city,
+        previewContext.region,
+        previewContext.country,
+      ],
+      g: previewSig,
+    };
 
     return json(200, {
       requestId,
@@ -449,7 +566,7 @@ exports.handler = async (event) => {
       regenerateCooldownSeconds: quickLoginRegenerateCooldownSeconds,
       regenerateRemainingSeconds: quickLoginRegenerateCooldownSeconds,
       reusedPending: false,
-      qrValue: `WOLFQL1.${qrPayload}`,
+      qrValue: buildQrValue(qrPayloadData),
       location: previewContext,
       previewContext,
       previewSig,

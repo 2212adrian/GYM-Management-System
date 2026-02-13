@@ -148,11 +148,18 @@ window.wolfScanner = {
   },
 
   isQuickLoginPayload(rawText) {
-    return typeof rawText === 'string' && rawText.startsWith('WOLFQL1.');
+    if (typeof rawText !== 'string') return false;
+    return rawText.startsWith('WOLFQL2.') || rawText.startsWith('WOLFQL1.');
   },
 
   decodeQuickLoginPayload(rawText) {
     if (!this.isQuickLoginPayload(rawText)) return null;
+
+    if (rawText.startsWith('WOLFQL2.')) {
+      return {
+        qrToken: String(rawText).trim(),
+      };
+    }
 
     try {
       const encoded = rawText.slice('WOLFQL1.'.length).trim();
@@ -203,12 +210,19 @@ window.wolfScanner = {
     const previewRes = await fetch('/.netlify/functions/quick-login-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId: payload.requestId,
-        previewContext: payload.previewContext,
-        previewSig: payload.previewSig,
-        consume: false,
-      }),
+      body: JSON.stringify(
+        payload.qrToken
+          ? {
+              qrToken: payload.qrToken,
+              consume: false,
+            }
+          : {
+              requestId: payload.requestId,
+              previewContext: payload.previewContext,
+              previewSig: payload.previewSig,
+              consume: false,
+            },
+      ),
     });
 
     let previewData = {};
@@ -254,8 +268,11 @@ window.wolfScanner = {
 
     const safeIpLine = sanitizePlain(ipLine);
     const safeLocationLine = sanitizePlain(locationLine);
+    const sessionRef = String(
+      payload.requestId || previewData.requestId || '',
+    ).trim();
     const safeSessionRef = sanitizePlain(
-      String(payload.requestId).slice(0, 10).toUpperCase(),
+      (sessionRef ? sessionRef.slice(0, 10) : '---').toUpperCase(),
     );
 
     let isConfirmed = false;
@@ -307,11 +324,19 @@ window.wolfScanner = {
     const approveRes = await fetch('/.netlify/functions/quick-login-approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId: payload.requestId,
-        accessToken: currentSession.access_token,
-        refreshToken: currentSession.refresh_token,
-      }),
+      body: JSON.stringify(
+        payload.qrToken
+          ? {
+              qrToken: payload.qrToken,
+              accessToken: currentSession.access_token,
+              refreshToken: currentSession.refresh_token,
+            }
+          : {
+              requestId: payload.requestId,
+              accessToken: currentSession.access_token,
+              refreshToken: currentSession.refresh_token,
+            },
+      ),
     });
 
     let approveData = {};

@@ -6,6 +6,17 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const quickLoginSecret = process.env.QUICK_LOGIN_SECRET || serviceRoleKey;
 const quickLoginHashSecret =
   process.env.QUICK_LOGIN_HASH_SECRET || quickLoginSecret || serviceRoleKey;
+const quickLoginQrSecret =
+  process.env.QUICK_LOGIN_QR_SECRET ||
+  process.env.QUICK_LOGIN_ENCRYPTION_SECRET ||
+  quickLoginHashSecret ||
+  quickLoginSecret ||
+  serviceRoleKey;
+const quickLoginQrPrefix = 'WOLFQL2.';
+const quickLoginQrEncryptionKey = crypto
+  .createHash('sha256')
+  .update(String(quickLoginQrSecret || ''))
+  .digest();
 
 function json(statusCode, body) {
   return {
@@ -73,6 +84,48 @@ function getUserAgent(event) {
   );
 }
 
+function decryptQrPayload(qrToken) {
+  const raw = String(qrToken || '').trim();
+  if (!raw) {
+    throw new Error('Missing quick-login QR token');
+  }
+
+  const encoded = raw.startsWith(quickLoginQrPrefix)
+    ? raw.slice(quickLoginQrPrefix.length)
+    : raw;
+  if (!encoded) {
+    throw new Error('Malformed quick-login QR token');
+  }
+
+  const packed = Buffer.from(encoded, 'base64url');
+  if (packed.length < 29) {
+    throw new Error('Malformed quick-login QR token');
+  }
+
+  const iv = packed.subarray(0, 12);
+  const authTag = packed.subarray(12, 28);
+  const ciphertext = packed.subarray(28);
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    quickLoginQrEncryptionKey,
+    iv,
+  );
+  decipher.setAuthTag(authTag);
+  const plaintext = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString('utf8');
+
+  return JSON.parse(plaintext);
+}
+
+function extractRequestIdFromQrToken(qrToken) {
+  const payload = decryptQrPayload(qrToken);
+  const requestId = String(payload?.requestId || payload?.r || '').trim();
+  if (!requestId) throw new Error('QR token missing requestId');
+  return requestId;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
   if (event.httpMethod !== 'POST') {
@@ -93,13 +146,26 @@ exports.handler = async (event) => {
       return json(400, { error: 'Invalid request body JSON' });
     }
 
-    const requestId = String(payload.requestId || '').trim();
+    const qrToken = String(payload.qrToken || '').trim();
+    let requestId = String(payload.requestId || '').trim();
     const accessToken = String(payload.accessToken || '').trim();
     const refreshToken = String(payload.refreshToken || '').trim();
 
+    if (qrToken) {
+      try {
+        const requestIdFromQr = extractRequestIdFromQrToken(qrToken);
+        if (requestId && requestId !== requestIdFromQr) {
+          return json(400, { error: 'requestId mismatch with qrToken payload' });
+        }
+        requestId = requestIdFromQr;
+      } catch (err) {
+        return json(400, { error: err.message || 'Invalid quick-login QR token' });
+      }
+    }
+
     if (!requestId || !accessToken || !refreshToken) {
       return json(400, {
-        error: 'requestId, accessToken, and refreshToken are required',
+        error: 'requestId (or qrToken), accessToken, and refreshToken are required',
       });
     }
 
