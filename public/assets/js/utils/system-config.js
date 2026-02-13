@@ -1,7 +1,7 @@
 const WOLF_CONFIG = {
   noLoadingScreen: false,
-  VERSION: 'v0.6.4',
-  FULL_VERSION: 'GYM V0.6.4',
+  VERSION: 'v0.6.51',
+  FULL_VERSION: 'GYM V0.6.51',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',
@@ -29,6 +29,7 @@ const WOLF_PWA_INSTALL_LABEL = 'Install App';
 const WOLF_PWA_IOS_LABEL = 'Add to Home Screen';
 const WOLF_PWA_IOS_HELP_TEXT =
   'On iPhone/iPad: tap Share, then choose "Add to Home Screen".';
+const WOLF_PWA_BUTTON_AUTO_COMPACT_MS = 3200;
 const WOLF_SW_UPDATE_CHECK_INTERVAL_MS = 60000;
 let wolfUpdateCheckTimer = null;
 let wolfKnownPageSignature = null;
@@ -41,6 +42,7 @@ let wolfThemeColorWatchBound = false;
 let wolfPwaPromptEvent = null;
 let wolfPwaInstallWatchBound = false;
 let wolfSwUpdateTimer = null;
+let wolfPwaCompactTimer = null;
 
 // Make this globally accessible
 window.applyVersioning = function () {
@@ -306,7 +308,8 @@ async function checkForNewVersion() {
     }
 
     const latestVersion = await fetchLatestVersionLabel();
-    window.latestAvailableVersion = normalizeVersionLabel(latestVersion) || null;
+    window.latestAvailableVersion =
+      normalizeVersionLabel(latestVersion) || null;
     wolfPendingUpdateSignature = latestSignature;
     let dismissedSignature = '';
     try {
@@ -342,7 +345,7 @@ async function checkForNewVersion() {
           }
         },
       );
-      }
+    }
   } catch (_) {
     // Ignore transient network/CDN errors during update checks.
   }
@@ -495,7 +498,10 @@ function setNetworkOverlayVisible(visible) {
 
 async function pingInternet() {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), WOLF_NETWORK_CHECK_TIMEOUT_MS);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    WOLF_NETWORK_CHECK_TIMEOUT_MS,
+  );
   try {
     await fetch(`/assets/images/favicon.ico?_netchk=${Date.now()}`, {
       method: 'GET',
@@ -572,7 +578,7 @@ function isTextEntryElement(element) {
   if (tagName !== 'input') {
     return Boolean(
       element.isContentEditable ||
-        element.getAttribute('contenteditable') === 'true',
+      element.getAttribute('contenteditable') === 'true',
     );
   }
 
@@ -599,7 +605,10 @@ function getViewportHeightPx() {
   if (Number.isFinite(window.innerHeight)) {
     return Math.max(0, Math.round(window.innerHeight));
   }
-  if (document.documentElement && Number.isFinite(document.documentElement.clientHeight)) {
+  if (
+    document.documentElement &&
+    Number.isFinite(document.documentElement.clientHeight)
+  ) {
     return Math.max(0, Math.round(document.documentElement.clientHeight));
   }
   return 0;
@@ -612,7 +621,10 @@ function syncViewportAndKeyboardState() {
   if (window.visualViewport) {
     const viewportBottom =
       window.visualViewport.height + window.visualViewport.offsetTop;
-    keyboardInset = Math.max(0, Math.round(window.innerHeight - viewportBottom));
+    keyboardInset = Math.max(
+      0,
+      Math.round(window.innerHeight - viewportBottom),
+    );
   }
 
   const keyboardOpen =
@@ -699,7 +711,7 @@ function startThemeColorWatch() {
 function isStandaloneAppMode() {
   return Boolean(
     window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true,
+    window.navigator.standalone === true,
   );
 }
 
@@ -718,26 +730,32 @@ function ensurePwaInstallStyle() {
   style.textContent = `
 #${WOLF_PWA_BUTTON_ID} {
   position: fixed;
-  right: calc(16px + env(safe-area-inset-right, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  z-index: 99998;
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 10050;
   display: inline-flex;
   align-items: center;
   gap: 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 14px;
-  padding: 11px 14px;
-  background: linear-gradient(130deg, #11161d, #1c2430);
+  border-radius: 999px;
+  padding: 10px 14px 10px 12px;
+  min-height: 48px;
+  max-width: 214px;
+  overflow: hidden;
+  background: linear-gradient(130deg, rgba(17, 22, 29, 0.95), rgba(28, 36, 48, 0.96));
   color: #f5f8ff;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
   cursor: pointer;
   opacity: 1;
   transform: translateY(0);
   transition:
+    max-width 260ms ease,
+    gap 220ms ease,
+    padding 220ms ease,
     transform 220ms ease,
     box-shadow 220ms ease,
     opacity 200ms ease,
@@ -748,34 +766,82 @@ function ensurePwaInstallStyle() {
   pointer-events: none;
   transform: translateY(16px);
 }
+#${WOLF_PWA_BUTTON_ID}.is-compact {
+  max-width: 52px;
+  gap: 0;
+  padding-right: 12px;
+}
+#${WOLF_PWA_BUTTON_ID}.is-expanded {
+  max-width: 214px;
+  gap: 10px;
+  padding-right: 14px;
+}
 #${WOLF_PWA_BUTTON_ID}:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: rgba(245, 178, 42, 0.75);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4);
 }
 #${WOLF_PWA_BUTTON_ID}:active {
   transform: translateY(-1px) scale(0.99);
 }
+#${WOLF_PWA_BUTTON_ID}.is-compact:hover,
+#${WOLF_PWA_BUTTON_ID}.is-compact:focus-visible,
+#${WOLF_PWA_BUTTON_ID}.is-expanded {
+  max-width: 214px;
+  gap: 10px;
+  padding-right: 14px;
+}
 #${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(245, 178, 42, 0.18);
   box-shadow: inset 0 0 0 1px rgba(245, 178, 42, 0.28);
+  flex-shrink: 0;
 }
 #${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon svg {
   width: 14px;
   height: 14px;
 }
+#${WOLF_PWA_BUTTON_ID} .wolf-pwa-label {
+  white-space: nowrap;
+  opacity: 1;
+  max-width: 140px;
+  transform: translateX(0);
+  transition: opacity 220ms ease, max-width 220ms ease, transform 220ms ease;
+}
+#${WOLF_PWA_BUTTON_ID}.is-compact .wolf-pwa-label {
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(8px);
+}
+#${WOLF_PWA_BUTTON_ID}.is-compact:hover .wolf-pwa-label,
+#${WOLF_PWA_BUTTON_ID}.is-compact:focus-visible .wolf-pwa-label,
+#${WOLF_PWA_BUTTON_ID}.is-expanded .wolf-pwa-label {
+  opacity: 1;
+  max-width: 140px;
+  transform: translateX(0);
+}
+body.wolf-keyboard-open #${WOLF_PWA_BUTTON_ID} {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
 @media (max-width: 767px) {
   #${WOLF_PWA_BUTTON_ID} {
-    left: calc(12px + env(safe-area-inset-left, 0px));
     right: calc(12px + env(safe-area-inset-right, 0px));
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    justify-content: center;
+    max-width: 52px;
+    gap: 0;
+    padding: 10px 12px;
+  }
+  #${WOLF_PWA_BUTTON_ID} .wolf-pwa-label {
+    opacity: 0 !important;
+    max-width: 0 !important;
+    transform: translateX(8px) !important;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -798,7 +864,9 @@ function ensurePwaInstallButton() {
   button = document.createElement('button');
   button.id = WOLF_PWA_BUTTON_ID;
   button.type = 'button';
-  button.className = 'is-hidden';
+  button.className = 'is-hidden is-compact';
+  button.setAttribute('aria-label', WOLF_PWA_INSTALL_LABEL);
+  button.title = WOLF_PWA_INSTALL_LABEL;
   button.innerHTML = `
     <span class="wolf-pwa-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -810,36 +878,82 @@ function ensurePwaInstallButton() {
     <span class="wolf-pwa-label">${WOLF_PWA_INSTALL_LABEL}</span>
   `;
   button.addEventListener('click', onPwaInstallButtonClick);
+  button.addEventListener('pointerenter', () => {
+    clearPwaInstallCompactTimer();
+    setPwaInstallButtonExpanded(true);
+  });
+  button.addEventListener('pointerleave', () => {
+    schedulePwaInstallAutoCompact();
+  });
+  button.addEventListener('focus', () => {
+    clearPwaInstallCompactTimer();
+    setPwaInstallButtonExpanded(true);
+  });
+  button.addEventListener('blur', () => {
+    schedulePwaInstallAutoCompact();
+  });
   document.body.appendChild(button);
   return button;
+}
+
+function clearPwaInstallCompactTimer() {
+  if (!wolfPwaCompactTimer) return;
+  window.clearTimeout(wolfPwaCompactTimer);
+  wolfPwaCompactTimer = null;
+}
+
+function setPwaInstallButtonExpanded(expanded) {
+  const button = ensurePwaInstallButton();
+  button.classList.toggle('is-expanded', Boolean(expanded));
+  button.classList.toggle('is-compact', !expanded);
+}
+
+function schedulePwaInstallAutoCompact() {
+  clearPwaInstallCompactTimer();
+  wolfPwaCompactTimer = window.setTimeout(() => {
+    setPwaInstallButtonExpanded(false);
+  }, WOLF_PWA_BUTTON_AUTO_COMPACT_MS);
 }
 
 function setPwaInstallButtonLabel(label) {
   const button = ensurePwaInstallButton();
   const labelElement = button.querySelector('.wolf-pwa-label');
   if (labelElement) labelElement.textContent = label;
+  button.setAttribute('aria-label', label);
+  button.title = label;
 }
 
 function setPwaInstallButtonVisible(visible) {
   const button = ensurePwaInstallButton();
   button.classList.toggle('is-hidden', !visible);
+
+  if (!visible) {
+    clearPwaInstallCompactTimer();
+    setPwaInstallButtonExpanded(false);
+    return;
+  }
+
+  setPwaInstallButtonExpanded(true);
+  schedulePwaInstallAutoCompact();
 }
 
 function showPwaInstallTip(message) {
   if (typeof window.Toastify === 'function') {
-    window.Toastify({
-      text: message,
-      duration: 4500,
-      gravity: 'bottom',
-      position: 'center',
-      close: true,
-      style: {
-        background:
-          'linear-gradient(130deg, rgba(17,22,29,0.95), rgba(28,36,48,0.95))',
-        color: '#f5f8ff',
-        border: '1px solid rgba(245,178,42,0.35)',
-      },
-    }).showToast();
+    window
+      .Toastify({
+        text: message,
+        duration: 4500,
+        gravity: 'bottom',
+        position: 'center',
+        close: true,
+        style: {
+          background:
+            'linear-gradient(130deg, rgba(17,22,29,0.95), rgba(28,36,48,0.95))',
+          color: '#f5f8ff',
+          border: '1px solid rgba(245,178,42,0.35)',
+        },
+      })
+      .showToast();
     return;
   }
   window.alert(message);
@@ -920,8 +1034,10 @@ function startPwaInstallWatch() {
 
   if (isIosSafariBrowser()) {
     setPwaInstallButtonLabel(WOLF_PWA_IOS_LABEL);
-    setPwaInstallButtonVisible(true);
+  } else {
+    setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL);
   }
+  setPwaInstallButtonVisible(true);
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
