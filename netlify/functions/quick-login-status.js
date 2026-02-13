@@ -370,15 +370,16 @@ exports.handler = async (event) => {
       const requesterUaIsHashed = looksLikeSha256Hex(requesterUserAgentStored);
 
       if (requesterIpIsHashed || requesterUaIsHashed) {
-        if (requesterIpIsHashed && requesterIpStored !== consumerIpHash) {
-          return json(403, { error: 'Quick-login consumer IP mismatch' });
-        }
+        const ipMatches = requesterIpIsHashed && requesterIpStored === consumerIpHash;
+        const uaMatches =
+          requesterUaIsHashed && requesterUserAgentStored === consumerUserAgentHash;
 
-        if (
-          requesterUaIsHashed &&
-          requesterUserAgentStored !== consumerUserAgentHash
-        ) {
-          return json(403, { error: 'Quick-login consumer device mismatch' });
+        // Allow consume when at least one hashed identity signal still matches.
+        // User-Agent can change across requests due proxies/browser updates.
+        if (!ipMatches && !uaMatches) {
+          return json(403, {
+            error: 'Quick-login consumer identity mismatch',
+          });
         }
       } else {
         // Legacy plaintext fallback support

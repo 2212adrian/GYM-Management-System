@@ -315,7 +315,23 @@ window.wolfScanner = {
     if (!isConfirmed) return;
 
     const sessionResult = await window.supabaseClient?.auth?.getSession?.();
-    const currentSession = sessionResult?.data?.session || null;
+    let currentSession = sessionResult?.data?.session || null;
+
+    if (
+      currentSession?.refresh_token &&
+      typeof window.supabaseClient?.auth?.refreshSession === 'function'
+    ) {
+      try {
+        const refreshResult = await window.supabaseClient.auth.refreshSession({
+          refresh_token: currentSession.refresh_token,
+        });
+        if (!refreshResult?.error && refreshResult?.data?.session) {
+          currentSession = refreshResult.data.session;
+        }
+      } catch (_) {
+        // Keep original session if refresh fails; server will still validate.
+      }
+    }
 
     if (!currentSession?.access_token || !currentSession?.refresh_token) {
       throw new Error('No active authenticated session found for approval');

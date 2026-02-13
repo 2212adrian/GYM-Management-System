@@ -126,6 +126,80 @@ function extractRequestIdFromQrToken(qrToken) {
   return requestId;
 }
 
+async function resolveApproverSession(supabase, accessToken, refreshToken) {
+  let effectiveAccessToken = String(accessToken || '').trim();
+  let effectiveRefreshToken = String(refreshToken || '').trim();
+  let user = null;
+
+  // Best path: setSession can auto-refresh expired access tokens.
+  const setSessionResult = await supabase.auth.setSession({
+    access_token: effectiveAccessToken,
+    refresh_token: effectiveRefreshToken,
+  });
+  if (!setSessionResult.error && setSessionResult.data?.session?.user) {
+    user = setSessionResult.data.session.user;
+    effectiveAccessToken =
+      setSessionResult.data.session.access_token || effectiveAccessToken;
+    effectiveRefreshToken =
+      setSessionResult.data.session.refresh_token || effectiveRefreshToken;
+    return {
+      user,
+      accessToken: effectiveAccessToken,
+      refreshToken: effectiveRefreshToken,
+    };
+  }
+
+  // First try the provided access token directly.
+  const directUser = await supabase.auth.getUser(effectiveAccessToken);
+  if (!directUser.error && directUser.data?.user) {
+    user = directUser.data.user;
+    return {
+      user,
+      accessToken: effectiveAccessToken,
+      refreshToken: effectiveRefreshToken,
+    };
+  }
+
+  // Fallback: refresh session using refresh token, then re-validate user.
+  const refreshed = await supabase.auth.refreshSession({
+    refresh_token: effectiveRefreshToken,
+  });
+  if (
+    refreshed.error ||
+    !refreshed.data?.session?.access_token ||
+    !refreshed.data?.session?.refresh_token
+  ) {
+    const reasons = [
+      setSessionResult.error?.message,
+      directUser.error?.message,
+      refreshed.error?.message,
+    ]
+      .filter(Boolean)
+      .join(' | ');
+    return {
+      error: reasons || 'Approver session is invalid or expired',
+    };
+  }
+
+  effectiveAccessToken = refreshed.data.session.access_token;
+  effectiveRefreshToken = refreshed.data.session.refresh_token;
+
+  const refreshedUser = await supabase.auth.getUser(effectiveAccessToken);
+  if (refreshedUser.error || !refreshedUser.data?.user) {
+    return {
+      error:
+        refreshedUser.error?.message || 'Approver session is invalid or expired',
+    };
+  }
+
+  user = refreshedUser.data.user;
+  return {
+    user,
+    accessToken: effectiveAccessToken,
+    refreshToken: effectiveRefreshToken,
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, {});
   if (event.httpMethod !== 'POST') {
@@ -194,14 +268,22 @@ exports.handler = async (event) => {
       return json(410, { error: 'Quick-login request expired' });
     }
 
-    const { data: approverData, error: approverError } =
-      await supabase.auth.getUser(accessToken);
-
-    if (approverError || !approverData?.user) {
-      return json(401, { error: 'Approver session is invalid or expired' });
+    const approverSession = await resolveApproverSession(
+      supabase,
+      accessToken,
+      refreshToken,
+    );
+    if (approverSession.error || !approverSession.user) {
+      console.warn(
+        'Quick-login approval rejected: approver session invalid',
+        approverSession.error || 'unknown',
+      );
+      return json(401, {
+        error: approverSession.error || 'Approver session is invalid or expired',
+      });
     }
 
-    const approverUser = approverData.user;
+    const approverUser = approverSession.user;
     if (approverUser.user_metadata?.role !== 'admin') {
       return json(403, { error: 'Only admin accounts can approve quick-login' });
     }
@@ -214,8 +296,8 @@ exports.handler = async (event) => {
         approved_at: new Date().toISOString(),
         approved_by_auth_user_id: approverUser.id,
         approved_by_email: approverUser.email || null,
-        approved_access_token: accessToken,
-        approved_refresh_token: refreshToken,
+        approved_access_token: approverSession.accessToken,
+        approved_refresh_token: approverSession.refreshToken,
         approved_by_ip: hashIp(getClientIp(event)),
         approved_by_user_agent: hashUserAgent(getUserAgent(event)),
       })
