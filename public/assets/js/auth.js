@@ -1195,6 +1195,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `Wait for ${safeSeconds}s to resend code`;
   }
 
+  function isErrPrefixed(text) {
+    return /^\[ERR_[A-Z0-9_]+\]/i.test(String(text || '').trim());
+  }
+
+  function getServerErrorMessage(payload, fallbackMessage = '') {
+    if (!payload || typeof payload !== 'object') {
+      return String(fallbackMessage || '').trim();
+    }
+
+    const raw = String(payload.error || payload.message || '').trim();
+    if (isErrPrefixed(raw)) return raw;
+
+    const code = String(payload.errorCode || '').trim();
+    const label = String(payload.errorLabel || '').trim();
+    if (code && label) {
+      const detail =
+        raw || String(payload.errorMeaning || '').trim() || fallbackMessage;
+      return `[ERR_${code}] ${label}: ${String(detail || '').trim()}`;
+    }
+
+    return raw || String(fallbackMessage || '').trim();
+  }
+
   function startOtpCountdown(seconds) {
     if (otpTimerInterval) clearInterval(otpTimerInterval);
     const safeSeconds = Math.max(0, Number(seconds || 0));
@@ -1440,12 +1463,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           await loadVerifyFragment(cooldownNow);
         }
       } else {
+        let serverPayload = null;
         let serverMsg = '';
         let waitSecs = 0;
         try {
-          const errJson = await res.json();
-          serverMsg = errJson?.error || '';
-          waitSecs = Number(errJson?.remainingTime || 0);
+          serverPayload = await res.json();
+          serverMsg = getServerErrorMessage(
+            serverPayload,
+            'Server error while requesting OTP.',
+          );
+          waitSecs = Number(serverPayload?.remainingTime || 0);
         } catch (_) {
           // ignore parse failures
         }
@@ -1455,7 +1482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (res.status === 404) {
           if (waitSecs > 0) startOtpCountdown(waitSecs);
           showResetOutput(
-            '[ERR_401] Identification failed. Email unauthorized.',
+            serverMsg || '[ERR_404] RESOURCE_MISSING: Email unauthorized.',
           );
         } else if (res.status === 429) {
           const isAntiSpam = String(serverMsg || '').includes(
@@ -1469,10 +1496,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             { color: 'var(--wolf-red)', autoHide: false },
           );
         } else if (res.status === 400) {
-          showResetOutput(`[ERR_400] ${serverMsg || 'Invalid request.'}`);
+          showResetOutput(
+            serverMsg || '[ERR_400] REQUEST_INVALID: Invalid request.',
+          );
         } else {
           showResetOutput(
-            `[ERR_500] ${serverMsg || 'Server error while requesting OTP.'}`,
+            serverMsg || '[ERR_500] SYSTEM_FAULT: Server error while requesting OTP.',
           );
         }
         isProcessingOtp = false;
@@ -1581,11 +1610,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
           });
         } else {
-          await res.json();
+          let errPayload = null;
+          try {
+            errPayload = await res.json();
+          } catch (_) {
+            errPayload = null;
+          }
+
           wolfAudio.play('denied');
-          showResetOutput('[ERR_602] Security key invalid or expired.', {
-            targetEl: localOutput,
-          });
+          const serverMsg = getServerErrorMessage(
+            errPayload,
+            'Security key invalid or expired.',
+          );
+          showResetOutput(
+            serverMsg || '[ERR_602] KEY_EXPIRED: Security key invalid or expired.',
+            {
+              targetEl: localOutput,
+            },
+          );
           resetBtn.disabled = false;
           resetBtn.textContent = 'RESTORE SYSTEM ACCESS';
         }

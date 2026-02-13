@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('node:crypto');
+const { withErrorCode } = require('./error-codes');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,7 +29,7 @@ function json(statusCode, body) {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withErrorCode(statusCode, body)),
   };
 }
 
@@ -244,7 +245,10 @@ exports.handler = async (event) => {
     try {
       payload = parseBody(event.body);
     } catch (_) {
-      return json(400, { error: 'Invalid request body JSON' });
+      return json(400, {
+        error: 'Invalid request body JSON',
+        errorKey: 'REQUEST_INVALID',
+      });
     }
 
     const qrToken = String(payload.qrToken || '').trim();
@@ -259,7 +263,10 @@ exports.handler = async (event) => {
       try {
         qrDetails = extractQuickLoginQrDetails(qrToken);
       } catch (err) {
-        return json(400, { error: err.message || 'Invalid quick-login QR token' });
+        return json(400, {
+          error: err.message || 'Invalid quick-login QR token',
+          errorKey: 'QL_TOKEN_INVALID',
+        });
       }
       if (!requestId) requestId = qrDetails.requestId;
       if (isEmptyPreviewContext(previewContextInput) && qrDetails.previewContext) {
@@ -299,7 +306,12 @@ exports.handler = async (event) => {
       .maybeSingle();
 
     if (rowError) return json(500, { error: rowError.message });
-    if (!row) return json(404, { error: 'Quick-login request not found' });
+    if (!row) {
+      return json(404, {
+        error: 'Quick-login request not found',
+        errorKey: 'QL_SESSION_INVALID',
+      });
+    }
 
     // Only the requester device (consume=true) must present the request secret.
     // Scanner preview checks (consume=false) use requestId + signed preview context.
@@ -313,7 +325,10 @@ exports.handler = async (event) => {
         requestSecret,
       );
       if (!isCredentialValid) {
-        return json(401, { error: 'Invalid quick-login credentials' });
+        return json(401, {
+          error: 'Invalid quick-login credentials',
+          errorKey: 'QL_SESSION_INVALID',
+        });
       }
     }
 
@@ -354,6 +369,7 @@ exports.handler = async (event) => {
         requestId,
         status: 'expired',
         error: 'Quick-login request expired',
+        errorKey: 'KEY_EXPIRED',
       });
     }
 
@@ -379,6 +395,7 @@ exports.handler = async (event) => {
         if (!ipMatches && !uaMatches) {
           return json(403, {
             error: 'Quick-login consumer identity mismatch',
+            errorKey: 'QL_DEVICE_MISMATCH',
           });
         }
       } else {
@@ -388,7 +405,10 @@ exports.handler = async (event) => {
           !isLocalOrUnknownIp(consumerIp) &&
           requesterIpStored !== consumerIp
         ) {
-          return json(403, { error: 'Quick-login consumer IP mismatch' });
+          return json(403, {
+            error: 'Quick-login consumer IP mismatch',
+            errorKey: 'QL_DEVICE_MISMATCH',
+          });
         }
 
         if (
@@ -396,7 +416,10 @@ exports.handler = async (event) => {
           consumerUserAgent &&
           requesterUserAgentStored !== consumerUserAgent
         ) {
-          return json(403, { error: 'Quick-login consumer device mismatch' });
+          return json(403, {
+            error: 'Quick-login consumer device mismatch',
+            errorKey: 'QL_DEVICE_MISMATCH',
+          });
         }
       }
 
@@ -405,7 +428,11 @@ exports.handler = async (event) => {
       const consumedAtIso = new Date().toISOString();
 
       if (!accessToken || !refreshToken) {
-        return json(410, { status: 'consumed', error: 'Approval already consumed' });
+        return json(410, {
+          status: 'consumed',
+          error: 'Approval already consumed',
+          errorKey: 'KEY_EXPIRED',
+        });
       }
 
       await supabase

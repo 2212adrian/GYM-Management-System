@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
+import errorCodes from './error-codes.js';
+
+const { withErrorCode } = errorCodes;
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,24 +19,24 @@ export async function handler(event, context) {
     'Content-Type': 'application/json',
   };
 
+  function respond(statusCode, payload) {
+    return {
+      statusCode,
+      headers,
+      body: JSON.stringify(withErrorCode(statusCode, payload)),
+    };
+  }
+
   try {
     if (event.httpMethod === 'OPTIONS') {
       return { statusCode: 200, headers, body: '' };
     }
     if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers,
-        body: JSON.stringify({ error: 'Method not allowed' }),
-      };
+      return respond(405, { error: 'Method not allowed' });
     }
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Missing Supabase server env vars' }),
-      };
+      return respond(500, { error: 'Missing Supabase server env vars' });
     }
 
     const otpHashSecret = process.env.OTP_HASH_SECRET || serviceRoleKey;
@@ -46,11 +49,7 @@ export async function handler(event, context) {
           ? JSON.parse(event.body)
           : event.body || {};
     } catch (_) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid request body JSON' }),
-      };
+      return respond(400, { error: 'Invalid request body JSON' });
     }
 
     const email = String(payload.email || '')
@@ -59,59 +58,53 @@ export async function handler(event, context) {
     const otp = String(payload.otp || '').trim();
     const newPassword = String(payload.newPassword || '');
     if (!email || !otp || !newPassword) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Email, OTP, and new password required' }),
-      };
+      return respond(400, { error: 'Email, OTP, and new password required' });
     }
 
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
     if (error) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: error.message }),
-      };
+      return respond(500, { error: error.message });
     }
 
     const user = users.find(u => u.email === email);
     if (!user) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'User not found' }),
-      };
+      return respond(404, { error: 'User not found' });
     }
 
     const otpHash = hashOtp(user.id, otp, otpHashSecret);
 
-    const { data: otpRecord } = await supabase
+    const { data: otpRecord, error: otpLookupError } = await supabase
       .from('password_reset_otp')
-      .select('*')
+      .select('id, expires_at')
       .eq('user_id', user.id)
       // Temporary compatibility for legacy plaintext OTP rows.
       .or(`otp_code.eq.${otpHash},otp_code.eq.${otp}`)
-      .gte('expires_at', new Date().toISOString())
+      .order('expires_at', { ascending: false })
       .maybeSingle();
 
+    if (otpLookupError) {
+      return respond(500, { error: otpLookupError.message });
+    }
+
     if (!otpRecord) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid or expired OTP' }),
-      };
+      return respond(400, {
+        error: 'Invalid OTP',
+        errorKey: 'KEY_INVALID',
+      });
+    }
+
+    if (new Date(otpRecord.expires_at).getTime() < Date.now()) {
+      return respond(410, {
+        error: 'OTP has expired',
+        errorKey: 'KEY_EXPIRED',
+      });
     }
 
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       password: newPassword
     });
     if (updateError) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: updateError.message }),
-      };
+      return respond(500, { error: updateError.message });
     }
 
     // Invalidate the used OTP and clear any leftover OTP rows for the same user.
@@ -120,23 +113,11 @@ export async function handler(event, context) {
       .delete()
       .eq('user_id', user.id);
     if (deleteOtpError) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: deleteOtpError.message }),
-      };
+      return respond(500, { error: deleteOtpError.message });
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ message: 'Password reset successfully!' }),
-    };
+    return respond(200, { message: 'Password reset successfully!' });
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message }),
-    };
+    return respond(500, { error: err.message });
   }
 }

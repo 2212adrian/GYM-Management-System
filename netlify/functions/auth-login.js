@@ -1,12 +1,24 @@
 const { createClient } = require('@supabase/supabase-js');
+const { withErrorCode } = require('./error-codes');
+
+function json(statusCode, body, extraHeaders = {}) {
+  const payload = withErrorCode(statusCode, body);
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
+    body: JSON.stringify(payload),
+  };
+}
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod !== 'POST') {
+    return json(405, { error: 'Method Not Allowed' });
+  }
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Missing Supabase env vars' }),
-    };
+    return json(500, { error: 'Missing Supabase env vars' });
   }
 
   const supabase = createClient(
@@ -19,7 +31,7 @@ exports.handler = async (event) => {
   // 1. Log in via Supabase Admin (Server-side)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) return { statusCode: 401, body: JSON.stringify({ error: error.message }) };
+  if (error) return json(401, { error: error.message });
 
   const token = data.session.access_token;
   const refreshToken = data.session.refresh_token;
@@ -31,12 +43,11 @@ exports.handler = async (event) => {
     `sb-refresh-token=${refreshToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`
   ];
 
-  return {
-    statusCode: 200,
-    headers: {
-      "Set-Cookie": cookieHeader, // Multi-value headers
-      "Content-Type": "application/json"
+  return json(
+    200,
+    { user: data.user },
+    {
+      'Set-Cookie': cookieHeader, // Multi-value headers
     },
-    body: JSON.stringify({ user: data.user })
-  };
+  );
 };

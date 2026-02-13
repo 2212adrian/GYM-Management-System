@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('node:crypto');
+const { withErrorCode } = require('./error-codes');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -128,24 +129,24 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
 
+  function respond(statusCode, payload) {
+    return {
+      statusCode,
+      headers,
+      body: JSON.stringify(withErrorCode(statusCode, payload)),
+    };
+  }
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
+    return respond(405, { error: 'Method not allowed' });
   }
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Missing Supabase server env vars' }),
-    };
+    return respond(500, { error: 'Missing Supabase server env vars' });
   }
 
   const hashSecret = process.env.PRODUCT_HASH_SECRET || serviceRoleKey;
@@ -159,7 +160,9 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Invalid request body JSON' }),
+        body: JSON.stringify(
+          withErrorCode(400, { error: 'Invalid request body JSON' }),
+        ),
       };
     }
 
@@ -175,27 +178,15 @@ exports.handler = async (event) => {
     const qty = Number(payload.qty);
 
     if (!Number.isFinite(price) || price < 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid price value' }),
-      };
+      return respond(400, { error: 'Invalid price value' });
     }
 
     if (!Number.isInteger(qty) || qty < 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid quantity value' }),
-      };
+      return respond(400, { error: 'Invalid quantity value' });
     }
 
     if (!productId && (!sku || !name)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing required product fields' }),
-      };
+      return respond(400, { error: 'Missing required product fields' });
     }
 
     let finalProductId = productId;
@@ -234,11 +225,7 @@ exports.handler = async (event) => {
 
       if (existingErr) throw existingErr;
       if (!existing) {
-        return {
-          statusCode: 404,
-          headers,
-          body: JSON.stringify({ error: 'Product not found' }),
-        };
+        return respond(404, { error: 'Product not found' });
       }
 
       if (createSale) {
@@ -330,31 +317,23 @@ exports.handler = async (event) => {
       console.warn('Audit insert warning:', auditErr.message);
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        message: createSale
-          ? 'Product and sale write secured'
-          : didUpdateProduct
-            ? 'Product update secured'
-            : didCreateProduct
-              ? 'Product write secured'
-              : 'Product request secured',
-        product: productRow,
-        sale,
-      }),
-    };
+    return respond(200, {
+      message: createSale
+        ? 'Product and sale write secured'
+        : didUpdateProduct
+          ? 'Product update secured'
+          : didCreateProduct
+            ? 'Product write secured'
+            : 'Product request secured',
+      product: productRow,
+      sale,
+    });
   } catch (error) {
     const message = error?.message || 'Unexpected server error';
     const duplicateKey =
       typeof message === 'string' &&
       /duplicate key value violates unique constraint/i.test(message);
 
-    return {
-      statusCode: duplicateKey ? 409 : 500,
-      headers,
-      body: JSON.stringify({ error: message }),
-    };
+    return respond(duplicateKey ? 409 : 500, { error: message });
   }
 };

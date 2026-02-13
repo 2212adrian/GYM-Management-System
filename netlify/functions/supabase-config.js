@@ -1,3 +1,13 @@
+const { withErrorCode } = require('./error-codes');
+
+function json(statusCode, headers, payload) {
+  return {
+    statusCode,
+    headers,
+    body: JSON.stringify(withErrorCode(statusCode, payload)),
+  };
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -10,11 +20,7 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
+    return json(405, headers, { error: 'Method not allowed' });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -25,22 +31,14 @@ exports.handler = async (event) => {
     if (!supabaseUrl) missing.push('SUPABASE_URL');
     if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY (or SUPABASE_KEY)');
 
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Supabase runtime config is missing on server',
-        missing,
-      }),
-    };
+    return json(500, headers, {
+      error: 'Supabase runtime config is missing on server',
+      missing,
+    });
   }
 
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({
-      supabaseUrl,
-      supabaseAnonKey,
-    }),
-  };
+  return json(200, headers, {
+    supabaseUrl,
+    supabaseAnonKey,
+  });
 };

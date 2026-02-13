@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('node:crypto');
+const { withErrorCode } = require('./error-codes');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -34,7 +35,7 @@ function json(statusCode, body) {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withErrorCode(statusCode, body)),
   };
 }
 
@@ -354,7 +355,10 @@ exports.handler = async (event) => {
     try {
       payload = parseBody(event.body);
     } catch (_) {
-      return json(400, { error: 'Invalid request body JSON' });
+      return json(400, {
+        error: 'Invalid request body JSON',
+        errorKey: 'REQUEST_INVALID',
+      });
     }
 
     const forceNew = Boolean(payload.forceNew);

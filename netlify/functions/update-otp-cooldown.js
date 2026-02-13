@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('node:crypto');
+const { withErrorCode } = require('./error-codes');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey =
@@ -42,28 +43,29 @@ exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json',
   };
+
+  function respond(statusCode, payload) {
+    return {
+      statusCode,
+      headers,
+      body: JSON.stringify(withErrorCode(statusCode, payload)),
+    };
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+    return respond(405, { error: 'Method not allowed' });
   }
 
   try {
     if (!supabaseUrl || !supabaseKey) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Missing Supabase env vars' }),
-      };
+      return respond(500, { error: 'Missing Supabase env vars' });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -86,25 +88,17 @@ exports.handler = async (event, context) => {
       throw error;
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: 'Cooldown updated',
-        ipHash: clientIpHash
-      })
-    };
+    return respond(200, {
+      success: true,
+      message: 'Cooldown updated',
+      ipHash: clientIpHash,
+    });
 
   } catch (error) {
     console.error('Cooldown update error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Failed to update cooldown',
-        success: false
-      })
-    };
+    return respond(500, {
+      error: 'Failed to update cooldown',
+      success: false,
+    });
   }
 };

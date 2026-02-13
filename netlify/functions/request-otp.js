@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import crypto from 'node:crypto';
+import errorCodes from './error-codes.js';
+
+const { withErrorCode } = errorCodes;
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -71,31 +74,27 @@ export async function handler(event, context) {
     'Content-Type': 'application/json',
   };
 
+  function respond(statusCode, payload) {
+    return {
+      statusCode,
+      headers,
+      body: JSON.stringify(withErrorCode(statusCode, payload)),
+    };
+  }
+
   try {
     if (event.httpMethod === 'OPTIONS') {
       return { statusCode: 200, headers, body: '' };
     }
     if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers,
-        body: JSON.stringify({ error: 'Method not allowed' }),
-      };
+      return respond(405, { error: 'Method not allowed' });
     }
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Missing Supabase server env vars' }),
-      };
+      return respond(500, { error: 'Missing Supabase server env vars' });
     }
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Missing SMTP env vars' }),
-      };
+      return respond(500, { error: 'Missing SMTP env vars' });
     }
 
     const otpHashSecret = process.env.OTP_HASH_SECRET || serviceRoleKey;
@@ -116,11 +115,7 @@ export async function handler(event, context) {
 
     if (cooldownRead.error) {
       if (!isMissingCooldownColumnsError(cooldownRead.error)) {
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ error: cooldownRead.error.message }),
-        };
+        return respond(500, { error: cooldownRead.error.message });
       }
 
       hasAdvancedCooldownColumns = false;
@@ -131,11 +126,7 @@ export async function handler(event, context) {
         .maybeSingle();
 
       if (legacyRead.error) {
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ error: legacyRead.error.message }),
-        };
+        return respond(500, { error: legacyRead.error.message });
       }
       cooldownRow = legacyRead.data;
     } else {
@@ -215,30 +206,22 @@ export async function handler(event, context) {
           );
 
         if (blockedWriteError) {
-          return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ error: blockedWriteError.message }),
-          };
+          return respond(500, { error: blockedWriteError.message });
         }
       }
 
       const antiSpamTriggered = hasAdvancedCooldownColumns && cooldownStartsNow;
-      return {
-        statusCode: 429,
-        headers,
-        body: JSON.stringify({
-          error: antiSpamTriggered
-            ? 'OTP cooldown active'
-            : resendRemainingTime >= abuseRemainingTime
-              ? 'Resend cooldown active'
-              : 'OTP cooldown active',
-          remainingTime: antiSpamTriggered
-            ? OTP_COOLDOWN_SECONDS
-            : activeRemainingTime,
-          maxAttempts: OTP_MAX_ATTEMPTS,
-        }),
-      };
+      return respond(429, {
+        error: antiSpamTriggered
+          ? 'OTP cooldown active'
+          : resendRemainingTime >= abuseRemainingTime
+            ? 'Resend cooldown active'
+            : 'OTP cooldown active',
+        remainingTime: antiSpamTriggered
+          ? OTP_COOLDOWN_SECONDS
+          : activeRemainingTime,
+        maxAttempts: OTP_MAX_ATTEMPTS,
+      });
     }
 
     let cooldownWriteError = null;
@@ -273,11 +256,7 @@ export async function handler(event, context) {
     }
 
     if (cooldownWriteError) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: cooldownWriteError.message }),
-      };
+      return respond(500, { error: cooldownWriteError.message });
     }
 
     const transporter = nodemailer.createTransport({
@@ -297,47 +276,31 @@ export async function handler(event, context) {
           ? JSON.parse(event.body)
           : event.body || {};
     } catch (_) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid request body JSON' }),
-      };
+      return respond(400, { error: 'Invalid request body JSON' });
     }
 
     const email = String(payload.email || '')
       .trim()
       .toLowerCase();
     if (!email) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Email is required' }),
-      };
+      return respond(400, { error: 'Email is required' });
     }
 
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
     if (error) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: error.message }),
-      };
+      return respond(500, { error: error.message });
     }
 
     const user = users.find(u => u.email === email);
     if (!user) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({
-          error: 'User not found',
-          remainingTime: Math.max(
-            OTP_RESEND_COOLDOWN_SECONDS,
-            cooldownStartsNow ? OTP_COOLDOWN_SECONDS : 0,
-          ),
-          maxAttempts: OTP_MAX_ATTEMPTS,
-        }),
-      };
+      return respond(404, {
+        error: 'User not found',
+        remainingTime: Math.max(
+          OTP_RESEND_COOLDOWN_SECONDS,
+          cooldownStartsNow ? OTP_COOLDOWN_SECONDS : 0,
+        ),
+        maxAttempts: OTP_MAX_ATTEMPTS,
+      });
     }
 
     const otp = generateOtp();
@@ -351,11 +314,7 @@ export async function handler(event, context) {
       .single();
 
     if (otpInsertError) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: otpInsertError.message }),
-      };
+      return respond(500, { error: otpInsertError.message });
     }
 
     const storedOtp = insertedOtp?.otp_code || '';
@@ -363,13 +322,9 @@ export async function handler(event, context) {
     if (!isSha256Hex) {
       // Safety guard: do not keep plaintext OTPs if DB trigger/rule overrides the value.
       await supabase.from('password_reset_otp').delete().eq('id', insertedOtp.id);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'Unsafe OTP storage detected (expected SHA-256 hash)',
-        }),
-      };
+      return respond(500, {
+        error: 'Unsafe OTP storage detected (expected SHA-256 hash)',
+      });
     }
 
     await transporter.sendMail({
@@ -379,28 +334,20 @@ export async function handler(event, context) {
       text: `Your OTP code is: ${otp} (expires in 5 minutes)`
     });
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        message: 'OTP sent to email!',
-        cooldownStarted: true,
-        remainingTime: Math.max(
-          OTP_RESEND_COOLDOWN_SECONDS,
-          cooldownStartsNow ? OTP_COOLDOWN_SECONDS : 0,
-        ),
-        attemptsLeft: hasAdvancedCooldownColumns
-          ? cooldownStartsNow
-            ? 0
-            : Math.max(0, OTP_MAX_ATTEMPTS - nextAttempts)
-          : null,
-      }),
-    };
+    return respond(200, {
+      message: 'OTP sent to email!',
+      cooldownStarted: true,
+      remainingTime: Math.max(
+        OTP_RESEND_COOLDOWN_SECONDS,
+        cooldownStartsNow ? OTP_COOLDOWN_SECONDS : 0,
+      ),
+      attemptsLeft: hasAdvancedCooldownColumns
+        ? cooldownStartsNow
+          ? 0
+          : Math.max(0, OTP_MAX_ATTEMPTS - nextAttempts)
+        : null,
+    });
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message }),
-    };
+    return respond(500, { error: err.message });
   }
 }

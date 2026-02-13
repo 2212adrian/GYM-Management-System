@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('node:crypto');
+const { withErrorCode } = require('./error-codes');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,7 +29,7 @@ function json(statusCode, body) {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withErrorCode(statusCode, body)),
   };
 }
 
@@ -177,7 +178,10 @@ exports.handler = async (event) => {
     try {
       payload = parseBody(event.body);
     } catch (_) {
-      return json(400, { error: 'Invalid request body JSON' });
+      return json(400, {
+        error: 'Invalid request body JSON',
+        errorKey: 'REQUEST_INVALID',
+      });
     }
 
     const qrToken = String(payload.qrToken || '').trim();
@@ -189,11 +193,17 @@ exports.handler = async (event) => {
       try {
         const requestIdFromQr = extractRequestIdFromQrToken(qrToken);
         if (requestId && requestId !== requestIdFromQr) {
-          return json(400, { error: 'requestId mismatch with qrToken payload' });
+          return json(400, {
+            error: 'requestId mismatch with qrToken payload',
+            errorKey: 'QL_TOKEN_INVALID',
+          });
         }
         requestId = requestIdFromQr;
       } catch (err) {
-        return json(400, { error: err.message || 'Invalid quick-login QR token' });
+        return json(400, {
+          error: err.message || 'Invalid quick-login QR token',
+          errorKey: 'QL_TOKEN_INVALID',
+        });
       }
     }
 
@@ -210,7 +220,12 @@ exports.handler = async (event) => {
       .maybeSingle();
 
     if (rowError) return json(500, { error: rowError.message });
-    if (!row) return json(404, { error: 'Quick-login request not found' });
+    if (!row) {
+      return json(404, {
+        error: 'Quick-login request not found',
+        errorKey: 'QL_SESSION_INVALID',
+      });
+    }
 
     if (row.status !== 'pending') {
       return json(409, { error: `Quick-login request is ${row.status}` });
@@ -240,12 +255,16 @@ exports.handler = async (event) => {
       );
       return json(401, {
         error: approverSession.error || 'Approver session is invalid or expired',
+        errorKey: 'QL_SESSION_INVALID',
       });
     }
 
     const approverUser = approverSession.user;
     if (approverUser.user_metadata?.role !== 'admin') {
-      return json(403, { error: 'Only admin accounts can approve quick-login' });
+      return json(403, {
+        error: 'Only admin accounts can approve quick-login',
+        errorKey: 'ACCESS_DENIED',
+      });
     }
 
     const { error: updateError } = await supabaseAdmin
