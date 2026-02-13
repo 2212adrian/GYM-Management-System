@@ -130,9 +130,13 @@ async function hashAssetFilenames() {
     const fileBuffer = await fs.readFile(resolvedPath);
     const hash = createHash("sha256").update(fileBuffer).digest("hex").slice(0, 12);
     const parsed = path.parse(resolvedPath);
-    const hashedFilename = `${parsed.name}.${hash}${parsed.ext}`;
+    const hashedFilename = `${hash}${parsed.ext}`;
     const hashedPath = path.join(parsed.dir, hashedFilename);
-    await fs.rename(resolvedPath, hashedPath);
+    if (await fileExists(hashedPath)) {
+      await fs.rm(resolvedPath, { force: true });
+    } else {
+      await fs.rename(resolvedPath, hashedPath);
+    }
     hashedByAbsolutePath.set(resolvedPath, hashedFilename);
   }
 
