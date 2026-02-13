@@ -55,23 +55,49 @@ function wolfHashText(input) {
   return (hash >>> 0).toString(16);
 }
 
-async function fetchCurrentPageSignature() {
-  const basePath = `${window.location.pathname}${window.location.search}`;
-  const joiner = basePath.includes('?') ? '&' : '?';
-  const url = `${basePath}${joiner}_vchk=${Date.now()}`;
-  const res = await fetch(url, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`Update check failed (${res.status})`);
+async function fetchNoStoreText(url, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const joiner = url.includes('?') ? '&' : '?';
+    const probeUrl = `${url}${joiner}_vchk=${Date.now()}`;
+    const res = await fetch(probeUrl, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Probe failed (${res.status}) for ${url}`);
+    }
+    return await res.text();
+  } finally {
+    clearTimeout(timeout);
   }
-  const html = await res.text();
-  return wolfHashText(html);
+}
+
+async function fetchCurrentPageSignature() {
+  const probes = [
+    '/asset-manifest.json',
+    '/assets/js/utils/system-config.js',
+    `${window.location.pathname}${window.location.search}`,
+    '/index.html',
+  ];
+
+  for (const probe of probes) {
+    try {
+      const text = await fetchNoStoreText(probe);
+      if (text) return wolfHashText(text);
+    } catch (_) {
+      // Try the next probe; some routes/files may not exist in every context.
+    }
+  }
+
+  throw new Error('Update check failed for all probes');
 }
 
 function ensureUpdateBannerStyle() {
@@ -164,47 +190,55 @@ window.showUpdateBanner = showUpdateBanner;
 window.newVersionAvailable = false;
 
 async function checkForNewVersion() {
-  if (window.newVersionAvailable) return;
   try {
     const latestSignature = await fetchCurrentPageSignature();
     if (!wolfKnownPageSignature) {
       wolfKnownPageSignature = latestSignature;
+      window.newVersionAvailable = false;
       return;
     }
-    if (latestSignature !== wolfKnownPageSignature) {
-      window.newVersionAvailable = true;
-      wolfPendingUpdateSignature = latestSignature;
-      let dismissedSignature = '';
-      try {
-        dismissedSignature =
-          window.sessionStorage.getItem(WOLF_UPDATE_DISMISS_KEY) || '';
-      } catch (_) {
-        dismissedSignature = '';
-      }
-      if (dismissedSignature === latestSignature) {
-        return;
-      }
-      if (window.newVersionAvailable) {
-        showUpdateBanner(
-          'A newer version is available. Click to refresh.',
-          () => {
-            window.location.reload();
-          },
-          () => {
-            try {
-              if (wolfPendingUpdateSignature) {
-                window.sessionStorage.setItem(
-                  WOLF_UPDATE_DISMISS_KEY,
-                  wolfPendingUpdateSignature,
-                );
-              }
-            } catch (_) {
-              // ignore storage failures
-            }
-          },
-        );
-      }
+
+    const hasNewVersion = latestSignature !== wolfKnownPageSignature;
+    window.newVersionAvailable = hasNewVersion;
+    if (!hasNewVersion) {
+      wolfPendingUpdateSignature = null;
+      dismissUpdateBanner();
+      return;
     }
+
+    wolfPendingUpdateSignature = latestSignature;
+    let dismissedSignature = '';
+    try {
+      dismissedSignature =
+        window.sessionStorage.getItem(WOLF_UPDATE_DISMISS_KEY) || '';
+    } catch (_) {
+      dismissedSignature = '';
+    }
+    if (dismissedSignature === latestSignature) {
+      dismissUpdateBanner();
+      return;
+    }
+
+    if (window.newVersionAvailable) {
+      showUpdateBanner(
+        'A newer version is available. Click to refresh.',
+        () => {
+          window.location.reload();
+        },
+        () => {
+          try {
+            if (wolfPendingUpdateSignature) {
+              window.sessionStorage.setItem(
+                WOLF_UPDATE_DISMISS_KEY,
+                wolfPendingUpdateSignature,
+              );
+            }
+          } catch (_) {
+            // ignore storage failures
+          }
+        },
+      );
+      }
   } catch (_) {
     // Ignore transient network/CDN errors during update checks.
   }
@@ -359,7 +393,7 @@ async function pingInternet() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), WOLF_NETWORK_CHECK_TIMEOUT_MS);
   try {
-    const res = await fetch(`/favicon.ico?_netchk=${Date.now()}`, {
+    await fetch(`/assets/images/favicon.ico?_netchk=${Date.now()}`, {
       method: 'GET',
       cache: 'no-store',
       signal: controller.signal,
@@ -368,7 +402,8 @@ async function pingInternet() {
         Pragma: 'no-cache',
       },
     });
-    return res.ok;
+    // Any resolved response means network path to server is alive (even 3xx/4xx).
+    return true;
   } catch (_) {
     return false;
   } finally {
@@ -380,10 +415,8 @@ async function evaluateNetworkState() {
   if (wolfNetworkCheckInFlight) return;
   wolfNetworkCheckInFlight = true;
   try {
-    let online = navigator.onLine;
-    if (online) {
-      online = await pingInternet();
-    }
+    // Use active probe as source of truth to avoid false offline/online events.
+    const online = await pingInternet();
 
     if (online !== wolfNetworkIsOnline) {
       wolfNetworkIsOnline = online;
