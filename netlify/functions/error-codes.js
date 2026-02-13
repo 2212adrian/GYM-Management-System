@@ -79,6 +79,26 @@ const ERROR_CODES = Object.freeze({
     label: 'QL_DEVICE_MISMATCH',
     meaning: 'Quick-login requester device does not match.',
   },
+  STOCK_EMPTY: {
+    code: '801',
+    label: 'STOCK_EMPTY',
+    meaning: 'Requested product is out of stock.',
+  },
+  STOCK_LIMIT: {
+    code: '802',
+    label: 'STOCK_LIMIT',
+    meaning: 'Requested quantity exceeds available stock.',
+  },
+  CHRONOLOCK_ACTIVE: {
+    code: '811',
+    label: 'CHRONOLOCK_ACTIVE',
+    meaning: 'Chronolock policy blocked future projection requests.',
+  },
+  FUTURE_DATE_LOCKED: {
+    code: '812',
+    label: 'FUTURE_DATE_LOCKED',
+    meaning: 'Future date selection is locked by security policy.',
+  },
 });
 
 const CODE_BY_STATUS = Object.freeze({

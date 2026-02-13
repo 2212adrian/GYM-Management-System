@@ -128,7 +128,7 @@ async function hashAssetFilenames() {
 
   for (const resolvedPath of assetsToHash) {
     const fileBuffer = await fs.readFile(resolvedPath);
-    const hash = createHash("sha256").update(fileBuffer).digest("hex").slice(0, 12);
+    const hash = createHash("sha256").update(fileBuffer).digest("hex");
     const parsed = path.parse(resolvedPath);
     const hashedFilename = `${hash}${parsed.ext}`;
     const hashedPath = path.join(parsed.dir, hashedFilename);

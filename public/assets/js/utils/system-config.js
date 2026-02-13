@@ -1,7 +1,7 @@
 const WOLF_CONFIG = {
   noLoadingScreen: false,
-  VERSION: 'v0.6.6',
-  FULL_VERSION: 'GYM V0.6.6',
+  VERSION: 'v0.6.62',
+  FULL_VERSION: 'GYM V0.6.62',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',
@@ -34,12 +34,14 @@ const WOLF_PWA_TOUCH_HELP_HOLD_MS = 360;
 const WOLF_PWA_TOUCH_HELP_HIDE_MS = 2200;
 const WOLF_PWA_INLINE_HELP_DURATION_MS = 2800;
 const WOLF_SW_UPDATE_CHECK_INTERVAL_MS = 60000;
+const WOLF_PWA_PROMPT_RECHECK_MS = 1200;
 let wolfUpdateCheckTimer = null;
 let wolfKnownPageSignature = null;
 let wolfPendingUpdateSignature = null;
 let wolfNetworkMonitorTimer = null;
 let wolfNetworkCheckInFlight = false;
 let wolfNetworkIsOnline = true;
+let wolfNetworkDetailsExpanded = false;
 let wolfKeyboardLayoutWatchBound = false;
 let wolfThemeColorWatchBound = false;
 let wolfPwaPromptEvent = null;
@@ -49,6 +51,8 @@ let wolfPwaCompactTimer = null;
 let wolfPwaTouchHoldTimer = null;
 let wolfPwaTouchHelpTimer = null;
 let wolfPwaSuppressNextInstallClick = false;
+let wolfPwaBeforeInstallSeen = false;
+let wolfPwaSwReady = false;
 
 // Make this globally accessible
 window.applyVersioning = function () {
@@ -373,86 +377,166 @@ function ensureNetworkMonitorStyle() {
   style.textContent = `
 #${WOLF_NETWORK_OVERLAY_ID} {
   position: fixed;
-  inset: 0;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  width: min(94vw, 560px);
+  transform: translateX(-50%) translateY(-12px);
   z-index: 100000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background:
-    radial-gradient(1200px 560px at 85% 10%, rgba(166, 52, 41, 0.16), transparent 62%),
-    radial-gradient(880px 480px at 15% 90%, rgba(40, 90, 166, 0.14), transparent 66%),
-    linear-gradient(150deg, rgba(6, 7, 10, 0.92), rgba(10, 12, 16, 0.98));
-  backdrop-filter: blur(3px);
-  opacity: 0;
   pointer-events: none;
-  transform: scale(1.02);
-  transition: opacity 220ms ease, transform 260ms ease;
+  opacity: 0;
+  transition: opacity 180ms ease, transform 220ms ease;
 }
 #${WOLF_NETWORK_OVERLAY_ID}.is-active {
   opacity: 1;
-  pointer-events: auto;
-  transform: scale(1);
-}
-#${WOLF_NETWORK_OVERLAY_ID}::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 34px 34px;
-  opacity: 0.45;
-  pointer-events: none;
+  transform: translateX(-50%) translateY(0);
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-card {
-  width: min(92vw, 560px);
-  border-radius: 16px;
+  pointer-events: auto;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-left: 4px solid rgba(255, 98, 83, 0.96);
-  background: linear-gradient(150deg, rgba(14, 16, 20, 0.9), rgba(11, 13, 18, 0.96));
-  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.44);
-  padding: 18px 18px 16px;
-  color: #f1f4fb;
+  background: linear-gradient(150deg, rgba(14, 16, 20, 0.93), rgba(10, 13, 18, 0.95));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  padding: 10px 12px;
+  color: #edf3ff;
   position: relative;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 10px;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   background: #ff6253;
   box-shadow: 0 0 0 0 rgba(255, 98, 83, 0.62);
   animation: wolfNetPulse 1.55s infinite;
+  flex-shrink: 0;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-head-copy {
+  min-width: 0;
+  flex: 1;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   letter-spacing: 0.3px;
   text-transform: uppercase;
   font-weight: 800;
+  line-height: 1.15;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-code {
-  margin: 0 0 10px;
+  margin: 3px 0 0;
   color: #b8c0ce;
-  font-size: 12px;
+  font-size: 10px;
   letter-spacing: 0.25px;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  min-height: 40px;
+  min-width: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.09);
+  color: #f2f6ff;
+  border-radius: 12px;
+  padding: 0 11px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.24px;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.14);
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle i {
+  font-size: 22px;
+  line-height: 1;
+  transform-origin: center;
+  color: #ffddd9;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-details {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    margin-top 180ms ease;
+}
+#${WOLF_NETWORK_OVERLAY_ID}.is-expanded .wolf-net-details {
+  max-height: 220px;
+  opacity: 1;
+  margin-top: 8px;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-desc {
   margin: 0;
-  color: #cfd7e4;
-  font-size: 13px;
-  line-height: 1.55;
+  color: #d6ddeb;
+  font-size: 12px;
+  line-height: 1.45;
 }
 #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-foot {
-  margin-top: 12px;
+  margin: 8px 0 0;
   font-size: 11px;
   color: #8f98a8;
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-card {
+  border-color: rgba(54, 45, 35, 0.24);
+  border-left-color: rgba(186, 67, 58, 0.9);
+  background: linear-gradient(150deg, rgba(242, 236, 228, 0.96), rgba(234, 227, 218, 0.94));
+  color: #362c23;
+  box-shadow: 0 10px 24px rgba(59, 45, 31, 0.16);
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-code {
+  color: #715f4c;
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-desc {
+  color: #584838;
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-foot {
+  color: #7f6c58;
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle {
+  border-color: rgba(54, 45, 35, 0.34);
+  background: rgba(54, 45, 35, 0.09);
+  color: #3a3028;
+}
+body.light-theme #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle i {
+  color: #a4362a;
+}
+@media (max-width: 767px) {
+  #${WOLF_NETWORK_OVERLAY_ID} {
+    width: calc(100vw - 12px);
+    top: calc(6px + env(safe-area-inset-top, 0px));
+  }
+  #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-card {
+    padding: 9px 10px;
+  }
+  #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle-text {
+    display: none;
+  }
+  #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    padding: 0;
+    border-radius: 11px;
+  }
+  #${WOLF_NETWORK_OVERLAY_ID} .wolf-net-toggle i {
+    font-size: 24px;
+  }
 }
 @keyframes wolfNetPulse {
   0% {
@@ -469,6 +553,34 @@ function ensureNetworkMonitorStyle() {
   document.head.appendChild(style);
 }
 
+function setNetworkOverlayExpanded(expanded) {
+  const overlay = ensureNetworkOverlay();
+  if (!overlay) return;
+
+  const next = Boolean(expanded);
+  wolfNetworkDetailsExpanded = next;
+  overlay.classList.toggle('is-expanded', next);
+
+  const toggle = overlay.querySelector('.wolf-net-toggle');
+  if (!toggle) return;
+
+  toggle.setAttribute('aria-expanded', next ? 'true' : 'false');
+  toggle.setAttribute(
+    'aria-label',
+    next ? 'Hide network details' : 'Show network details',
+  );
+
+  const toggleText = toggle.querySelector('.wolf-net-toggle-text');
+  if (toggleText) {
+    toggleText.textContent = next ? 'Hide details' : 'Show details';
+  }
+
+  const icon = toggle.querySelector('i');
+  if (icon) {
+    icon.className = `bx ${next ? 'bxs-chevron-up' : 'bxs-chevron-down'}`;
+  }
+}
+
 function ensureNetworkOverlay() {
   ensureNetworkMonitorStyle();
   let overlay = document.getElementById(WOLF_NETWORK_OVERLAY_ID);
@@ -482,24 +594,51 @@ function ensureNetworkOverlay() {
     <div class="wolf-net-card">
       <div class="wolf-net-head">
         <span class="wolf-net-dot" aria-hidden="true"></span>
-        <h3 class="wolf-net-title">Connection Lost</h3>
+        <div class="wolf-net-head-copy">
+          <h3 class="wolf-net-title">Connection Lost</h3>
+          <p class="wolf-net-code">[ERR_503] LINK_OFFLINE</p>
+        </div>
+        <button type="button" class="wolf-net-toggle" aria-expanded="false" aria-label="Show network details">
+          <span class="wolf-net-toggle-text">Show details</span>
+          <i class="bx bxs-chevron-down" aria-hidden="true"></i>
+        </button>
       </div>
-      <p class="wolf-net-code">[OFFLINE_UPLINK_SEVERED]</p>
-      <p class="wolf-net-desc">
-        Live connection to Wolf Palomar servers is unavailable.
-        The interface will automatically resume once internet access is restored.
-      </p>
-      <p class="wolf-net-foot">Realtime auto-reconnect is active.</p>
+      <div class="wolf-net-details">
+        <p class="wolf-net-desc">
+          Live connection to Wolf Palomar servers is unavailable.
+          The interface will automatically resume once internet access is restored.
+        </p>
+        <p class="wolf-net-foot">Realtime auto-reconnect is active.</p>
+      </div>
     </div>
   `;
   document.body.appendChild(overlay);
+
+  const toggle = overlay.querySelector('.wolf-net-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      setNetworkOverlayExpanded(!wolfNetworkDetailsExpanded);
+    });
+  }
+
+  setNetworkOverlayExpanded(false);
   return overlay;
 }
 
 function setNetworkOverlayVisible(visible) {
   const overlay = ensureNetworkOverlay();
   if (!overlay) return;
-  overlay.classList.toggle('is-active', Boolean(visible));
+  const shouldShow = Boolean(visible);
+  const wasShown = overlay.classList.contains('is-active');
+  overlay.classList.toggle('is-active', shouldShow);
+  if (!shouldShow) {
+    setNetworkOverlayExpanded(false);
+    return;
+  }
+  if (!wasShown) {
+    setNetworkOverlayExpanded(false);
+  }
 }
 
 async function pingInternet() {
@@ -1095,6 +1234,33 @@ function showPwaInstallTip(message) {
   window.alert(message);
 }
 
+function hasBeforeInstallPromptSupport() {
+  return (
+    'BeforeInstallPromptEvent' in window || 'onbeforeinstallprompt' in window
+  );
+}
+
+async function attemptNativePwaPrompt() {
+  if (!wolfPwaPromptEvent) return false;
+
+  const promptEvent = wolfPwaPromptEvent;
+  wolfPwaPromptEvent = null;
+  promptEvent.prompt();
+
+  try {
+    const choice = await promptEvent.userChoice;
+    if (choice && choice.outcome === 'accepted') {
+      setPwaInstallButtonVisible(false);
+      return true;
+    }
+  } catch (_) {
+    // keep button visible
+  }
+
+  setPwaInstallButtonVisible(true);
+  return true;
+}
+
 async function onPwaInstallButtonClick() {
   if (wolfPwaSuppressNextInstallClick) {
     wolfPwaSuppressNextInstallClick = false;
@@ -1107,22 +1273,7 @@ async function onPwaInstallButtonClick() {
     return;
   }
 
-  if (wolfPwaPromptEvent) {
-    const promptEvent = wolfPwaPromptEvent;
-    wolfPwaPromptEvent = null;
-    promptEvent.prompt();
-
-    try {
-      const choice = await promptEvent.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        setPwaInstallButtonVisible(false);
-        return;
-      }
-    } catch (_) {
-      // keep button visible
-    }
-
-    setPwaInstallButtonVisible(true);
+  if (await attemptNativePwaPrompt()) {
     return;
   }
 
@@ -1131,7 +1282,34 @@ async function onPwaInstallButtonClick() {
     return;
   }
 
-  showPwaInstallTip('Install prompt is not available yet. Try again shortly.');
+  // Give the browser one short chance to dispatch beforeinstallprompt if it is late.
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, WOLF_PWA_PROMPT_RECHECK_MS);
+  });
+
+  if (await attemptNativePwaPrompt()) {
+    return;
+  }
+
+  if (!hasBeforeInstallPromptSupport()) {
+    showPwaInstallTip(
+      'Install from browser menu: open \u22ee then choose "Install app".',
+    );
+    return;
+  }
+
+  if (!wolfPwaSwReady) {
+    showPwaInstallTip(
+      'Install setup is still initializing. Refresh once, then tap Install App again.',
+    );
+    return;
+  }
+
+  showPwaInstallTip(
+    wolfPwaBeforeInstallSeen
+      ? 'Install prompt was recently dismissed. Use browser menu (\u22ee > Install app) or try again in a moment.'
+      : 'Install prompt is not ready yet. Use browser menu (\u22ee > Install app) if available.',
+  );
 }
 
 function registerPwaServiceWorker() {
@@ -1141,26 +1319,31 @@ function registerPwaServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (window.location.protocol !== 'https:' && !isLocalhost) return;
 
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        registration.update().catch(() => {
-          // ignore transient update checks
-        });
-
-        if (!wolfSwUpdateTimer) {
-          wolfSwUpdateTimer = window.setInterval(() => {
-            registration.update().catch(() => {
-              // ignore transient update checks
-            });
-          }, WOLF_SW_UPDATE_CHECK_INTERVAL_MS);
-        }
-      })
-      .catch(() => {
-        // service worker is optional; ignore registration failures
+  navigator.serviceWorker
+    .register('/sw.js')
+    .then(async (registration) => {
+      registration.update().catch(() => {
+        // ignore transient update checks
       });
-  });
+
+      if (!wolfSwUpdateTimer) {
+        wolfSwUpdateTimer = window.setInterval(() => {
+          registration.update().catch(() => {
+            // ignore transient update checks
+          });
+        }, WOLF_SW_UPDATE_CHECK_INTERVAL_MS);
+      }
+
+      try {
+        await navigator.serviceWorker.ready;
+        wolfPwaSwReady = true;
+      } catch (_) {
+        wolfPwaSwReady = true;
+      }
+    })
+    .catch(() => {
+      // service worker is optional; ignore registration failures
+    });
 }
 
 function startPwaInstallWatch() {
@@ -1184,6 +1367,7 @@ function startPwaInstallWatch() {
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     wolfPwaPromptEvent = event;
+    wolfPwaBeforeInstallSeen = true;
     setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL);
     setPwaInstallButtonVisible(true);
   });

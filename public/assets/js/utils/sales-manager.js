@@ -4,14 +4,26 @@
 
 // --- PRE-LOADER: Injects HTML immediately when script runs ---
 (function preLoadAlert() {
-  if (!document.getElementById('wolf-system-alert')) {
+  const inject = () => {
+    if (document.getElementById('wolf-system-alert')) return;
+    if (!document.body) return;
+
     document.body.insertAdjacentHTML(
       'beforeend',
-      `<div id="wolf-system-alert">
-         <i class='bx alert-icon'></i>
-         <span class="alert-text"></span>
+      `<div id="wolf-system-alert" role="status" aria-live="assertive">
+         <span class="alert-icon-wrap"><i class='bx alert-icon'></i></span>
+         <span class="alert-copy">
+           <span class="alert-code"></span>
+           <span class="alert-text"></span>
+         </span>
        </div>`,
     );
+  };
+
+  if (document.body) {
+    inject();
+  } else {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
   }
 })();
 
@@ -26,8 +38,67 @@ window.salesManager = {
   // --- UI HELPER: TOP SYSTEM ALERT ---
   _alertTimeout: null,
 
-  showSystemAlert(message, type = 'success', color = '#28a745') {
-    // default green
+  hasErrPrefix(message) {
+    return /^\[ERR_[A-Z0-9_]+\]/i.test(String(message || '').trim());
+  },
+
+  enrichAlertMessage(message, type = 'success') {
+    const raw = String(message || '').trim();
+    if (!raw) return '';
+    if (this.hasErrPrefix(raw)) return raw;
+    if (type !== 'error' && type !== 'warning') return raw;
+
+    if (
+      /CHRONOLOCK_ACTIVE|FUTURE PROJECTION BLOCKED/i.test(
+        raw,
+      )
+    ) {
+      const detail = raw.replace(/^CHRONOLOCK_ACTIVE:\s*/i, '').trim();
+      return `[ERR_811] CHRONOLOCK_ACTIVE: ${detail || raw}`;
+    }
+
+    if (/FUTURE_DATE_LOCKED|INVALID_PROTOCOL/i.test(raw)) {
+      const detail = raw
+        .replace(/^INVALID_PROTOCOL:\s*/i, '')
+        .replace(/^FUTURE_DATE_LOCKED:\s*/i, '')
+        .trim();
+      return `[ERR_812] FUTURE_DATE_LOCKED: ${detail || raw}`;
+    }
+
+    if (/REQUEST EXCEEDS STOCK|STOCK LIMIT|EXCEEDS AVAILABLE/i.test(raw)) {
+      return `[ERR_802] STOCK_LIMIT: ${raw}`;
+    }
+
+    if (/OUT OF STOCK|NO STOCK AVAILABLE|INVENTORY DEPLETED/i.test(raw)) {
+      return `[ERR_801] STOCK_EMPTY: ${raw}`;
+    }
+
+    if (/SKU\\s*\\[[^\\]]+\\]\\s*(NOT FOUND|NOT RECOGNIZED|UNKNOWN)/i.test(raw)) {
+      return `[ERR_404] RESOURCE_MISSING: ${raw}`;
+    }
+
+    if (
+      /DATABASE_REJECTED_ENTRY|TRANSACTION_FAILED|TRANSACTION_FAULT|PURGE_PROTOCOL_FAILED|ARCHIVE_RECORD_NOT_FOUND|ASSET VALIDATION FAILED|LOGBOOK_MODULE_NOT_READY/i.test(
+        raw,
+      )
+    ) {
+      return `[ERR_500] SYSTEM_FAULT: ${raw}`;
+    }
+
+    return `[ERR_500] SYSTEM_FAULT: ${raw}`;
+  },
+
+  splitAlertMessage(message) {
+    const value = String(message || '').trim();
+    const match = value.match(/^\[(ERR_[A-Z0-9_]+)\]\s*(.*)$/i);
+    if (!match) return { code: '', detail: value };
+    return {
+      code: match[1].toUpperCase(),
+      detail: String(match[2] || '').trim(),
+    };
+  },
+
+  showSystemAlert(message, type = 'success') {
     const isMobile = window.matchMedia('(max-width: 767px)').matches;
     if (!isMobile) return; // Only show on mobile
 
@@ -39,26 +110,46 @@ window.salesManager = {
     if (this._alertTimeout) clearTimeout(this._alertTimeout);
 
     // 3. Reset Classes & Update Content
-    alertEl.className = ''; // Remove all previous classes
-    alertEl.style.backgroundColor = color; // Apply custom color
+    const normalizedType =
+      type === 'error' || type === 'warning' || type === 'success'
+        ? type
+        : 'success';
+    const normalizedMessage = this.enrichAlertMessage(message, normalizedType);
+    const parsed = this.splitAlertMessage(normalizedMessage);
 
-    setTimeout(() => {
-      const iconMap = {
-        success: 'bx-check-shield',
-        error: 'bx-error-alt',
-        warning: 'bx-shield-quarter',
-      };
+    const iconMap = {
+      success: 'bx-check-shield',
+      error: 'bx-error-alt',
+      warning: 'bx-shield-quarter',
+    };
+    const iconEl = alertEl.querySelector('.alert-icon');
+    const codeEl = alertEl.querySelector('.alert-code');
+    const textEl = alertEl.querySelector('.alert-text');
 
-      alertEl.querySelector('.alert-icon').className =
-        `bx alert-icon ${iconMap[type] || 'bx-notification'}`;
-      alertEl.querySelector('.alert-text').innerText = message.toUpperCase();
+    if (iconEl) {
+      iconEl.className = `bx alert-icon ${iconMap[normalizedType] || 'bx-notification'}`;
+    }
+    if (codeEl) {
+      codeEl.textContent = parsed.code ? `[${parsed.code}]` : '';
+      codeEl.hidden = !parsed.code;
+    }
+    if (textEl) {
+      const detail = parsed.detail || normalizedMessage || '';
+      textEl.textContent = detail.toUpperCase();
+    }
 
-      alertEl.classList.add('show', type);
+    alertEl.classList.remove('show', 'success', 'error', 'warning');
+    alertEl.classList.add(normalizedType);
 
-      // Play Audio
-      if (window.wolfAudio)
-        window.wolfAudio.play(type === 'success' ? 'success' : 'error');
-    }, 10);
+    // Restart slide-down animation when called repeatedly.
+    void alertEl.offsetWidth;
+    requestAnimationFrame(() => {
+      alertEl.classList.add('show');
+    });
+
+    // Play Audio
+    if (window.wolfAudio)
+      window.wolfAudio.play(normalizedType === 'success' ? 'success' : 'error');
 
     // 4. Schedule Hide after 4 seconds
     this._alertTimeout = setTimeout(() => {
@@ -437,7 +528,7 @@ window.salesManager = {
       }
     } else {
       if (qtyInput) qtyInput.value = 0;
-      this.showSystemAlert(`No stock available for ${prod.name}`, 'error');
+      this.showSystemAlert(`OUT OF STOCK: ${prod.name}`, 'error');
     }
 
     this.validateTransaction();
@@ -464,7 +555,7 @@ window.salesManager = {
       if (available <= 0) {
         qtyInput.disabled = true;
         qtyInput.style.opacity = '0.3';
-        this.showSystemAlert(`INVENTORY DEPLETED: ${prod.name}`, 'error');
+        this.showSystemAlert(`OUT OF STOCK: ${prod.name}`, 'error');
       } else {
         qtyInput.disabled = false;
         qtyInput.style.opacity = '1';
@@ -495,7 +586,14 @@ window.salesManager = {
       // 1. Visual/Audio Feedback
       qtyInput.classList.add('input-error');
       if (window.wolfAudio) window.wolfAudio.play('denied');
-      this.showSystemAlert(`No stock available for ${prod.name}`, 'error');
+      if (available <= 0) {
+        this.showSystemAlert(`OUT OF STOCK: ${prod.name}`, 'error');
+      } else {
+        this.showSystemAlert(
+          `REQUEST EXCEEDS STOCK: ${prod.name} (MAX ${available})`,
+          'error',
+        );
+      }
 
       // 2. THE RESET: Force values back to zero
       qtyInput.value = '';

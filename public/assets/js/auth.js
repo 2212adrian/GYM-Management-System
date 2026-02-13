@@ -110,6 +110,32 @@ async function getClientIP() {
   }
 }
 
+function isConnectivityAuthError(error) {
+  const name = String(error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  const statusRaw = Number(error?.status);
+  const hasStatus = Number.isFinite(statusRaw);
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return true;
+  }
+
+  if (hasStatus && statusRaw === 0) return true;
+  if (hasStatus && statusRaw >= 502 && statusRaw <= 504) return true;
+
+  return (
+    name.includes('fetch') ||
+    message.includes('failed to fetch') ||
+    message.includes('fetch failed') ||
+    message.includes('networkerror') ||
+    message.includes('network error') ||
+    message.includes('network request failed') ||
+    message.includes('gateway') ||
+    message.includes('service unavailable') ||
+    message.includes('timed out')
+  );
+}
+
 function isRememberDeviceEnabled() {
   try {
     if (window.wolfAuthStorage?.shouldRememberDevice) {
@@ -805,7 +831,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       startQuickLoginPolling();
     } catch (err) {
-      setQuickLoginStatus(`[ERR_QL1] ${err.message}`, 'error');
+      const quickLoginErr = getServerErrorMessage(err, String(err?.message || err));
+      setQuickLoginStatus(
+        quickLoginErr || '[ERR_500] SYSTEM_FAULT: Quick-login setup failed.',
+        'error',
+      );
       if (quickLoginRefEl) quickLoginRefEl.textContent = '---';
       if (quickLoginTimerEl) quickLoginTimerEl.textContent = '--s';
     } finally {
@@ -908,7 +938,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         runAdminBootSequence();
       }, 550);
     } catch (err) {
-      setQuickLoginStatus(`[ERR_QL2] ${err.message}`, 'error');
+      const quickLoginErr = getServerErrorMessage(err, String(err?.message || err));
+      setQuickLoginStatus(
+        quickLoginErr || '[ERR_500] SYSTEM_FAULT: Quick-login polling failed.',
+        'error',
+      );
     }
   }
 
@@ -1037,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (loginAgreement && !loginAgreement.checked) {
         showLoginOutput(
-          '[ERR_105] Please agree to the data security policy to continue.',
+          '[ERR_003] AGREE_FAILED: Please agree to the data security policy to continue.',
           { color: 'var(--wolf-red)' },
         );
         if (window.wolfAudio) window.wolfAudio.play('denied');
@@ -1061,6 +1095,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (error) {
+        if (isConnectivityAuthError(error)) {
+          showLoginOutput(
+            '[ERR_503] LINK_OFFLINE: Security gateway is unreachable. Check internet connection.',
+            { color: 'var(--wolf-red)' },
+          );
+          if (window.wolfAudio) window.wolfAudio.play('error');
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'AUTHORIZE ACCESS';
+          return;
+        }
+
         shakeField(document.getElementById('password'));
         wolfAudio.play('denied');
         const { data: check } = await supabaseClient
