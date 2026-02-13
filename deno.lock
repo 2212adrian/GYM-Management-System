@@ -13,6 +13,7 @@
       "dependencies": [
         "npm:@supabase/supabase-js@^2.86.0",
         "npm:dompurify@^3.3.1",
+        "npm:esbuild@~0.25.10",
         "npm:nodemailer@^7.0.11",
         "npm:toastify-js@^1.12.0"
       ]
