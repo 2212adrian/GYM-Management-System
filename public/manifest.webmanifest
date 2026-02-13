@@ -1,0 +1,24 @@
+{
+  "name": "Wolf OS Terminal",
+  "short_name": "Wolf OS",
+  "description": "Wolf Palomar Gym Management System terminal interface",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1012",
+  "theme_color": "#0f1012",
+  "icons": [
+    {
+      "src": "/assets/images/logo.jpg",
+      "sizes": "707x701",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/images/logo.jpg",
+      "sizes": "707x701",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

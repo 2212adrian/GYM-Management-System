@@ -13,6 +13,24 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --input-bg: #13161a;
   --intro-anim-delay: 0s;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --wolf-app-height: 100vh;
+  --wolf-keyboard-offset: 0px;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --wolf-app-height: 100svh;
+  }
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --wolf-app-height: 100dvh;
+  }
 }
 /* Light Mode Overrides */
 body.light-theme {
@@ -38,7 +56,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: var(--wolf-app-height);
   overflow: hidden;
 }
 
@@ -897,7 +915,7 @@ button:hover:not(:disabled) {
 
   .flip-card {
     width: 100%;
-    height: 100vh;
+    height: var(--wolf-app-height);
     /* Initial state for intro animation */
     transform: translateX(-100vw) rotateY(90deg);
     opacity: 0;
@@ -1184,10 +1202,16 @@ body.light-theme .quick-login-refresh {
 /* --- SPLIT LAYOUT --- */
 .auth-split-container {
   display: flex;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: var(--wolf-app-height);
   opacity: 0;
   background-color: var(--bg-dark);
+  padding:
+    var(--safe-area-top)
+    var(--safe-area-right)
+    var(--safe-area-bottom)
+    var(--safe-area-left);
+  box-sizing: border-box;
   transition: opacity 1s ease;
   transition-delay: var(--intro-anim-delay);
 }
@@ -1296,7 +1320,13 @@ body.light-theme .quick-login-refresh {
   .flip-card {
     background-color: transparent;
     width: 400px;
-    height: min(620px, calc(100vh - 28px));
+    height: min(
+      620px,
+      calc(
+        var(--wolf-app-height) - var(--safe-area-top) - var(--safe-area-bottom) -
+          28px
+      )
+    );
     z-index: 4;
     perspective: 1000px;
   }
@@ -1476,7 +1506,13 @@ body.light-theme .quick-login-refresh {
 .flip-card {
   background-color: transparent;
   width: 400px;
-  height: min(620px, calc(100vh - 28px));
+  height: min(
+    620px,
+    calc(
+      var(--wolf-app-height) - var(--safe-area-top) - var(--safe-area-bottom) -
+        28px
+    )
+  );
   z-index: 4;
   perspective: 1000px;
 }
@@ -1574,8 +1610,20 @@ body.light-theme .quick-login-refresh {
   .flip-card {
     width: 100%;
     max-width: 400px;
-    height: calc(100dvh - 12px);
-    max-height: calc(100dvh - 12px);
+    height: max(
+      380px,
+      calc(
+        var(--wolf-app-height) - var(--safe-area-top) - var(--safe-area-bottom) -
+          var(--wolf-keyboard-offset) - 12px
+      )
+    );
+    max-height: max(
+      380px,
+      calc(
+        var(--wolf-app-height) - var(--safe-area-top) - var(--safe-area-bottom) -
+          var(--wolf-keyboard-offset) - 12px
+      )
+    );
     opacity: 0;
     filter: blur(10px);
   }
@@ -1598,6 +1646,23 @@ body.light-theme .quick-login-refresh {
 
   .flip-card-back {
     overflow-y: auto;
+  }
+
+  body.wolf-keyboard-open {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  body.wolf-keyboard-open .auth-split-container,
+  body.wolf-keyboard-open .auth-left {
+    align-items: flex-start;
+  }
+
+  body.wolf-keyboard-open .flip-card-front,
+  body.wolf-keyboard-open .flip-card-back {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .brand {
@@ -2014,4 +2079,50 @@ body.light-theme .quick-login-refresh {
   text-transform: uppercase !important;
   letter-spacing: 2px !important;
   color: #fff !important;
+}
+
+/* --- ACCESSIBILITY + MOBILE COMFORT --- */
+:focus-visible {
+  outline: 2px solid rgba(var(--wolf-red-rgb), 0.86);
+  outline-offset: 2px;
+}
+
+body.light-theme :focus-visible {
+  outline-color: rgba(var(--wolf-red-rgb), 0.92);
+}
+
+@media (max-width: 1023px) {
+  button,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  .quick-login-refresh {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .flip-card,
+  .star,
+  .intro-cutout,
+  .intro-cutout-svg {
+    animation: none !important;
+    transition: none !important;
+  }
 }

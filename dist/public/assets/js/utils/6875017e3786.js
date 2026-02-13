@@ -1,0 +1,236 @@
+const WOLF_CONFIG={noLoadingScreen:!1,VERSION:"v0.6.4",FULL_VERSION:"GYM V0.6.4",BRAND_WHITE:"WOLF",BRAND_RED:"PALOMAR",COMPANY:"WOLF PALOMAR",YEAR:"2026"},WOLF_UPDATE_CHECK_INTERVAL_MS=45e3,WOLF_UPDATE_BANNER_ID="wolf-update-banner",WOLF_UPDATE_BANNER_STYLE_ID="wolf-update-banner-style",WOLF_UPDATE_DISMISS_KEY="wolf_update_banner_dismissed_signature",WOLF_NETWORK_STYLE_ID="wolf-network-monitor-style",WOLF_NETWORK_OVERLAY_ID="wolf-network-overlay",WOLF_NETWORK_CHECK_INTERVAL_MS=12e3,WOLF_NETWORK_CHECK_TIMEOUT_MS=4500,WOLF_KEYBOARD_OPEN_CLASS="wolf-keyboard-open",WOLF_APP_HEIGHT_VAR="--wolf-app-height",WOLF_KEYBOARD_OFFSET_VAR="--wolf-keyboard-offset",WOLF_KEYBOARD_OPEN_THRESHOLD_PX=110,WOLF_THEME_META_SELECTOR='meta[name="theme-color"]',WOLF_THEME_COLOR_DARK="#0f1012",WOLF_THEME_COLOR_LIGHT="#ebe5dd",WOLF_PWA_BUTTON_ID="wolf-pwa-install-button",WOLF_PWA_STYLE_ID="wolf-pwa-install-style",WOLF_PWA_INSTALL_LABEL="Install App",WOLF_PWA_IOS_LABEL="Add to Home Screen",WOLF_PWA_IOS_HELP_TEXT='On iPhone/iPad: tap Share, then choose "Add to Home Screen".',WOLF_SW_UPDATE_CHECK_INTERVAL_MS=6e4;let wolfUpdateCheckTimer=null,wolfKnownPageSignature=null,wolfPendingUpdateSignature=null,wolfNetworkMonitorTimer=null,wolfNetworkCheckInFlight=!1,wolfNetworkIsOnline=!0,wolfKeyboardLayoutWatchBound=!1,wolfThemeColorWatchBound=!1,wolfPwaPromptEvent=null,wolfPwaInstallWatchBound=!1,wolfSwUpdateTimer=null;window.applyVersioning=function(){console.log("Wolf OS: Applying Versioning:",WOLF_CONFIG.FULL_VERSION),document.querySelectorAll(".sys-full-version").forEach(e=>e.textContent=WOLF_CONFIG.FULL_VERSION),document.querySelectorAll(".sys-version").forEach(e=>e.textContent=WOLF_CONFIG.VERSION),document.querySelectorAll(".sys-os-version").forEach(e=>e.textContent=`OS ${WOLF_CONFIG.VERSION}`),document.querySelectorAll(".brand-container").forEach(e=>{e.innerHTML=`${WOLF_CONFIG.BRAND_WHITE} <span>${WOLF_CONFIG.BRAND_RED}</span>`}),document.querySelectorAll(".sys-copyright").forEach(e=>{e.innerHTML=`&copy; ${WOLF_CONFIG.YEAR} ${WOLF_CONFIG.COMPANY}. All Rights Reserved.`})};function wolfHashText(e){const t=String(e||"");let n=5381;for(let o=0;o<t.length;o+=1)n=(n<<5)+n^t.charCodeAt(o);return(n>>>0).toString(16)}async function fetchNoStoreText(e,t=5e3){const n=new AbortController,o=setTimeout(()=>n.abort(),t);try{const r=e.includes("?")?"&":"?",a=`${e}${r}_vchk=${Date.now()}`,i=await fetch(a,{method:"GET",cache:"no-store",signal:n.signal,headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}});if(!i.ok)throw new Error(`Probe failed (${i.status}) for ${e}`);return await i.text()}finally{clearTimeout(o)}}function normalizeVersionLabel(e){return String(e||"").trim()}function extractVersionFromSystemConfigSource(e){const t=String(e||"");if(!t)return null;const n=t.match(/VERSION\s*:\s*['"]([^'"]+)['"]/i);return n&&n[1]?normalizeVersionLabel(n[1]):null}async function fetchRemoteSystemConfigSource(){try{return await fetchNoStoreText("/assets/js/utils/system-config.js")}catch(e){}try{const e=await fetchNoStoreText("/asset-manifest.json"),t=JSON.parse(e),n=t&&typeof t=="object"&&t["/assets/js/utils/system-config.js"];return n?await fetchNoStoreText(String(n)):null}catch(e){return null}}async function fetchLatestVersionLabel(){const e=await fetchRemoteSystemConfigSource();return extractVersionFromSystemConfigSource(e)}function buildUpdateBannerMessage(e,t){const n=normalizeVersionLabel(e),o=normalizeVersionLabel(t);return n&&o&&n!==o?`A newer version is available (${n} -> ${o}). Click to refresh.`:o?`A newer version (${o}) is available. Click to refresh.`:"A newer version is available. Click to refresh."}async function fetchCurrentPageSignature(){const e=["/asset-manifest.json","/assets/js/utils/system-config.js",`${window.location.pathname}${window.location.search}`,"/index.html"];for(const t of e)try{const n=await fetchNoStoreText(t);if(n)return wolfHashText(n)}catch(n){}throw new Error("Update check failed for all probes")}function ensureUpdateBannerStyle(){if(document.getElementById(WOLF_UPDATE_BANNER_STYLE_ID))return;const e=document.createElement("style");e.id=WOLF_UPDATE_BANNER_STYLE_ID,e.textContent=`
+#${WOLF_UPDATE_BANNER_ID} {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 640px);
+  background: linear-gradient(120deg, #101010, #191919);
+  color: #f2f2f2;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-left: 4px solid #f5b22a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#${WOLF_UPDATE_BANNER_ID} button {
+  border: none;
+  background: #f5b22a;
+  color: #1b1b1b;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+#${WOLF_UPDATE_BANNER_ID} button:hover {
+  filter: brightness(1.05);
+}
+#${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-dismiss {
+  background: transparent;
+  color: #bfc3ca;
+  border: 1px solid rgba(191, 195, 202, 0.35);
+}
+#${WOLF_UPDATE_BANNER_ID} .wolf-update-banner-dismiss:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+  `,document.head.appendChild(e)}function dismissUpdateBanner(){const e=document.getElementById(WOLF_UPDATE_BANNER_ID);e&&e.remove()}function showUpdateBanner(e,t,n=null){ensureUpdateBannerStyle();const o=document.getElementById(WOLF_UPDATE_BANNER_ID);if(o){o.querySelector(".wolf-update-banner-text").textContent=e;return}const r=document.createElement("div");r.id=WOLF_UPDATE_BANNER_ID,r.innerHTML=`
+    <span class="wolf-update-banner-text"></span>
+    <button type="button" class="wolf-update-banner-refresh">Refresh Now</button>
+    <button type="button" class="wolf-update-banner-dismiss">Dismiss</button>
+  `,r.querySelector(".wolf-update-banner-text").textContent=e;const a=r.querySelector(".wolf-update-banner-refresh"),i=r.querySelector(".wolf-update-banner-dismiss");a.addEventListener("click",()=>{typeof t=="function"&&t()}),i.addEventListener("click",()=>{dismissUpdateBanner(),typeof n=="function"&&n()}),document.body.appendChild(r)}window.showUpdateBanner=showUpdateBanner,window.newVersionAvailable=!1,window.currentAppVersion=WOLF_CONFIG.VERSION,window.latestAvailableVersion=null,window.forceShowUpdateNotification=function(e=null){window.newVersionAvailable=!0;const t=normalizeVersionLabel(e);t&&(window.latestAvailableVersion=t),showUpdateBanner(buildUpdateBannerMessage(WOLF_CONFIG.VERSION,window.latestAvailableVersion),()=>{window.location.reload()},()=>{window.newVersionAvailable=!1})},window.hideUpdateNotification=function(){dismissUpdateBanner(),window.newVersionAvailable=!1};async function checkForNewVersion(){try{const e=await fetchCurrentPageSignature();if(!wolfKnownPageSignature){wolfKnownPageSignature=e,window.newVersionAvailable=!1;return}const t=e!==wolfKnownPageSignature;if(window.newVersionAvailable=t,!t){wolfPendingUpdateSignature=null,window.latestAvailableVersion=null,dismissUpdateBanner();return}const n=await fetchLatestVersionLabel();window.latestAvailableVersion=normalizeVersionLabel(n)||null,wolfPendingUpdateSignature=e;let o="";try{o=window.sessionStorage.getItem(WOLF_UPDATE_DISMISS_KEY)||""}catch(r){o=""}if(o===e){dismissUpdateBanner();return}window.newVersionAvailable&&showUpdateBanner(buildUpdateBannerMessage(WOLF_CONFIG.VERSION,window.latestAvailableVersion),()=>{window.location.reload()},()=>{try{wolfPendingUpdateSignature&&window.sessionStorage.setItem(WOLF_UPDATE_DISMISS_KEY,wolfPendingUpdateSignature)}catch(r){}})}catch(e){}}function startVersionWatch(){wolfUpdateCheckTimer||(checkForNewVersion(),wolfUpdateCheckTimer=setInterval(checkForNewVersion,WOLF_UPDATE_CHECK_INTERVAL_MS))}function ensureNetworkMonitorStyle(){if(document.getElementById(WOLF_NETWORK_STYLE_ID))return;const e=document.createElement("style");e.id=WOLF_NETWORK_STYLE_ID,e.textContent=`
+#${WOLF_NETWORK_OVERLAY_ID} {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 560px at 85% 10%, rgba(166, 52, 41, 0.16), transparent 62%),
+    radial-gradient(880px 480px at 15% 90%, rgba(40, 90, 166, 0.14), transparent 66%),
+    linear-gradient(150deg, rgba(6, 7, 10, 0.92), rgba(10, 12, 16, 0.98));
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.02);
+  transition: opacity 220ms ease, transform 260ms ease;
+}
+#${WOLF_NETWORK_OVERLAY_ID}.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+#${WOLF_NETWORK_OVERLAY_ID}::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-card {
+  width: min(92vw, 560px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 4px solid rgba(255, 98, 83, 0.96);
+  background: linear-gradient(150deg, rgba(14, 16, 20, 0.9), rgba(11, 13, 18, 0.96));
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.44);
+  padding: 18px 18px 16px;
+  color: #f1f4fb;
+  position: relative;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff6253;
+  box-shadow: 0 0 0 0 rgba(255, 98, 83, 0.62);
+  animation: wolfNetPulse 1.55s infinite;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-title {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-code {
+  margin: 0 0 10px;
+  color: #b8c0ce;
+  font-size: 12px;
+  letter-spacing: 0.25px;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-desc {
+  margin: 0;
+  color: #cfd7e4;
+  font-size: 13px;
+  line-height: 1.55;
+}
+#${WOLF_NETWORK_OVERLAY_ID} .wolf-net-foot {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #8f98a8;
+}
+@keyframes wolfNetPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 98, 83, 0.62);
+  }
+  70% {
+    box-shadow: 0 0 0 11px rgba(255, 98, 83, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 98, 83, 0);
+  }
+}
+  `,document.head.appendChild(e)}function ensureNetworkOverlay(){ensureNetworkMonitorStyle();let e=document.getElementById(WOLF_NETWORK_OVERLAY_ID);return e||(e=document.createElement("div"),e.id=WOLF_NETWORK_OVERLAY_ID,e.setAttribute("role","status"),e.setAttribute("aria-live","assertive"),e.innerHTML=`
+    <div class="wolf-net-card">
+      <div class="wolf-net-head">
+        <span class="wolf-net-dot" aria-hidden="true"></span>
+        <h3 class="wolf-net-title">Connection Lost</h3>
+      </div>
+      <p class="wolf-net-code">[OFFLINE_UPLINK_SEVERED]</p>
+      <p class="wolf-net-desc">
+        Live connection to Wolf Palomar servers is unavailable.
+        The interface will automatically resume once internet access is restored.
+      </p>
+      <p class="wolf-net-foot">Realtime auto-reconnect is active.</p>
+    </div>
+  `,document.body.appendChild(e),e)}function setNetworkOverlayVisible(e){const t=ensureNetworkOverlay();t&&t.classList.toggle("is-active",!!e)}async function pingInternet(){const e=new AbortController,t=setTimeout(()=>e.abort(),WOLF_NETWORK_CHECK_TIMEOUT_MS);try{return await fetch(`/assets/images/favicon.ico?_netchk=${Date.now()}`,{method:"GET",cache:"no-store",signal:e.signal,headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}}),!0}catch(n){return!1}finally{clearTimeout(t)}}async function evaluateNetworkState(){if(!wolfNetworkCheckInFlight){wolfNetworkCheckInFlight=!0;try{const e=await pingInternet();e!==wolfNetworkIsOnline?(wolfNetworkIsOnline=e,setNetworkOverlayVisible(!e)):e||setNetworkOverlayVisible(!0)}finally{wolfNetworkCheckInFlight=!1}}}function startNetworkMonitor(){wolfNetworkMonitorTimer||(ensureNetworkOverlay(),wolfNetworkIsOnline=navigator.onLine,setNetworkOverlayVisible(!wolfNetworkIsOnline),window.addEventListener("offline",()=>{wolfNetworkIsOnline=!1,setNetworkOverlayVisible(!0)}),window.addEventListener("online",()=>{evaluateNetworkState()}),document.addEventListener("visibilitychange",()=>{document.hidden||evaluateNetworkState()}),evaluateNetworkState(),wolfNetworkMonitorTimer=setInterval(evaluateNetworkState,WOLF_NETWORK_CHECK_INTERVAL_MS))}function setWolfCssVariable(e,t){document.documentElement&&document.documentElement.style.setProperty(e,t)}function isTextEntryElement(e){if(!e||!e.tagName)return!1;const t=String(e.tagName).toLowerCase();if(t==="textarea"||t==="select")return!0;if(t!=="input")return!!(e.isContentEditable||e.getAttribute("contenteditable")==="true");const n=String(e.type||"text").toLowerCase();return!new Set(["button","checkbox","color","file","hidden","image","radio","range","reset","submit"]).has(n)}function getViewportHeightPx(){return window.visualViewport&&Number.isFinite(window.visualViewport.height)?Math.max(0,Math.round(window.visualViewport.height)):Number.isFinite(window.innerHeight)?Math.max(0,Math.round(window.innerHeight)):document.documentElement&&Number.isFinite(document.documentElement.clientHeight)?Math.max(0,Math.round(document.documentElement.clientHeight)):0}function syncViewportAndKeyboardState(){setWolfCssVariable(WOLF_APP_HEIGHT_VAR,`${getViewportHeightPx()}px`);let e=0;if(window.visualViewport){const n=window.visualViewport.height+window.visualViewport.offsetTop;e=Math.max(0,Math.round(window.innerHeight-n))}const t=e>WOLF_KEYBOARD_OPEN_THRESHOLD_PX&&isTextEntryElement(document.activeElement);setWolfCssVariable(WOLF_KEYBOARD_OFFSET_VAR,`${t?e:0}px`),document.body&&document.body.classList.toggle(WOLF_KEYBOARD_OPEN_CLASS,t)}function startKeyboardAwareLayoutWatch(){if(wolfKeyboardLayoutWatchBound)return;wolfKeyboardLayoutWatchBound=!0;const e=()=>{window.requestAnimationFrame(syncViewportAndKeyboardState)};e(),window.addEventListener("resize",e),window.addEventListener("focusin",e),window.addEventListener("focusout",()=>setTimeout(e,80)),window.addEventListener("orientationchange",()=>setTimeout(e,180)),document.addEventListener("visibilitychange",()=>{document.hidden||e()}),window.visualViewport&&(window.visualViewport.addEventListener("resize",e),window.visualViewport.addEventListener("scroll",e))}function resolveThemeColor(){return document.body&&document.body.classList.contains("light-theme")?WOLF_THEME_COLOR_LIGHT:WOLF_THEME_COLOR_DARK}function ensureThemeColorMetaTag(){let e=document.querySelector(WOLF_THEME_META_SELECTOR);return e||(e=document.createElement("meta"),e.name="theme-color",e.content=resolveThemeColor(),document.head.appendChild(e),e)}function syncThemeColorMeta(){const e=ensureThemeColorMetaTag();e&&(e.content=resolveThemeColor())}function startThemeColorWatch(){if(wolfThemeColorWatchBound)return;wolfThemeColorWatchBound=!0,syncThemeColorMeta(),window.addEventListener("focus",syncThemeColorMeta),document.addEventListener("visibilitychange",()=>{document.hidden||syncThemeColorMeta()}),new MutationObserver(()=>{syncThemeColorMeta()}).observe(document.body,{attributes:!0,attributeFilter:["class"]})}function isStandaloneAppMode(){return!!(window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===!0)}function isIosSafariBrowser(){const e=String(window.navigator.userAgent||""),t=/iPad|iPhone|iPod/i.test(e),n=/WebKit/i.test(e),o=/CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser|DuckDuckGo/i.test(e);return t&&n&&!o}function ensurePwaInstallStyle(){if(document.getElementById(WOLF_PWA_STYLE_ID))return;const e=document.createElement("style");e.id=WOLF_PWA_STYLE_ID,e.textContent=`
+#${WOLF_PWA_BUTTON_ID} {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 99998;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 11px 14px;
+  background: linear-gradient(130deg, #11161d, #1c2430);
+  color: #f5f8ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    opacity 200ms ease,
+    border-color 220ms ease;
+}
+#${WOLF_PWA_BUTTON_ID}.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+}
+#${WOLF_PWA_BUTTON_ID}:hover {
+  transform: translateY(-3px);
+  border-color: rgba(245, 178, 42, 0.75);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42);
+}
+#${WOLF_PWA_BUTTON_ID}:active {
+  transform: translateY(-1px) scale(0.99);
+}
+#${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 178, 42, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(245, 178, 42, 0.28);
+}
+#${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon svg {
+  width: 14px;
+  height: 14px;
+}
+@media (max-width: 767px) {
+  #${WOLF_PWA_BUTTON_ID} {
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #${WOLF_PWA_BUTTON_ID},
+  #${WOLF_PWA_BUTTON_ID}:hover,
+  #${WOLF_PWA_BUTTON_ID}:active {
+    transition: none;
+    transform: none;
+  }
+}
+  `,document.head.appendChild(e)}function ensurePwaInstallButton(){ensurePwaInstallStyle();let e=document.getElementById(WOLF_PWA_BUTTON_ID);return e||(e=document.createElement("button"),e.id=WOLF_PWA_BUTTON_ID,e.type="button",e.className="is-hidden",e.innerHTML=`
+    <span class="wolf-pwa-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 3v11"></path>
+        <path d="m7 10 5 5 5-5"></path>
+        <path d="M5 19h14"></path>
+      </svg>
+    </span>
+    <span class="wolf-pwa-label">${WOLF_PWA_INSTALL_LABEL}</span>
+  `,e.addEventListener("click",onPwaInstallButtonClick),document.body.appendChild(e),e)}function setPwaInstallButtonLabel(e){const n=ensurePwaInstallButton().querySelector(".wolf-pwa-label");n&&(n.textContent=e)}function setPwaInstallButtonVisible(e){ensurePwaInstallButton().classList.toggle("is-hidden",!e)}function showPwaInstallTip(e){if(typeof window.Toastify=="function"){window.Toastify({text:e,duration:4500,gravity:"bottom",position:"center",close:!0,style:{background:"linear-gradient(130deg, rgba(17,22,29,0.95), rgba(28,36,48,0.95))",color:"#f5f8ff",border:"1px solid rgba(245,178,42,0.35)"}}).showToast();return}window.alert(e)}async function onPwaInstallButtonClick(){if(isStandaloneAppMode()){setPwaInstallButtonVisible(!1);return}if(wolfPwaPromptEvent){const e=wolfPwaPromptEvent;wolfPwaPromptEvent=null,e.prompt();try{const t=await e.userChoice;if(t&&t.outcome==="accepted"){setPwaInstallButtonVisible(!1);return}}catch(t){}setPwaInstallButtonVisible(!0);return}if(isIosSafariBrowser()){showPwaInstallTip(WOLF_PWA_IOS_HELP_TEXT);return}showPwaInstallTip("Install prompt is not available yet. Try again shortly.")}function registerPwaServiceWorker(){const e=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1";"serviceWorker"in navigator&&(window.location.protocol!=="https:"&&!e||window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(t=>{t.update().catch(()=>{}),wolfSwUpdateTimer||(wolfSwUpdateTimer=window.setInterval(()=>{t.update().catch(()=>{})},WOLF_SW_UPDATE_CHECK_INTERVAL_MS))}).catch(()=>{})}))}function startPwaInstallWatch(){if(!wolfPwaInstallWatchBound){if(wolfPwaInstallWatchBound=!0,registerPwaServiceWorker(),isStandaloneAppMode()){setPwaInstallButtonVisible(!1);return}isIosSafariBrowser()&&(setPwaInstallButtonLabel(WOLF_PWA_IOS_LABEL),setPwaInstallButtonVisible(!0)),window.addEventListener("beforeinstallprompt",e=>{e.preventDefault(),wolfPwaPromptEvent=e,setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL),setPwaInstallButtonVisible(!0)}),window.addEventListener("appinstalled",()=>{wolfPwaPromptEvent=null,setPwaInstallButtonVisible(!1)})}}document.addEventListener("DOMContentLoaded",()=>{window.applyVersioning(),startVersionWatch(),startNetworkMonitor(),startKeyboardAwareLayoutWatch(),startThemeColorWatch(),startPwaInstallWatch()});

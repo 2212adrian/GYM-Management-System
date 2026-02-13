@@ -16,12 +16,31 @@ const WOLF_NETWORK_STYLE_ID = 'wolf-network-monitor-style';
 const WOLF_NETWORK_OVERLAY_ID = 'wolf-network-overlay';
 const WOLF_NETWORK_CHECK_INTERVAL_MS = 12000;
 const WOLF_NETWORK_CHECK_TIMEOUT_MS = 4500;
+const WOLF_KEYBOARD_OPEN_CLASS = 'wolf-keyboard-open';
+const WOLF_APP_HEIGHT_VAR = '--wolf-app-height';
+const WOLF_KEYBOARD_OFFSET_VAR = '--wolf-keyboard-offset';
+const WOLF_KEYBOARD_OPEN_THRESHOLD_PX = 110;
+const WOLF_THEME_META_SELECTOR = 'meta[name="theme-color"]';
+const WOLF_THEME_COLOR_DARK = '#0f1012';
+const WOLF_THEME_COLOR_LIGHT = '#ebe5dd';
+const WOLF_PWA_BUTTON_ID = 'wolf-pwa-install-button';
+const WOLF_PWA_STYLE_ID = 'wolf-pwa-install-style';
+const WOLF_PWA_INSTALL_LABEL = 'Install App';
+const WOLF_PWA_IOS_LABEL = 'Add to Home Screen';
+const WOLF_PWA_IOS_HELP_TEXT =
+  'On iPhone/iPad: tap Share, then choose "Add to Home Screen".';
+const WOLF_SW_UPDATE_CHECK_INTERVAL_MS = 60000;
 let wolfUpdateCheckTimer = null;
 let wolfKnownPageSignature = null;
 let wolfPendingUpdateSignature = null;
 let wolfNetworkMonitorTimer = null;
 let wolfNetworkCheckInFlight = false;
 let wolfNetworkIsOnline = true;
+let wolfKeyboardLayoutWatchBound = false;
+let wolfThemeColorWatchBound = false;
+let wolfPwaPromptEvent = null;
+let wolfPwaInstallWatchBound = false;
+let wolfSwUpdateTimer = null;
 
 // Make this globally accessible
 window.applyVersioning = function () {
@@ -541,9 +560,388 @@ function startNetworkMonitor() {
   );
 }
 
+function setWolfCssVariable(name, value) {
+  if (!document.documentElement) return;
+  document.documentElement.style.setProperty(name, value);
+}
+
+function isTextEntryElement(element) {
+  if (!element || !element.tagName) return false;
+  const tagName = String(element.tagName).toLowerCase();
+  if (tagName === 'textarea' || tagName === 'select') return true;
+  if (tagName !== 'input') {
+    return Boolean(
+      element.isContentEditable ||
+        element.getAttribute('contenteditable') === 'true',
+    );
+  }
+
+  const inputType = String(element.type || 'text').toLowerCase();
+  const blockedTypes = new Set([
+    'button',
+    'checkbox',
+    'color',
+    'file',
+    'hidden',
+    'image',
+    'radio',
+    'range',
+    'reset',
+    'submit',
+  ]);
+  return !blockedTypes.has(inputType);
+}
+
+function getViewportHeightPx() {
+  if (window.visualViewport && Number.isFinite(window.visualViewport.height)) {
+    return Math.max(0, Math.round(window.visualViewport.height));
+  }
+  if (Number.isFinite(window.innerHeight)) {
+    return Math.max(0, Math.round(window.innerHeight));
+  }
+  if (document.documentElement && Number.isFinite(document.documentElement.clientHeight)) {
+    return Math.max(0, Math.round(document.documentElement.clientHeight));
+  }
+  return 0;
+}
+
+function syncViewportAndKeyboardState() {
+  setWolfCssVariable(WOLF_APP_HEIGHT_VAR, `${getViewportHeightPx()}px`);
+
+  let keyboardInset = 0;
+  if (window.visualViewport) {
+    const viewportBottom =
+      window.visualViewport.height + window.visualViewport.offsetTop;
+    keyboardInset = Math.max(0, Math.round(window.innerHeight - viewportBottom));
+  }
+
+  const keyboardOpen =
+    keyboardInset > WOLF_KEYBOARD_OPEN_THRESHOLD_PX &&
+    isTextEntryElement(document.activeElement);
+
+  setWolfCssVariable(
+    WOLF_KEYBOARD_OFFSET_VAR,
+    `${keyboardOpen ? keyboardInset : 0}px`,
+  );
+  if (document.body) {
+    document.body.classList.toggle(WOLF_KEYBOARD_OPEN_CLASS, keyboardOpen);
+  }
+}
+
+function startKeyboardAwareLayoutWatch() {
+  if (wolfKeyboardLayoutWatchBound) return;
+  wolfKeyboardLayoutWatchBound = true;
+
+  const scheduleSync = () => {
+    window.requestAnimationFrame(syncViewportAndKeyboardState);
+  };
+
+  scheduleSync();
+  window.addEventListener('resize', scheduleSync);
+  window.addEventListener('focusin', scheduleSync);
+  window.addEventListener('focusout', () => setTimeout(scheduleSync, 80));
+  window.addEventListener('orientationchange', () =>
+    setTimeout(scheduleSync, 180),
+  );
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleSync();
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleSync);
+    window.visualViewport.addEventListener('scroll', scheduleSync);
+  }
+}
+
+function resolveThemeColor() {
+  if (!document.body) return WOLF_THEME_COLOR_DARK;
+  return document.body.classList.contains('light-theme')
+    ? WOLF_THEME_COLOR_LIGHT
+    : WOLF_THEME_COLOR_DARK;
+}
+
+function ensureThemeColorMetaTag() {
+  let meta = document.querySelector(WOLF_THEME_META_SELECTOR);
+  if (meta) return meta;
+
+  meta = document.createElement('meta');
+  meta.name = 'theme-color';
+  meta.content = resolveThemeColor();
+  document.head.appendChild(meta);
+  return meta;
+}
+
+function syncThemeColorMeta() {
+  const meta = ensureThemeColorMetaTag();
+  if (!meta) return;
+  meta.content = resolveThemeColor();
+}
+
+function startThemeColorWatch() {
+  if (wolfThemeColorWatchBound) return;
+  wolfThemeColorWatchBound = true;
+
+  syncThemeColorMeta();
+  window.addEventListener('focus', syncThemeColorMeta);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncThemeColorMeta();
+  });
+
+  const observer = new MutationObserver(() => {
+    syncThemeColorMeta();
+  });
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+}
+
+function isStandaloneAppMode() {
+  return Boolean(
+    window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true,
+  );
+}
+
+function isIosSafariBrowser() {
+  const ua = String(window.navigator.userAgent || '');
+  const isIos = /iPad|iPhone|iPod/i.test(ua);
+  const isWebkit = /WebKit/i.test(ua);
+  const excluded = /CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser|DuckDuckGo/i.test(ua);
+  return isIos && isWebkit && !excluded;
+}
+
+function ensurePwaInstallStyle() {
+  if (document.getElementById(WOLF_PWA_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = WOLF_PWA_STYLE_ID;
+  style.textContent = `
+#${WOLF_PWA_BUTTON_ID} {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 99998;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 11px 14px;
+  background: linear-gradient(130deg, #11161d, #1c2430);
+  color: #f5f8ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    opacity 200ms ease,
+    border-color 220ms ease;
+}
+#${WOLF_PWA_BUTTON_ID}.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+}
+#${WOLF_PWA_BUTTON_ID}:hover {
+  transform: translateY(-3px);
+  border-color: rgba(245, 178, 42, 0.75);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42);
+}
+#${WOLF_PWA_BUTTON_ID}:active {
+  transform: translateY(-1px) scale(0.99);
+}
+#${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 178, 42, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(245, 178, 42, 0.28);
+}
+#${WOLF_PWA_BUTTON_ID} .wolf-pwa-icon svg {
+  width: 14px;
+  height: 14px;
+}
+@media (max-width: 767px) {
+  #${WOLF_PWA_BUTTON_ID} {
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #${WOLF_PWA_BUTTON_ID},
+  #${WOLF_PWA_BUTTON_ID}:hover,
+  #${WOLF_PWA_BUTTON_ID}:active {
+    transition: none;
+    transform: none;
+  }
+}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensurePwaInstallButton() {
+  ensurePwaInstallStyle();
+  let button = document.getElementById(WOLF_PWA_BUTTON_ID);
+  if (button) return button;
+
+  button = document.createElement('button');
+  button.id = WOLF_PWA_BUTTON_ID;
+  button.type = 'button';
+  button.className = 'is-hidden';
+  button.innerHTML = `
+    <span class="wolf-pwa-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 3v11"></path>
+        <path d="m7 10 5 5 5-5"></path>
+        <path d="M5 19h14"></path>
+      </svg>
+    </span>
+    <span class="wolf-pwa-label">${WOLF_PWA_INSTALL_LABEL}</span>
+  `;
+  button.addEventListener('click', onPwaInstallButtonClick);
+  document.body.appendChild(button);
+  return button;
+}
+
+function setPwaInstallButtonLabel(label) {
+  const button = ensurePwaInstallButton();
+  const labelElement = button.querySelector('.wolf-pwa-label');
+  if (labelElement) labelElement.textContent = label;
+}
+
+function setPwaInstallButtonVisible(visible) {
+  const button = ensurePwaInstallButton();
+  button.classList.toggle('is-hidden', !visible);
+}
+
+function showPwaInstallTip(message) {
+  if (typeof window.Toastify === 'function') {
+    window.Toastify({
+      text: message,
+      duration: 4500,
+      gravity: 'bottom',
+      position: 'center',
+      close: true,
+      style: {
+        background:
+          'linear-gradient(130deg, rgba(17,22,29,0.95), rgba(28,36,48,0.95))',
+        color: '#f5f8ff',
+        border: '1px solid rgba(245,178,42,0.35)',
+      },
+    }).showToast();
+    return;
+  }
+  window.alert(message);
+}
+
+async function onPwaInstallButtonClick() {
+  if (isStandaloneAppMode()) {
+    setPwaInstallButtonVisible(false);
+    return;
+  }
+
+  if (wolfPwaPromptEvent) {
+    const promptEvent = wolfPwaPromptEvent;
+    wolfPwaPromptEvent = null;
+    promptEvent.prompt();
+
+    try {
+      const choice = await promptEvent.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        setPwaInstallButtonVisible(false);
+        return;
+      }
+    } catch (_) {
+      // keep button visible
+    }
+
+    setPwaInstallButtonVisible(true);
+    return;
+  }
+
+  if (isIosSafariBrowser()) {
+    showPwaInstallTip(WOLF_PWA_IOS_HELP_TEXT);
+    return;
+  }
+
+  showPwaInstallTip('Install prompt is not available yet. Try again shortly.');
+}
+
+function registerPwaServiceWorker() {
+  const isLocalhost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+  if (!('serviceWorker' in navigator)) return;
+  if (window.location.protocol !== 'https:' && !isLocalhost) return;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        registration.update().catch(() => {
+          // ignore transient update checks
+        });
+
+        if (!wolfSwUpdateTimer) {
+          wolfSwUpdateTimer = window.setInterval(() => {
+            registration.update().catch(() => {
+              // ignore transient update checks
+            });
+          }, WOLF_SW_UPDATE_CHECK_INTERVAL_MS);
+        }
+      })
+      .catch(() => {
+        // service worker is optional; ignore registration failures
+      });
+  });
+}
+
+function startPwaInstallWatch() {
+  if (wolfPwaInstallWatchBound) return;
+  wolfPwaInstallWatchBound = true;
+
+  registerPwaServiceWorker();
+
+  if (isStandaloneAppMode()) {
+    setPwaInstallButtonVisible(false);
+    return;
+  }
+
+  if (isIosSafariBrowser()) {
+    setPwaInstallButtonLabel(WOLF_PWA_IOS_LABEL);
+    setPwaInstallButtonVisible(true);
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    wolfPwaPromptEvent = event;
+    setPwaInstallButtonLabel(WOLF_PWA_INSTALL_LABEL);
+    setPwaInstallButtonVisible(true);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    wolfPwaPromptEvent = null;
+    setPwaInstallButtonVisible(false);
+  });
+}
+
 // Run once on initial load
 document.addEventListener('DOMContentLoaded', () => {
   window.applyVersioning();
   startVersionWatch();
   startNetworkMonitor();
+  startKeyboardAwareLayoutWatch();
+  startThemeColorWatch();
+  startPwaInstallWatch();
 });

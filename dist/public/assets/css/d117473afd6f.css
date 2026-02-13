@@ -88,6 +88,24 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
   --skeleton-mid: #313844;
   --breadcrumb-current-color: var(--text-main);
   --font-main: 'Inter', sans-serif;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --wolf-app-height: 100vh;
+  --wolf-keyboard-offset: 0px;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --wolf-app-height: 100svh;
+  }
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --wolf-app-height: 100dvh;
+  }
 }
 
 @keyframes wolfPageIntro {
@@ -242,7 +260,10 @@ body:has(#muteToggleBtn i.bx-volume-mute) #muteToggleBtn {
 /* --- GLOBAL STYLES --- */
 body {
   overflow-x: hidden;
-  padding-left: var(--sidebar-width);
+  padding-top: var(--safe-area-top);
+  padding-right: var(--safe-area-right);
+  padding-bottom: var(--safe-area-bottom);
+  padding-left: calc(var(--sidebar-width) + var(--safe-area-left));
   background-color: var(--bg-dark) !important;
   background-image: url('/assets/images/textures/grid-me.png');
   background-blend-mode: var(--body-bg-blend);
@@ -260,7 +281,7 @@ body {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--wolf-app-height);
   background: var(--bg-dark);
   z-index: 99999;
   display: flex;
@@ -803,7 +824,11 @@ main {
   display: block;
   justify-content: center; /* THE MAGIC: Flex centering inside a Grid cell */
   align-items: flex-start;
-  padding: 80px 20px 120px 20px;
+  padding:
+    calc(80px + var(--safe-area-top))
+    calc(20px + var(--safe-area-right))
+    calc(120px + var(--safe-area-bottom) + var(--wolf-keyboard-offset))
+    calc(20px + var(--safe-area-left));
   min-width: 0; /* Prevents overflow content from breaking the grid */
 }
 
@@ -811,7 +836,7 @@ main {
   display: grid;
   /* 1. Define two columns: [Sidebar Width] [Remaining Space] */
   grid-template-columns: 80px 1fr;
-  min-height: 100vh;
+  min-height: var(--wolf-app-height);
   /* 2. Animate the columns changing size */
   transition: grid-template-columns 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -844,7 +869,7 @@ body.sidebar-open #wolf-layout {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--wolf-app-height);
   background: rgba(0, 0, 0, 0.5); /* Essential for blur to show up */
   -webkit-backdrop-filter: blur(10px) !important;
   backdrop-filter: blur(10px) !important;
@@ -894,14 +919,20 @@ body.sidebar-open #wolf-layout {
   }
 
   body {
-    padding-left: 0 !important; /* Ensure body doesn't shift */
+    padding-left: var(--safe-area-left) !important; /* Ensure body doesn't shift */
+    padding-right: var(--safe-area-right) !important;
+    padding-bottom: var(--safe-area-bottom) !important;
   }
 
   /* 3. Ensure the Main content area is static and full width */
   main {
     margin-left: 0 !important;
     width: 100% !important;
-    padding: 80px 15px 100px 15px;
+    padding:
+      calc(80px + var(--safe-area-top))
+      calc(15px + var(--safe-area-right))
+      calc(100px + var(--safe-area-bottom) + var(--wolf-keyboard-offset))
+      calc(15px + var(--safe-area-left));
     transition: none !important; /* Remove any margin/padding animations */
     transform: none !important;
   }
@@ -1756,14 +1787,23 @@ body.light-theme .btn-logbook-neutral {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--wolf-app-height);
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
   display: flex; /* Hidden by default via style="display:none" */
   justify-content: center;
   align-items: center;
   z-index: 15000; /* Must be higher than the scanner overlay */
-  padding: 20px;
+  padding:
+    calc(20px + var(--safe-area-top))
+    calc(20px + var(--safe-area-right))
+    calc(20px + var(--safe-area-bottom) + var(--wolf-keyboard-offset))
+    calc(20px + var(--safe-area-left));
+  overflow-y: auto;
+}
+
+body.wolf-keyboard-open #scanResultModal.modal-overlay {
+  align-items: flex-start;
 }
 
 .cyber-modal-container {
@@ -2712,5 +2752,51 @@ body.light-theme .btn-close-archive {
 
   .sales-landscape {
     max-width: min(94vw, 900px) !important;
+  }
+}
+
+/* --- ACCESSIBILITY + MOBILE COMFORT --- */
+:focus-visible {
+  outline: 2px solid rgba(var(--wolf-red-rgb), 0.86);
+  outline-offset: 2px;
+}
+
+body.light-theme :focus-visible {
+  outline-color: rgba(var(--wolf-red-rgb), 0.92);
+}
+
+@media (max-width: 767px) {
+  button,
+  .btn,
+  [role='button'],
+  .icon-btn,
+  .chrono-nav-btn,
+  .day-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  #stars-container .star,
+  .wolf-page-intro,
+  .fade-in {
+    animation: none !important;
+    transition: none !important;
   }
 }
