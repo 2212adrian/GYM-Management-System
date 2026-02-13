@@ -3069,6 +3069,7 @@
 
     applyAccessPolicy() {
       this.access = getAccessFlags();
+      const root = document.querySelector('.settings-wrapper');
       const tabs = document.getElementById('settings-tabs');
       const usersTabBtn = document.querySelector('[data-settings-tab="users"]');
       const usersPanel = document.querySelector('[data-settings-tab-panel="users"]');
@@ -3078,11 +3079,13 @@
       const adminLimitNote = document.getElementById('settings-admin-limit-note');
 
       if (!this.access.isAdmin) {
+        if (root) root.classList.add('settings-single-column');
         if (tabs) tabs.style.display = 'none';
         if (usersTabBtn) usersTabBtn.style.display = 'none';
         if (usersPanel) usersPanel.classList.remove('is-active');
         this.setActiveTab('personalize');
       } else {
+        if (root) root.classList.remove('settings-single-column');
         if (tabs) tabs.style.display = '';
         if (usersTabBtn) usersTabBtn.style.display = '';
       }

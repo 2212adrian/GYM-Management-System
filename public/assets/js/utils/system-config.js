@@ -1,7 +1,7 @@
 const WOLF_CONFIG = {
   noLoadingScreen: false,
-  VERSION: 'v0.8.0',
-  FULL_VERSION: 'GYM V0.8.0',
+  VERSION: 'v0.8.01',
+  FULL_VERSION: 'GYM V0.8.01',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',

@@ -41,6 +41,12 @@
     }
   }
 
+  @media (min-width: 1024px) {
+    .settings-wrapper.settings-single-column .settings-shell {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .settings-tabs {
     display: flex;
     gap: 10px;
