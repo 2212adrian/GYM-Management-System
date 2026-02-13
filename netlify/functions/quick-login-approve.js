@@ -129,74 +129,17 @@ function extractRequestIdFromQrToken(qrToken) {
 async function resolveApproverSession(supabase, accessToken, refreshToken) {
   let effectiveAccessToken = String(accessToken || '').trim();
   let effectiveRefreshToken = String(refreshToken || '').trim();
-  let user = null;
-
-  // Best path: setSession can auto-refresh expired access tokens.
-  const setSessionResult = await supabase.auth.setSession({
-    access_token: effectiveAccessToken,
-    refresh_token: effectiveRefreshToken,
-  });
-  if (!setSessionResult.error && setSessionResult.data?.session?.user) {
-    user = setSessionResult.data.session.user;
-    effectiveAccessToken =
-      setSessionResult.data.session.access_token || effectiveAccessToken;
-    effectiveRefreshToken =
-      setSessionResult.data.session.refresh_token || effectiveRefreshToken;
-    return {
-      user,
-      accessToken: effectiveAccessToken,
-      refreshToken: effectiveRefreshToken,
-    };
-  }
-
-  // First try the provided access token directly.
   const directUser = await supabase.auth.getUser(effectiveAccessToken);
   if (!directUser.error && directUser.data?.user) {
-    user = directUser.data.user;
     return {
-      user,
+      user: directUser.data.user,
       accessToken: effectiveAccessToken,
       refreshToken: effectiveRefreshToken,
     };
   }
 
-  // Fallback: refresh session using refresh token, then re-validate user.
-  const refreshed = await supabase.auth.refreshSession({
-    refresh_token: effectiveRefreshToken,
-  });
-  if (
-    refreshed.error ||
-    !refreshed.data?.session?.access_token ||
-    !refreshed.data?.session?.refresh_token
-  ) {
-    const reasons = [
-      setSessionResult.error?.message,
-      directUser.error?.message,
-      refreshed.error?.message,
-    ]
-      .filter(Boolean)
-      .join(' | ');
-    return {
-      error: reasons || 'Approver session is invalid or expired',
-    };
-  }
-
-  effectiveAccessToken = refreshed.data.session.access_token;
-  effectiveRefreshToken = refreshed.data.session.refresh_token;
-
-  const refreshedUser = await supabase.auth.getUser(effectiveAccessToken);
-  if (refreshedUser.error || !refreshedUser.data?.user) {
-    return {
-      error:
-        refreshedUser.error?.message || 'Approver session is invalid or expired',
-    };
-  }
-
-  user = refreshedUser.data.user;
   return {
-    user,
-    accessToken: effectiveAccessToken,
-    refreshToken: effectiveRefreshToken,
+    error: directUser.error?.message || 'Approver session is invalid or expired',
   };
 }
 
