@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Country Blocked</title>
+    <style>
+      :root {
+        --bg0: #05060a;
+        --bg1: #070c18;
+        --bg2: #0a142a;
+        --fg: #eaf0ff;
+        --muted: rgba(234, 240, 255, 0.72);
+        --line: rgba(234, 240, 255, 0.12);
+        --danger: #ff3b3b;
+        --ice: #38bdf8;
+        --ok: #4ade80;
+        --shadow: rgba(0, 0, 0, 0.55);
+      }
+      * { box-sizing: border-box; }
+
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;650;700&family=JetBrains+Mono:wght@500;700&display=swap");
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--fg);
+        font-family: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background:
+          radial-gradient(900px 550px at 18% 18%, rgba(255, 59, 59, 0.20), transparent 58%),
+          radial-gradient(820px 520px at 88% 74%, rgba(56, 189, 248, 0.16), transparent 56%),
+          radial-gradient(1100px 700px at 50% 110%, rgba(10, 20, 42, 0.95), transparent 55%),
+          linear-gradient(180deg, var(--bg0), var(--bg1));
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .bg-grid {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.45;
+        background:
+          linear-gradient(to right, rgba(234, 240, 255, 0.06) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(234, 240, 255, 0.06) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: radial-gradient(60% 55% at 50% 45%, #000 55%, transparent 100%);
+        animation: gridFloat 12s ease-in-out infinite;
+      }
+
+      @keyframes gridFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(10px); }
+      }
+
+      .card {
+        width: min(860px, 100%);
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(8, 12, 24, 0.78), rgba(6, 8, 16, 0.66));
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: 0 18px 70px var(--shadow);
+        position: relative;
+        overflow: hidden;
+        transform: translateY(8px);
+        opacity: 0;
+        animation: cardIn 560ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+
+      @keyframes cardIn {
+        to { transform: translateY(0); opacity: 1; }
+      }
+
+      .scanline {
+        position: absolute;
+        left: -20%;
+        right: -20%;
+        top: -40%;
+        height: 180%;
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          rgba(56, 189, 248, 0.0) 36%,
+          rgba(56, 189, 248, 0.12) 48%,
+          rgba(56, 189, 248, 0.0) 62%,
+          transparent 100%
+        );
+        transform: rotate(8deg);
+        animation: scan 2.9s ease-in-out infinite;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+
+      @keyframes scan {
+        0%, 100% { transform: translateY(-10%) rotate(8deg); opacity: 0.65; }
+        50% { transform: translateY(10%) rotate(8deg); opacity: 0.9; }
+      }
+
+      .row {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 59, 59, 0.35);
+        background: rgba(255, 59, 59, 0.10);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--danger);
+        box-shadow: 0 0 0 6px rgba(255, 59, 59, 0.12);
+        animation: pulse 1.35s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 59, 59, 0.10); }
+        50% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(255, 59, 59, 0.14); }
+      }
+
+      .icon-lock {
+        width: 22px;
+        height: 22px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      .title-row {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        margin-top: 14px;
+      }
+
+      .sigil {
+        width: 46px;
+        height: 46px;
+        flex: 0 0 auto;
+        border-radius: 14px;
+        border: 1px solid rgba(56, 189, 248, 0.22);
+        background:
+          radial-gradient(14px 14px at 30% 28%, rgba(56, 189, 248, 0.40), transparent 60%),
+          radial-gradient(16px 16px at 68% 68%, rgba(255, 59, 59, 0.34), transparent 62%),
+          linear-gradient(180deg, rgba(10, 20, 42, 0.95), rgba(5, 6, 10, 0.95));
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        display: grid;
+        place-items: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .sigil::after {
+        content: "";
+        position: absolute;
+        inset: -50%;
+        background: conic-gradient(from 180deg, transparent, rgba(56, 189, 248, 0.22), transparent, rgba(255, 59, 59, 0.18), transparent);
+        animation: spin 6.5s linear infinite;
+        opacity: 0.8;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .sigil svg {
+        position: relative;
+        z-index: 1;
+        width: 22px;
+        height: 22px;
+        opacity: 0.95;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: clamp(26px, 3.8vw, 38px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .code {
+        margin-top: 16px;
+        padding: 14px;
+        border: 1px dashed rgba(238, 242, 255, 0.22);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.20);
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        position: relative;
+        overflow: hidden;
+      }
+      .code span { color: rgba(238, 242, 255, 0.82); font-weight: 700; }
+      .code::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.10), transparent);
+        transform: translateX(-65%);
+        animation: sheen 2.6s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes sheen {
+        0%, 100% { transform: translateX(-65%); opacity: 0.45; }
+        50% { transform: translateX(65%); opacity: 0.85; }
+      }
+
+      .facts {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .fact {
+        border: 1px solid rgba(234, 240, 255, 0.12);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .fact .k {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(234, 240, 255, 0.72);
+      }
+      .fact .v {
+        margin-top: 6px;
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+
+      .mini-icon {
+        width: 14px;
+        height: 14px;
+        opacity: 0.9;
+      }
+
+      .footer {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      a {
+        color: rgba(56, 189, 248, 0.95);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+      }
+      a:hover { border-bottom-color: rgba(56, 189, 248, 0.65); }
+
+      .actions {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        appearance: none;
+        border: 1px solid rgba(234, 240, 255, 0.16);
+        background: rgba(10, 20, 42, 0.45);
+        color: var(--fg);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      }
+
+      .btn:hover { transform: translateY(-1px); border-color: rgba(56, 189, 248, 0.35); background: rgba(10, 20, 42, 0.60); }
+      .btn:active { transform: translateY(0); }
+      .btn.primary { border-color: rgba(255, 59, 59, 0.35); background: rgba(255, 59, 59, 0.08); }
+      .btn.primary:hover { border-color: rgba(255, 59, 59, 0.55); background: rgba(255, 59, 59, 0.12); }
+
+      @media (max-width: 700px) {
+        .facts { grid-template-columns: 1fr; }
+        .title-row { align-items: center; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bg-grid, .dot, .scanline, .sigil::after, .card, .code::before { animation: none !important; }
+        .btn { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <main class="card" role="main">
+      <div class="scanline" aria-hidden="true"></div>
+      <div class="row">
+        <div class="badge">
+          <span class="dot" aria-hidden="true"></span>
+          <svg class="icon-lock" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7.5 10V7.8a4.5 4.5 0 0 1 9 0V10" stroke="rgba(234,240,255,0.92)" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M7.2 10h9.6a2.4 2.4 0 0 1 2.4 2.4v6.9A2.7 2.7 0 0 1 16.5 22h-9A2.7 2.7 0 0 1 4.8 19.3v-6.9A2.4 2.4 0 0 1 7.2 10Z" stroke="rgba(234,240,255,0.92)" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 14v3" stroke="rgba(255,59,59,0.95)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          COUNTRY BLOCKED
+        </div>
+      </div>
+
+      <div class="title-row">
+        <div class="sigil" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 2.5 20.5 6v6.8c0 5.2-3.4 8.8-8.5 9.7-5.1-.9-8.5-4.5-8.5-9.7V6L12 2.5Z" stroke="rgba(234,240,255,0.9)" stroke-width="1.6"/>
+            <path d="M8.2 12.2 11 15l4.8-6" stroke="rgba(56,189,248,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Philippines-only access</h1>
+          <p>
+            This system is restricted to users located in the Philippines (PH). If you are currently in PH,
+            disable VPN/proxy, refresh the page, and try again.
+          </p>
+        </div>
+      </div>
+
+      <div class="code" id="errBox">[ERR_451] <span>COUNTRY_BLOCKED</span>: Access from this country is not permitted.</div>
+
+      <section class="facts" aria-label="Block details">
+        <div class="fact">
+          <div class="k">
+            <svg class="mini-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 22s8-4.5 8-12V6l-8-3-8 3v4c0 7.5 8 12 8 12Z" stroke="rgba(234,240,255,0.75)" stroke-width="1.6"/>
+              <path d="M12 11.2v4.4" stroke="rgba(255,59,59,0.95)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 8.4h.01" stroke="rgba(255,59,59,0.95)" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            Reason
+          </div>
+          <div class="v">Geo policy enforcement</div>
+        </div>
+        <div class="fact">
+          <div class="k">
+            <svg class="mini-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 21s7-4.1 7-11.2V6.2L12 3 5 6.2v3.6C5 16.9 12 21 12 21Z" stroke="rgba(234,240,255,0.75)" stroke-width="1.6"/>
+              <path d="M8.7 12.3h6.6" stroke="rgba(56,189,248,0.95)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Detected country
+          </div>
+          <div class="v" id="countryVal">Unknown</div>
+        </div>
+      </section>
+
+      <div class="actions" aria-label="Actions">
+        <button class="btn primary" type="button" id="retryBtn">Retry</button>
+        <button class="btn" type="button" id="copyBtn">Copy error</button>
+      </div>
+
+      <div class="footer">
+        <p>If you believe this is a mistake, contact the system administrator.</p>
+        <p><a href="/login">Go to login</a></p>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search || "");
+        const cc = String(params.get("cc") || "").trim().toUpperCase();
+        const countryEl = document.getElementById("countryVal");
+        if (countryEl) countryEl.textContent = cc || "Unknown";
+
+        const retryBtn = document.getElementById("retryBtn");
+        if (retryBtn) {
+          retryBtn.addEventListener("click", function () {
+            // Best-effort: go home and let the edge function re-evaluate.
+            window.location.href = "/";
+          });
+        }
+
+        const copyBtn = document.getElementById("copyBtn");
+        const errBox = document.getElementById("errBox");
+        if (copyBtn && errBox && navigator.clipboard) {
+          copyBtn.addEventListener("click", async function () {
+            try {
+              await navigator.clipboard.writeText(errBox.textContent || "");
+              copyBtn.textContent = "Copied";
+              setTimeout(() => (copyBtn.textContent = "Copy error"), 900);
+            } catch (e) {}
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

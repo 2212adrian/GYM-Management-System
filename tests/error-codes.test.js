@@ -11,6 +11,7 @@ test('maps HTTP status to expected error keys', () => {
   assert.equal(inferErrorKeyByStatus(400), 'REQUEST_INVALID');
   assert.equal(inferErrorKeyByStatus(409), 'STATE_CONFLICT');
   assert.equal(inferErrorKeyByStatus(503), 'LINK_OFFLINE');
+  assert.equal(inferErrorKeyByStatus(451), 'COUNTRY_BLOCKED');
   assert.equal(inferErrorKeyByStatus(999), 'SYSTEM_FAULT');
 });
 
@@ -38,4 +39,5 @@ test('newly introduced domain codes are registered', () => {
   assert.equal(ERROR_CODES.STOCK_LIMIT.code, '802');
   assert.equal(ERROR_CODES.CHRONOLOCK_ACTIVE.code, '811');
   assert.equal(ERROR_CODES.FUTURE_DATE_LOCKED.code, '812');
+  assert.equal(ERROR_CODES.COUNTRY_BLOCKED.code, '451');
 });
