@@ -90,6 +90,12 @@ function resetRecaptcha() {
   } catch (_) {}
 }
 
+function getRecaptchaRequiredAt() {
+  const raw = Number(window.WOLF_RECAPTCHA_PUBLIC_CONFIG?.requiredAt);
+  if (!Number.isFinite(raw)) return RECAPTCHA_REQUIRED_AT;
+  return Math.max(0, Math.floor(raw));
+}
+
 async function verifyRecaptchaToken(token) {
   const res = await fetch('/.netlify/functions/verify-recaptcha', {
     method: 'POST',
@@ -515,6 +521,98 @@ async function getLoginAttemptState(userIP) {
   }
 
   return { attempts: Number(log.attempts || 0), locked: false, remainingSeconds: 0 };
+}
+
+async function checkLoginLockoutStatus(
+  userIP = null,
+  { enforceCaptcha = false } = {},
+) {
+  const loginBtn = document.getElementById('loginBtn');
+  const recaptchaWrap = document.getElementById('recaptchaWrap');
+
+  const ip = String(userIP || '').trim() || (await getClientIP());
+  const attemptState = await getLoginAttemptState(ip);
+
+  if (attemptState.locked) {
+    const countdownSeconds =
+      Number(attemptState.remainingSeconds) || LOGIN_LOCKOUT_MINUTES * 60;
+    startLoginCountdown(countdownSeconds);
+    return true;
+  }
+
+  if (loginBtn && loginBtn.textContent.startsWith('LOCKED:')) {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'AUTHORIZE ACCESS';
+    hideLoginOutput(true);
+  }
+
+  const requiredAt = getRecaptchaRequiredAt();
+  const hasSiteKey = Boolean(getRecaptchaSiteKey());
+  const shouldGateWithRecaptcha =
+    hasSiteKey &&
+    (requiredAt <= 0 || attemptState.attempts >= Math.max(0, requiredAt - 1));
+
+  if (!shouldGateWithRecaptcha) {
+    if (recaptchaWrap) recaptchaWrap.hidden = true;
+    resetRecaptcha();
+    return false;
+  }
+
+  let rendered = false;
+  try {
+    rendered = await ensureRecaptchaRendered();
+  } catch (_) {
+    rendered = false;
+  }
+
+  if (!rendered) {
+    if (enforceCaptcha) {
+      showLoginOutput(
+        '[ERR_503] CAPTCHA_UNAVAILABLE: Verification module failed to initialize.',
+        { color: 'var(--wolf-red)' },
+      );
+      if (window.wolfAudio) window.wolfAudio.play('error');
+      if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'AUTHORIZE ACCESS';
+      }
+      return true;
+    }
+    return false;
+  }
+
+  if (!enforceCaptcha) return false;
+
+  const token = getRecaptchaResponseToken();
+  if (!token) {
+    showLoginOutput(
+      '[ERR_402] CAPTCHA_REQUIRED: Please complete the verification challenge.',
+      { color: 'var(--wolf-red)' },
+    );
+    if (window.wolfAudio) window.wolfAudio.play('denied');
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'AUTHORIZE ACCESS';
+    }
+    return true;
+  }
+
+  const verify = await verifyRecaptchaToken(token);
+  if (!verify.ok) {
+    showLoginOutput(
+      '[ERR_403] CAPTCHA_FAILED: Verification denied. Please try again.',
+      { color: 'var(--wolf-red)' },
+    );
+    if (window.wolfAudio) window.wolfAudio.play('denied');
+    resetRecaptcha();
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'AUTHORIZE ACCESS';
+    }
+    return true;
+  }
+
+  return false;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1192,7 +1290,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const userIP = await getClientIP();
-      const isLocked = await checkLoginLockoutStatus();
+      const isLocked = await checkLoginLockoutStatus(userIP, {
+        enforceCaptcha: true,
+      });
 
       if (isLocked) return;
 
