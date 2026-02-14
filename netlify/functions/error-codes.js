@@ -99,11 +99,6 @@ const ERROR_CODES = Object.freeze({
     label: 'FUTURE_DATE_LOCKED',
     meaning: 'Future date selection is locked by security policy.',
   },
-  COUNTRY_BLOCKED: {
-    code: '451',
-    label: 'COUNTRY_BLOCKED',
-    meaning: 'Access from this country is not permitted.',
-  },
 });
 
 const CODE_BY_STATUS = Object.freeze({
@@ -114,7 +109,6 @@ const CODE_BY_STATUS = Object.freeze({
   405: 'METHOD_BLOCKED',
   409: 'STATE_CONFLICT',
   410: 'KEY_EXPIRED',
-  451: 'COUNTRY_BLOCKED',
   429: 'RATE_LIMIT',
   500: 'SYSTEM_FAULT',
   501: 'SYSTEM_FAULT',

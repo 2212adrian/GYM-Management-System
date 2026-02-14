@@ -26,8 +26,92 @@ async function ensureSupabaseClient() {
   return supabaseClient;
 }
 
+// --- 1b. RECAPTCHA (on-demand, only after repeated failed logins) ---
+const RECAPTCHA_REQUIRED_AT = 6; // show/require captcha starting on 6th failed attempt
+let recaptchaWidgetId = null;
+let recaptchaScriptPromise = null;
+
+function getRecaptchaSiteKey() {
+  const key = String(window.WOLF_RECAPTCHA_PUBLIC_CONFIG?.siteKey || '').trim();
+  if (!key || key.includes('__WOLF_RECAPTCHA_SITE_KEY__')) return '';
+  return key;
+}
+
+function loadRecaptchaScriptOnce() {
+  if (recaptchaScriptPromise) return recaptchaScriptPromise;
+  recaptchaScriptPromise = new Promise((resolve, reject) => {
+    if (typeof window.grecaptcha !== 'undefined') return resolve(true);
+
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?render=explicit';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => reject(new Error('Failed to load reCAPTCHA script'));
+    document.head.appendChild(script);
+  });
+  return recaptchaScriptPromise;
+}
+
+async function ensureRecaptchaRendered() {
+  const wrap = document.getElementById('recaptchaWrap');
+  const widgetEl = document.getElementById('recaptchaWidget');
+  if (!wrap || !widgetEl) return false;
+
+  wrap.hidden = false;
+
+  const siteKey = getRecaptchaSiteKey();
+  if (!siteKey) return false;
+
+  await loadRecaptchaScriptOnce();
+  if (!window.grecaptcha || typeof window.grecaptcha.render !== 'function') {
+    return false;
+  }
+
+  if (recaptchaWidgetId == null) {
+    recaptchaWidgetId = window.grecaptcha.render(widgetEl, {
+      sitekey: siteKey,
+      theme: 'dark',
+    });
+  }
+
+  return true;
+}
+
+function getRecaptchaResponseToken() {
+  if (recaptchaWidgetId == null || !window.grecaptcha) return '';
+  return String(window.grecaptcha.getResponse(recaptchaWidgetId) || '').trim();
+}
+
+function resetRecaptcha() {
+  if (recaptchaWidgetId == null || !window.grecaptcha) return;
+  try {
+    window.grecaptcha.reset(recaptchaWidgetId);
+  } catch (_) {}
+}
+
+async function verifyRecaptchaToken(token) {
+  const res = await fetch('/.netlify/functions/verify-recaptcha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!res.ok) {
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch (_) {
+      payload = null;
+    }
+    return { ok: false, payload };
+  }
+
+  return { ok: true, payload: null };
+}
+
 // --- 2. CONFIGURATION ---
-const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS = 12;
 const LOGIN_LOCKOUT_MINUTES = 5;
 const OTP_CLICK_SPAM_WINDOW_MS = 1000;
 const OTP_CLICK_SPAM_THRESHOLD = 3;
@@ -399,34 +483,38 @@ function startLoginCountdown(seconds) {
   }, 1000);
 }
 
-// --- UTILS: CHECK DATABASE LOCKOUT ---
-async function checkLoginLockoutStatus() {
+// --- UTILS: LOGIN ATTEMPTS (used for lockout + optional reCAPTCHA gating) ---
+async function getLoginAttemptState(userIP) {
   await ensureSupabaseClient();
-  const userIP = await getClientIP();
+
+  const ip = String(userIP || '').trim();
+  if (!ip || ip === 'unknown_device') {
+    return { attempts: 0, locked: false, remainingSeconds: 0 };
+  }
+
   const { data: log } = await supabaseClient
     .from('login_attempts')
     .select('*')
-    .eq('ip_address', userIP)
+    .eq('ip_address', ip)
     .maybeSingle();
 
-  if (log) {
-    const diff = (Date.now() - new Date(log.last_attempt_at).getTime()) / 60000;
+  if (!log) return { attempts: 0, locked: false, remainingSeconds: 0 };
 
-    // If they hit max attempts and are still within the 5-minute window
-    if (log.attempts >= MAX_ATTEMPTS && diff < LOGIN_LOCKOUT_MINUTES) {
-      const remainingSeconds = Math.ceil((LOGIN_LOCKOUT_MINUTES - diff) * 60);
-      startLoginCountdown(remainingSeconds);
-      return true;
-    }
-    // If 5 minutes passed, reset their record
-    else if (diff >= LOGIN_LOCKOUT_MINUTES) {
-      await supabaseClient
-        .from('login_attempts')
-        .delete()
-        .eq('ip_address', userIP);
-    }
+  const diffMin =
+    (Date.now() - new Date(log.last_attempt_at).getTime()) / 60000;
+
+  // Reset record after the window expires.
+  if (diffMin >= LOGIN_LOCKOUT_MINUTES) {
+    await supabaseClient.from('login_attempts').delete().eq('ip_address', ip);
+    return { attempts: 0, locked: false, remainingSeconds: 0 };
   }
-  return false;
+
+  if (log.attempts >= MAX_ATTEMPTS) {
+    const remainingSeconds = Math.ceil((LOGIN_LOCKOUT_MINUTES - diffMin) * 60);
+    return { attempts: Number(log.attempts || 0), locked: true, remainingSeconds };
+  }
+
+  return { attempts: Number(log.attempts || 0), locked: false, remainingSeconds: 0 };
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

@@ -976,6 +976,64 @@ button:hover:not(:disabled) {
   margin-bottom: 20px;
 }
 
+/* --- reCAPTCHA (shown after repeated failed login attempts) --- */
+.recaptcha-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 14px;
+  padding: 12px 12px 14px;
+  margin-top: -8px;
+  margin-bottom: 16px;
+  animation: recaptchaIn 260ms ease both;
+}
+
+@keyframes recaptchaIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recaptcha-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #9fb2ff;
+  font-weight: 800;
+}
+
+.recaptcha-header i {
+  font-size: 16px;
+  color: var(--wolf-red);
+}
+
+.recaptcha-body {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.recaptcha-widget {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 520px) {
+  .recaptcha-widget {
+    transform: scale(0.92);
+    transform-origin: top center;
+  }
+}
+
 .checkbox-group input[type='checkbox'] {
   position: absolute;
   opacity: 0;

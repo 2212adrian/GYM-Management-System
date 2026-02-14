@@ -31,6 +31,7 @@
     <script src="https://unpkg.com/navigo@8.11.1/lib/navigo.min.js"></script>
     <script src="/assets/js/libraries/qrcode-generator.min.js"></script>
     <script src="assets/js/utils/supabase-public-config.js"></script>
+    <script src="assets/js/utils/recaptcha-public-config.js"></script>
     <script src="assets/js/utils/supabase-init.js"></script>
     <script src="assets/js/utils/system-config.js"></script>
     <script src="assets/js/utils/wolf-router.js"></script>
@@ -430,6 +431,17 @@
                     <span class="checkbox-ui" aria-hidden="true"></span>
                     <span>Remember this device for 30 days.</span>
                   </label>
+                </div>
+
+                <div id="recaptchaWrap" class="recaptcha-wrap" hidden>
+                  <div class="recaptcha-header">
+                    <i class="bx bx-shield"></i>
+                    <span>VERIFICATION REQUIRED</span>
+                  </div>
+                  <div class="recaptcha-body">
+                    Complete the security check to continue.
+                  </div>
+                  <div id="recaptchaWidget" class="recaptcha-widget"></div>
                 </div>
 
                 <button type="submit" id="loginBtn">LOGIN NOW</button>

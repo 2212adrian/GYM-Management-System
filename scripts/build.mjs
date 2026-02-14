@@ -72,6 +72,25 @@ async function injectPublicSupabaseConfig() {
   return true;
 }
 
+async function injectPublicRecaptchaConfig() {
+  const cfgPath = path.join(outDir, "assets", "js", "utils", "recaptcha-public-config.js");
+  const hasCfg = await fileExists(cfgPath);
+  if (!hasCfg) return false;
+
+  const siteKey = (
+    process.env.PUBLIC_RECAPTCHA_SITE_KEY ||
+    process.env.RECAPTCHA_SITE_KEY ||
+    ""
+  ).trim();
+
+  if (!siteKey) return false;
+
+  let source = await fs.readFile(cfgPath, "utf8");
+  source = source.replaceAll("__WOLF_RECAPTCHA_SITE_KEY__", siteKey);
+  await fs.writeFile(cfgPath, source, "utf8");
+  return true;
+}
+
 function toPosix(p) {
   return p.split(path.sep).join("/");
 }
@@ -208,10 +227,12 @@ async function hashAssetFilenames() {
 async function main() {
   await copyPublic();
   const injectedPublicConfig = await injectPublicSupabaseConfig();
+  const injectedRecaptchaConfig = await injectPublicRecaptchaConfig();
   const minifiedCount = await minifyJs();
   const hashedCount = await hashAssetFilenames();
   console.log(`[build] Copied public -> dist/public`);
   console.log(`[build] Injected Supabase public config: ${injectedPublicConfig ? "yes" : "no"}`);
+  console.log(`[build] Injected reCAPTCHA public config: ${injectedRecaptchaConfig ? "yes" : "no"}`);
   console.log(`[build] Minified ${minifiedCount} JS files`);
   console.log(`[build] Hashed ${hashedCount} asset filenames`);
 }
