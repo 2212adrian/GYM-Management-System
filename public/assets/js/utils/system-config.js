@@ -1,7 +1,7 @@
 const WOLF_CONFIG = {
   noLoadingScreen: false,
-  VERSION: 'v0.8.01',
-  FULL_VERSION: 'GYM V0.8.01',
+  VERSION: 'v0.8.1',
+  FULL_VERSION: 'GYM V0.8.1',
   BRAND_WHITE: 'WOLF',
   BRAND_RED: 'PALOMAR',
   COMPANY: 'WOLF PALOMAR',
@@ -206,7 +206,10 @@ function buildUpdateBannerMessage(currentVersion, latestVersion) {
 
 async function fetchCurrentPageSignature() {
   const host = String(window.location.hostname || '').toLowerCase();
-  const probes = [`${window.location.pathname}${window.location.search}`, '/index.html'];
+  const probes = [
+    `${window.location.pathname}${window.location.search}`,
+    '/index.html',
+  ];
 
   if (host !== 'localhost' && host !== '127.0.0.1') {
     try {

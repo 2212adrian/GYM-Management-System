@@ -46,6 +46,44 @@ function getRecaptchaSiteKey() {
   return key;
 }
 
+function getRecaptchaClient() {
+  if (window.grecaptcha && typeof window.grecaptcha.getResponse === 'function') {
+    return window.grecaptcha;
+  }
+  if (
+    window.grecaptcha &&
+    window.grecaptcha.enterprise &&
+    typeof window.grecaptcha.enterprise.getResponse === 'function'
+  ) {
+    return window.grecaptcha.enterprise;
+  }
+  return null;
+}
+
+function getRecaptchaRenderClient() {
+  if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+    return window.grecaptcha;
+  }
+  if (
+    window.grecaptcha &&
+    window.grecaptcha.enterprise &&
+    typeof window.grecaptcha.enterprise.render === 'function'
+  ) {
+    return window.grecaptcha.enterprise;
+  }
+  return null;
+}
+
+async function waitForRecaptchaRenderClient(timeoutMs = 4000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const client = getRecaptchaRenderClient();
+    if (client) return client;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  }
+  return null;
+}
+
 function loadRecaptchaScriptOnce() {
   if (recaptchaScriptPromise) return recaptchaScriptPromise;
   recaptchaScriptPromise = new Promise((resolve, reject) => {
@@ -85,7 +123,15 @@ async function ensureRecaptchaRendered() {
     return false;
   }
 
-  if (!window.grecaptcha || typeof window.grecaptcha.render !== 'function') {
+  const existingToken = getRecaptchaResponseToken();
+  if (existingToken) {
+    setRecaptchaInitError('');
+    wrap.hidden = true;
+    return true;
+  }
+
+  const recaptchaClient = await waitForRecaptchaRenderClient(4500);
+  if (!recaptchaClient) {
     wrap.hidden = true;
     setRecaptchaInitError('reCAPTCHA API loaded without render() function.');
     return false;
@@ -93,9 +139,20 @@ async function ensureRecaptchaRendered() {
 
   if (recaptchaWidgetId == null) {
     try {
-      recaptchaWidgetId = window.grecaptcha.render(widgetEl, {
+      recaptchaWidgetId = recaptchaClient.render(widgetEl, {
         sitekey: siteKey,
         theme: 'dark',
+        callback: () => {
+          wrap.hidden = true;
+          setRecaptchaInitError('');
+        },
+        'expired-callback': () => {
+          wrap.hidden = false;
+        },
+        'error-callback': () => {
+          wrap.hidden = false;
+          setRecaptchaInitError('reCAPTCHA encountered a client error.');
+        },
       });
     } catch (err) {
       wrap.hidden = true;
@@ -110,14 +167,16 @@ async function ensureRecaptchaRendered() {
 }
 
 function getRecaptchaResponseToken() {
-  if (recaptchaWidgetId == null || !window.grecaptcha) return '';
-  return String(window.grecaptcha.getResponse(recaptchaWidgetId) || '').trim();
+  const recaptchaClient = getRecaptchaClient();
+  if (recaptchaWidgetId == null || !recaptchaClient) return '';
+  return String(recaptchaClient.getResponse(recaptchaWidgetId) || '').trim();
 }
 
 function resetRecaptcha() {
-  if (recaptchaWidgetId == null || !window.grecaptcha) return;
+  const recaptchaClient = getRecaptchaClient();
+  if (recaptchaWidgetId == null || !recaptchaClient) return;
   try {
-    window.grecaptcha.reset(recaptchaWidgetId);
+    recaptchaClient.reset(recaptchaWidgetId);
   } catch (_) {}
 }
 
@@ -633,6 +692,7 @@ async function checkLoginLockoutStatus(
 
   const verify = await verifyRecaptchaToken(token);
   if (!verify.ok) {
+    if (recaptchaWrap) recaptchaWrap.hidden = false;
     showLoginOutput(
       '[ERR_403] CAPTCHA_FAILED: Verification denied. Please try again.',
       { color: 'var(--wolf-red)' },

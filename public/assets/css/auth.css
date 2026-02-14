@@ -987,6 +987,10 @@ button:hover:not(:disabled) {
   animation: recaptchaIn 260ms ease both;
 }
 
+.recaptcha-wrap[hidden] {
+  display: none !important;
+}
+
 @keyframes recaptchaIn {
   from {
     opacity: 0;
