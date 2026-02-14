@@ -134,3 +134,9 @@
   to = "/404.html"
   status = 404
   force = false
+
+[[redirects]]
+  from = "/*"
+  to = "/philippines-only" # ANTI-VPN USERS
+  status = 302
+  force = true
