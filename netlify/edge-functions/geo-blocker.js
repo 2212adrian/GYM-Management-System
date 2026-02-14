@@ -44,7 +44,7 @@ function isSensitivePath(pathname) {
   return false;
 }
 
-export default async (request) => {
+export default async (request, context) => {
   const url = new URL(request.url);
   const path = url.pathname || "/";
 
@@ -62,7 +62,7 @@ export default async (request) => {
 
   // Always allow the block page itself so it can render.
   if (path === "/philippines-only" || path.startsWith("/philippines-only/")) {
-    return await fetch(request);
+    return context.next();
   }
 
   // Netlify sets x-nf-geo-country in production. Accept a couple header variants.
@@ -72,8 +72,12 @@ export default async (request) => {
     "";
   const countryCode = String(countryCodeRaw).trim().toUpperCase();
 
-  // Avoid blocking local dev if the geo header is missing.
-  if (!countryCode && isLocalDev(url)) return await fetch(request);
+  // If Netlify geo headers are missing, don't block. Otherwise you'd block PH users
+  // when the platform doesn't send geo info (or during some environments).
+  if (!countryCode) return context.next();
+
+  // Avoid blocking local dev if someone manually sets a non-PH header.
+  if (isLocalDev(url)) return context.next();
 
   if (countryCode !== "PH") {
     if (wantsHtml(request)) {
@@ -98,5 +102,5 @@ export default async (request) => {
     );
   }
 
-  return await fetch(request);
+  return context.next();
 };
