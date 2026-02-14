@@ -23,10 +23,43 @@
     letter-spacing: 1px;
   }
 
+  .settings-shell {
+    display: grid;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .settings-content {
+    min-width: 0;
+    display: grid;
+    gap: 16px;
+  }
+
+  @media (min-width: 1024px) {
+    .settings-shell {
+      grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .settings-wrapper.settings-single-column .settings-shell {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .settings-tabs {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+  }
+
+  @media (min-width: 1024px) {
+    .settings-tabs {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      position: sticky;
+      top: 12px;
+    }
   }
 
   .settings-tab {
@@ -259,6 +292,13 @@
   .settings-actions {
     display: grid;
     gap: 10px;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 768px) {
+    .settings-actions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .settings-btn {
@@ -496,16 +536,18 @@
 <div class="settings-wrapper" id="settings-page">
   <div class="settings-title">Profile Settings</div>
 
-  <div class="settings-tabs" id="settings-tabs">
-    <button class="settings-tab is-active" data-settings-tab-btn data-settings-tab="personalize">
-      Personalize
-    </button>
-    <button class="settings-tab" data-settings-tab-btn data-settings-tab="users">
-      User Accounts
-    </button>
-  </div>
+  <div class="settings-shell">
+    <div class="settings-tabs" id="settings-tabs">
+      <button class="settings-tab is-active" data-settings-tab-btn data-settings-tab="personalize">
+        Personalize
+      </button>
+      <button class="settings-tab" data-settings-tab-btn data-settings-tab="users">
+        User Accounts
+      </button>
+    </div>
 
-  <div class="settings-panel is-active" data-settings-tab-panel="personalize">
+    <div class="settings-content">
+      <div class="settings-panel is-active" data-settings-tab-panel="personalize">
     <div class="settings-card">
       <div class="profile-banner">
         <div class="profile-avatar">
@@ -581,14 +623,15 @@
       </div>
     </div>
 
-    <div class="settings-actions">
-      <button id="settings-update-btn" class="settings-btn primary">Update Account</button>
-      <button id="settings-logout-btn" class="settings-btn secondary">Terminate Session</button>
+      <div class="settings-actions">
+        <button id="settings-update-btn" class="settings-btn primary">Update Account</button>
+        <button id="settings-reset-btn" class="settings-btn secondary">Reset To Default</button>
+        <button id="settings-logout-btn" class="settings-btn secondary">Terminate Session</button>
+      </div>
     </div>
-  </div>
 
-  <div class="settings-panel" data-settings-tab-panel="users">
-    <div class="settings-card">
+      <div class="settings-panel" data-settings-tab-panel="users">
+        <div class="settings-card">
       <div class="settings-topline">
         <div class="settings-label">User Accounts Provisioning</div>
         <div id="settings-admin-count-chip" class="settings-pill">Admins: 0/3</div>
@@ -649,13 +692,15 @@
       </div>
     </div>
 
-    <div class="settings-card">
-      <div class="settings-users-tools">
-        <div class="settings-label">Managed Accounts</div>
-        <button id="settings-refresh-users-btn" class="settings-btn secondary">Refresh List</button>
+        <div class="settings-card">
+          <div class="settings-users-tools">
+            <div class="settings-label">Managed Accounts</div>
+            <button id="settings-refresh-users-btn" class="settings-btn secondary">Refresh List</button>
+          </div>
+          <div id="settings-users-empty" class="settings-empty">No managed accounts found.</div>
+          <div id="settings-users-list" class="settings-users-list"></div>
+        </div>
       </div>
-      <div id="settings-users-empty" class="settings-empty">No managed accounts found.</div>
-      <div id="settings-users-list" class="settings-users-list"></div>
     </div>
   </div>
 

@@ -14,6 +14,15 @@ exports.handler = async (event) => {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
   };
+  const context = String(process.env.CONTEXT || process.env.NODE_ENV || '')
+    .trim()
+    .toLowerCase();
+  const isProduction = context === 'production';
+  const allowPublicConfig =
+    !isProduction ||
+    String(process.env.ALLOW_PUBLIC_SUPABASE_CONFIG || '')
+      .trim()
+      .toLowerCase() === 'true';
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
@@ -21,6 +30,10 @@ exports.handler = async (event) => {
 
   if (event.httpMethod !== 'GET') {
     return json(405, headers, { error: 'Method not allowed' });
+  }
+
+  if (!allowPublicConfig) {
+    return json(404, headers, { error: 'Not found' });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;

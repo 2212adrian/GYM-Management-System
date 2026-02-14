@@ -61,67 +61,24 @@ window.wolfRetry = async function () {
 // --- 0. DOM PURIFY SETUP ---
 // Create a global purifier function for consistent use
 
-const WOLF_PURIFIER = (dirty) => {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: [
-      'div',
-      'span',
-      'p',
-      'a',
-      'button',
-      'input',
-      'label',
-      'ul',
-      'li',
-      'table',
-      'thead',
-      'tbody',
-      'tr',
-      'td',
-      'section',
-      'header',
-      'footer',
-      'main',
-      'nav',
-      'i',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'style',
-      'form',
-      'textarea',
-      'select',
-      'option',
-      'img', // ⬅ add these
-    ],
-    ALLOWED_ATTR: [
-      'class',
-      'id',
-      'style',
-      'data-page',
-      'data-date',
-      'data-day',
-      'data-id',
-      'data-product-id', // ⬅ add
-      'href',
-      'type',
-      'value',
-      'placeholder',
-      'aria-label',
-      'role',
-      'src',
-      'alt', // ⬅ add src, alt
-      'accept',
-      'hidden',
-    ],
+const WOLF_PURIFIER = (dirty) =>
+  DOMPurify.sanitize(String(dirty ?? ''), {
     KEEP_CONTENT: true,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick'],
   });
-};
+
+window.WOLF_PURIFIER = WOLF_PURIFIER;
+
+function safeSetHTML(target, html) {
+  if (!target) return;
+  target.innerHTML = String(html ?? '');
+}
+
+function safeInsertHTML(target, position, html) {
+  if (!target) return;
+  target.insertAdjacentHTML(position, String(html ?? ''));
+}
 
 const getSkeletonUI = () => `
   <div class="skeleton-wrapper">
@@ -171,7 +128,9 @@ const WOLF_MAIN_PAGE_ALIASES = Object.freeze({
 });
 
 function normalizeMainPage(pageName) {
-  const raw = String(pageName || '').trim().toLowerCase();
+  const raw = String(pageName || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return 'dashboard';
   return WOLF_MAIN_PAGE_ALIASES[raw] || raw;
 }
@@ -267,7 +226,9 @@ function toggleTopbarSettingsMenu() {
 }
 
 function openSettingsTab(tabName = 'personalize') {
-  const normalized = String(tabName || 'personalize').trim().toLowerCase();
+  const normalized = String(tabName || 'personalize')
+    .trim()
+    .toLowerCase();
   try {
     localStorage.setItem('wolf_settings_open_tab', normalized);
   } catch (_) {
@@ -303,7 +264,10 @@ async function hydrateSidebarAuthIdentity() {
 
   try {
     if (!email || !displayName) {
-      if (window.supabaseReady && typeof window.supabaseReady.then === 'function') {
+      if (
+        window.supabaseReady &&
+        typeof window.supabaseReady.then === 'function'
+      ) {
         await window.supabaseReady;
       }
       if (window.supabaseClient?.auth?.getUser) {
@@ -496,7 +460,7 @@ async function loadComponent(targetId, url) {
     if (!res.ok) throw new Error('Failed to load component');
     const html = await res.text();
 
-    container.insertAdjacentHTML('beforeend', html);
+    safeInsertHTML(container, 'beforeend', html);
 
     // After injecting, move any <style> tags to <head>
     const styles = container.querySelectorAll('style');
@@ -726,20 +690,23 @@ async function navigateTo(pageName, options = {}) {
 
   if (!canAccessMainPage(pageName)) {
     const deniedUI = getUnauthorizedUI(pageName);
-    mainContent.innerHTML = deniedUI;
+    safeSetHTML(mainContent, deniedUI);
     mainContent.style.opacity = '1';
     updateNavHighlights('');
     window.WOLF_CURRENT_PAGE = 'unauthorized';
     window.WOLF_LAST_REQUESTED_PAGE = pageName;
 
     if (brandEl) {
-      brandEl.innerHTML = `
+      safeSetHTML(
+        brandEl,
+        `
         <div class="breadcrumb-container" style="display: flex; align-items: center; gap: 8px;">
           <span style="opacity:0.5;">SYSTEM</span>
           <i class='bx bx-chevron-right' style="color: var(--wolf-red); font-size:1.2rem; font-weight:bold;"></i>
           <span style="letter-spacing: 1px; font-weight: 800; color: var(--wolf-red);">UNAUTHORIZED</span>
         </div>
-      `;
+      `,
+      );
     }
     wolfNavInFlight = false;
     wolfNavCooldownUntil = Date.now() + 280;
@@ -752,7 +719,12 @@ async function navigateTo(pageName, options = {}) {
   await closeAllActiveModals();
 
   const navigationMap = {
-    dashboard: { label: 'DASHBOARD', parent: 'MAIN', parentRoute: 'hub', section: 'main' },
+    dashboard: {
+      label: 'DASHBOARD',
+      parent: 'MAIN',
+      parentRoute: 'hub',
+      section: 'main',
+    },
     home: { label: 'WOLF <span>PALOMAR</span> GYM', parent: null },
     hub: { label: 'COMMAND CENTER', parent: 'WOLF OS', section: 'main' },
     // Admin Category
@@ -867,7 +839,7 @@ async function navigateTo(pageName, options = {}) {
 
   // 1. Immediate Network Guard
   if (!navigator.onLine) {
-    mainContent.innerHTML = offlineUI;
+    safeSetHTML(mainContent, offlineUI);
     mainContent.style.opacity = '1';
     wolfNavInFlight = false;
     wolfNavCooldownUntil = Date.now() + 220;
@@ -876,7 +848,7 @@ async function navigateTo(pageName, options = {}) {
   }
 
   // 2. Show Skeleton immediately
-  mainContent.innerHTML = skeletonUI;
+  safeSetHTML(mainContent, skeletonUI);
   mainContent.style.opacity = '1';
 
   // 3. Forced Delay for smooth perception
@@ -911,134 +883,137 @@ async function navigateTo(pageName, options = {}) {
 
     await new Promise((resolveSwap) => {
       setTimeout(() => {
-      // 6. Wrap incoming HTML in the intro animation class
-      mainContent.innerHTML = `<div class="wolf-page-intro">${html}</div>`;
-      applyRoleBasedVisibility(document);
+        // 6. Wrap incoming HTML in the intro animation class
+        safeSetHTML(mainContent, `<div class="wolf-page-intro">${html}</div>`);
+        applyRoleBasedVisibility(document);
 
-      if (brandEl) {
-        const isMobile = window.innerWidth <= 1024;
-        const info = navigationMap[pageName];
+        if (brandEl) {
+          const isMobile = window.innerWidth <= 1024;
+          const info = navigationMap[pageName];
 
-        if (!info || pageName === 'home') {
-          // Reset to Logo for Home
-          brandEl.innerHTML = 'WOLF <span>PALOMAR</span> GYM';
-          brandEl.style.fontSize = ''; // Reset size
-        } else {
-          // 1. Determine sizes
-          const baseFontSize = isMobile ? '0.85rem' : '1rem';
-          const parentOpacity = '0.5';
+          if (!info || pageName === 'home') {
+            // Reset to Logo for Home
+            safeSetHTML(brandEl, 'WOLF <span>PALOMAR</span> GYM');
+            brandEl.style.fontSize = ''; // Reset size
+          } else {
+            // 1. Determine sizes
+            const baseFontSize = isMobile ? '0.85rem' : '1rem';
+            const parentOpacity = '0.5';
 
-          // 2. Clickable Parent Logic
-          const isAlreadyOnParent = pageName === info.parentRoute;
-          const parentHTML = isAlreadyOnParent
-            ? `<span style="opacity: ${parentOpacity};">${info.parent}</span>`
-            : `<span class="breadcrumb-link" 
+            // 2. Clickable Parent Logic
+            const isAlreadyOnParent = pageName === info.parentRoute;
+            const parentHTML = isAlreadyOnParent
+              ? `<span style="opacity: ${parentOpacity};">${info.parent}</span>`
+              : `<span class="breadcrumb-link" 
                onclick="window.pendingHubSection='${info.section}'; navigateTo('hub')" 
                style="cursor:pointer; opacity: ${parentOpacity}; transition: opacity 0.2s;">
             ${info.parent}
           </span>`;
 
-          // 3. Set the HTML with the Blue Arrow
-          brandEl.style.fontSize = baseFontSize;
-          brandEl.style.display = 'flex';
-          brandEl.style.alignItems = 'center';
-          brandEl.style.justifyContent = 'center'; // Keeps it centered in the top bar
+            // 3. Set the HTML with the Blue Arrow
+            brandEl.style.fontSize = baseFontSize;
+            brandEl.style.display = 'flex';
+            brandEl.style.alignItems = 'center';
+            brandEl.style.justifyContent = 'center'; // Keeps it centered in the top bar
 
-          brandEl.innerHTML = `
+            safeSetHTML(
+              brandEl,
+              `
           <div class="breadcrumb-container" style="display: flex; align-items: center; gap: ${isMobile ? '5px' : '8px'};">
             ${parentHTML}
             <i class='bx bx-chevron-right' style="color: var(--wolf-red); font-size: ${isMobile ? '1.1rem' : '1.3rem'}; font-weight: bold;"></i>
             <span style="letter-spacing: 1px; font-weight: 800; color: var(--breadcrumb-current-color, var(--text-main));">${info.label}</span>
           </div>
-        `;
-        }
-      }
-
-      // 7. INITIALIZE PAGE MANAGERS
-      if (isLedger && window.wolfData) {
-        wolfData.activeMode = pageName;
-        wolfData.initLedger(pageName);
-      } else if (
-        pageName === 'dashboard' &&
-        typeof window.DashboardManager !== 'undefined'
-      ) {
-        window.DashboardManager.init();
-      } else if (
-        pageName === 'members' &&
-        typeof MemberManager !== 'undefined'
-      ) {
-        MemberManager.init();
-      } else if (
-        (pageName === 'management/products' || pageName === 'products') &&
-        typeof ProductManager !== 'undefined'
-      ) {
-        ProductManager.init();
-      } else if (
-        pageName === 'equipments' &&
-        typeof window.EquipmentManager !== 'undefined'
-      ) {
-        window.EquipmentManager.init();
-      } else if (
-        pageName === 'feedback' &&
-        typeof window.FeedbackManager !== 'undefined'
-      ) {
-        window.FeedbackManager.init();
-      } else if (
-        pageName === 'id-maker' &&
-        typeof window.IdMakerManager !== 'undefined'
-      ) {
-        window.IdMakerManager.init();
-      } else if (
-        pageName === 'audit-log' &&
-        typeof window.AuditManager !== 'undefined'
-      ) {
-        window.AuditManager.init();
-      } else if (
-        pageName === 'settings' &&
-        typeof window.SettingsManager !== 'undefined'
-      ) {
-        window.SettingsManager.init();
-      } else if (
-        pageName === 'goal-center' &&
-        typeof window.GoalCenterManager !== 'undefined'
-      ) {
-        window.GoalCenterManager.init();
-      }
-
-      // 8. Reveal content
-      mainContent.style.opacity = '1';
-      updateNavHighlights(pageName);
-
-      window.WOLF_CURRENT_PAGE = pageName;
-      window.WOLF_LAST_REQUESTED_PAGE = pageName;
-
-      if (updateRoute && pageName) {
-        if (wolfMainRouter) {
-          const nextRoute = `/${pageName}`;
-          const currentRoute =
-            String(window.location.hash || '').replace('#', '') || '/';
-
-          if (currentRoute !== nextRoute) {
-            wolfMainRouterSyncing = true;
-            wolfMainRouter.navigate(nextRoute);
-            setTimeout(() => {
-              wolfMainRouterSyncing = false;
-            }, 0);
+        `,
+            );
           }
-        } else {
-          window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
         }
-      }
 
-      if (window.applyVersioning) window.applyVersioning();
-      resolveSwap();
+        // 7. INITIALIZE PAGE MANAGERS
+        if (isLedger && window.wolfData) {
+          wolfData.activeMode = pageName;
+          wolfData.initLedger(pageName);
+        } else if (
+          pageName === 'dashboard' &&
+          typeof window.DashboardManager !== 'undefined'
+        ) {
+          window.DashboardManager.init();
+        } else if (
+          pageName === 'members' &&
+          typeof MemberManager !== 'undefined'
+        ) {
+          MemberManager.init();
+        } else if (
+          (pageName === 'management/products' || pageName === 'products') &&
+          typeof ProductManager !== 'undefined'
+        ) {
+          ProductManager.init();
+        } else if (
+          pageName === 'equipments' &&
+          typeof window.EquipmentManager !== 'undefined'
+        ) {
+          window.EquipmentManager.init();
+        } else if (
+          pageName === 'feedback' &&
+          typeof window.FeedbackManager !== 'undefined'
+        ) {
+          window.FeedbackManager.init();
+        } else if (
+          pageName === 'id-maker' &&
+          typeof window.IdMakerManager !== 'undefined'
+        ) {
+          window.IdMakerManager.init();
+        } else if (
+          pageName === 'audit-log' &&
+          typeof window.AuditManager !== 'undefined'
+        ) {
+          window.AuditManager.init();
+        } else if (
+          pageName === 'settings' &&
+          typeof window.SettingsManager !== 'undefined'
+        ) {
+          window.SettingsManager.init();
+        } else if (
+          pageName === 'goal-center' &&
+          typeof window.GoalCenterManager !== 'undefined'
+        ) {
+          window.GoalCenterManager.init();
+        }
+
+        // 8. Reveal content
+        mainContent.style.opacity = '1';
+        updateNavHighlights(pageName);
+
+        window.WOLF_CURRENT_PAGE = pageName;
+        window.WOLF_LAST_REQUESTED_PAGE = pageName;
+
+        if (updateRoute && pageName) {
+          if (wolfMainRouter) {
+            const nextRoute = `/${pageName}`;
+            const currentRoute =
+              String(window.location.hash || '').replace('#', '') || '/';
+
+            if (currentRoute !== nextRoute) {
+              wolfMainRouterSyncing = true;
+              wolfMainRouter.navigate(nextRoute);
+              setTimeout(() => {
+                wolfMainRouterSyncing = false;
+              }, 0);
+            }
+          } else {
+            window.history.pushState({ page: pageName }, '', `?p=${pageName}`);
+          }
+        }
+
+        if (window.applyVersioning) window.applyVersioning();
+        resolveSwap();
       }, 200);
     });
   } catch (err) {
     console.warn(`Wolf OS: Navigation Error ->`, err);
 
     if (!navigator.onLine || err instanceof TypeError) {
-      mainContent.innerHTML = offlineUI;
+      safeSetHTML(mainContent, offlineUI);
       mainContent.style.opacity = '1';
       wolfNavInFlight = false;
       wolfNavCooldownUntil = Date.now() + 260;
@@ -1053,10 +1028,13 @@ async function navigateTo(pageName, options = {}) {
       const doc = parser.parseFromString(fullHtml, 'text/html');
 
       // Add intro animation to 404 page too
-      mainContent.innerHTML = `<div class="wolf-page-intro">
+      safeSetHTML(
+        mainContent,
+        `<div class="wolf-page-intro">
         ${doc.querySelector('style')?.outerHTML || ''}
         ${doc.body.innerHTML}
-      </div>`;
+      </div>`,
+      );
 
       mainContent.style.opacity = '1';
       const pathEl = document.getElementById('display-path');
@@ -1066,8 +1044,8 @@ async function navigateTo(pageName, options = {}) {
         .querySelectorAll('[data-page]')
         .forEach((el) => el.classList.remove('active'));
     } catch (fatal) {
-      if (brandEl) brandEl.innerHTML = 'WOLF <span>PALOMAR</span> GYM';
-      mainContent.innerHTML = offlineUI;
+      if (brandEl) safeSetHTML(brandEl, 'WOLF <span>PALOMAR</span> GYM');
+      safeSetHTML(mainContent, offlineUI);
       mainContent.style.opacity = '1';
     }
   } finally {
@@ -1110,9 +1088,9 @@ async function initUI() {
         loadHTML('/assets/components/floating-nav.html'),
       ]);
 
-      document.getElementById('topbar-container').innerHTML = topbar;
-      document.getElementById('sidebar-container').innerHTML = sidebar;
-      document.getElementById('nav-container').innerHTML = nav;
+      safeSetHTML(document.getElementById('topbar-container'), topbar);
+      safeSetHTML(document.getElementById('sidebar-container'), sidebar);
+      safeSetHTML(document.getElementById('nav-container'), nav);
       applyRoleBasedVisibility(document);
       await hydrateSidebarAuthIdentity();
 
@@ -1410,7 +1388,9 @@ function setupGlobalClickHandlers() {
     const settingsTabMenuBtn = e.target.closest('[data-settings-menu-tab]');
     if (settingsTabMenuBtn) {
       e.preventDefault();
-      const requestedTab = settingsTabMenuBtn.getAttribute('data-settings-menu-tab');
+      const requestedTab = settingsTabMenuBtn.getAttribute(
+        'data-settings-menu-tab',
+      );
       closeTopbarSettingsMenu();
       openSettingsTab(requestedTab || 'personalize');
       return;

@@ -2,7 +2,11 @@
   .goal-center-wrapper {
     --goal-accent: #ff4d3f;
     --goal-accent-rgb: 255, 77, 63;
-    --goal-card-bg: linear-gradient(165deg, rgba(18, 19, 26, 0.94), rgba(11, 12, 17, 0.9));
+    --goal-card-bg: linear-gradient(
+      165deg,
+      rgba(18, 19, 26, 0.94),
+      rgba(11, 12, 17, 0.9)
+    );
     --goal-card-border: rgba(255, 255, 255, 0.09);
     --goal-track: rgba(255, 255, 255, 0.08);
     --goal-muted: #94a3b8;
@@ -49,6 +53,40 @@
     gap: 18px;
   }
 
+  .goal-custom-zone {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(circle at 0% 0%, rgba(249, 115, 22, 0.12), transparent 40%),
+      linear-gradient(165deg, rgba(16, 17, 23, 0.94), rgba(11, 12, 18, 0.9));
+    box-shadow:
+      0 16px 32px rgba(0, 0, 0, 0.32),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+
+  .goal-custom-title {
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 1.3px;
+    color: #f8fafc;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .goal-custom-caution {
+    font-size: 10px;
+    line-height: 1.45;
+    color: #c6d0e4;
+    letter-spacing: 0.4px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.09);
+  }
+
   @media (max-width: 1023px) {
     .goal-grid {
       grid-template-columns: 1fr;
@@ -78,8 +116,16 @@
     inset: 0;
     z-index: -1;
     background:
-      radial-gradient(circle at 22% -10%, rgba(var(--goal-accent-rgb), 0.2), transparent 48%),
-      radial-gradient(circle at 95% 130%, rgba(var(--goal-accent-rgb), 0.12), transparent 48%);
+      radial-gradient(
+        circle at 22% -10%,
+        rgba(var(--goal-accent-rgb), 0.2),
+        transparent 48%
+      ),
+      radial-gradient(
+        circle at 95% 130%,
+        rgba(var(--goal-accent-rgb), 0.12),
+        transparent 48%
+      );
   }
 
   .goal-card.goal-weekly {
@@ -90,6 +136,21 @@
   .goal-card.goal-monthly {
     --goal-accent: #22c55e;
     --goal-accent-rgb: 34, 197, 94;
+  }
+
+  .goal-card.goal-quarterly {
+    --goal-accent: #8b5cf6;
+    --goal-accent-rgb: 139, 92, 246;
+  }
+
+  .goal-card.goal-yearly {
+    --goal-accent: #0ea5e9;
+    --goal-accent-rgb: 14, 165, 233;
+  }
+
+  .goal-card.goal-custom {
+    --goal-accent: #f97316;
+    --goal-accent-rgb: 249, 115, 22;
   }
 
   .goal-card .goal-meta {
@@ -112,7 +173,8 @@
     text-transform: uppercase;
     letter-spacing: 1.2px;
     font-weight: 800;
-    border: 1px solid color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
+    border: 1px solid
+      color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
     border-radius: 999px;
     padding: 3px 8px;
     background: color-mix(in srgb, var(--goal-accent) 14%, transparent 86%);
@@ -135,6 +197,60 @@
     align-items: center;
   }
 
+  .goal-input-row.goal-input-row-custom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .goal-custom-chrono {
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .goal-custom-chrono .date-status-pill {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(7, 10, 15, 0.84);
+    border-radius: 12px;
+    padding: 10px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .goal-custom-chrono .date-status-pill:hover {
+    border-color: var(--goal-accent);
+    background: rgba(13, 16, 24, 0.95);
+  }
+
+  .goal-custom-chrono .protocol-label {
+    display: block;
+    font-weight: 900;
+    font-size: 9px;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    color: #a7b2c7;
+    margin-bottom: 5px;
+  }
+
+  #goal-custom-range-display {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: #f1f5ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .goal-input {
     flex: 1;
     background: rgba(5, 8, 14, 0.9);
@@ -146,16 +262,23 @@
     font-weight: 800;
     letter-spacing: 0.6px;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .goal-input:focus {
     border-color: var(--goal-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--goal-accent) 24%, transparent 76%);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--goal-accent) 24%, transparent 76%);
   }
 
   .goal-btn {
-    background: linear-gradient(140deg, var(--goal-accent), color-mix(in srgb, var(--goal-accent) 70%, #ffffff 30%));
+    background: linear-gradient(
+      140deg,
+      var(--goal-accent),
+      color-mix(in srgb, var(--goal-accent) 70%, #ffffff 30%)
+    );
     color: #fff;
     border: none;
     padding: 12px 16px;
@@ -166,7 +289,8 @@
     text-transform: uppercase;
     cursor: pointer;
     transition: 0.2s ease;
-    box-shadow: 0 10px 22px color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
+    box-shadow: 0 10px 22px
+      color-mix(in srgb, var(--goal-accent) 45%, transparent 55%);
   }
 
   .goal-btn:hover {
@@ -243,7 +367,8 @@
   }
 
   @keyframes goalPulse {
-    0%, 100% {
+    0%,
+    100% {
       filter: saturate(0.94);
     }
     50% {
@@ -252,7 +377,11 @@
   }
 
   body.light-theme .goal-center-wrapper {
-    --goal-card-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(242, 247, 255, 0.96));
+    --goal-card-bg: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(242, 247, 255, 0.96)
+    );
     --goal-card-border: rgba(51, 65, 85, 0.15);
     --goal-track: rgba(51, 65, 85, 0.1);
     --goal-muted: #64748b;
@@ -272,6 +401,37 @@
     background: rgba(255, 255, 255, 0.92);
     border-color: rgba(51, 65, 85, 0.2);
     color: #0f172a;
+  }
+
+  body.light-theme .goal-custom-chrono .date-status-pill {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: rgba(51, 65, 85, 0.2);
+  }
+
+  body.light-theme .goal-custom-chrono .protocol-label {
+    color: #64748b;
+  }
+
+  body.light-theme #goal-custom-range-display {
+    color: #0f172a;
+  }
+
+  body.light-theme .goal-custom-zone {
+    border-color: rgba(51, 65, 85, 0.16);
+    background:
+      radial-gradient(circle at 0% 0%, rgba(251, 146, 60, 0.17), transparent 40%),
+      linear-gradient(165deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.96));
+    box-shadow: 0 12px 24px rgba(51, 65, 85, 0.12);
+  }
+
+  body.light-theme .goal-custom-title {
+    color: #0f172a;
+  }
+
+  body.light-theme .goal-custom-caution {
+    color: #475569;
+    border-color: rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.14);
   }
 
   body.light-theme .goal-progress::after {
@@ -313,6 +473,10 @@
     .goal-btn {
       font-size: 9px;
       padding: 10px 12px;
+    }
+
+    .goal-input-row.goal-input-row-custom {
+      grid-template-columns: 1fr;
     }
 
     .goal-progress {
@@ -396,7 +560,109 @@
         />
         <button class="goal-btn" id="goal-monthly-save">Set</button>
       </div>
-      <div class="goal-footnote" id="goal-monthly-window">Active: This Month</div>
+      <div class="goal-footnote" id="goal-monthly-window">
+        Active: This Month
+      </div>
+    </div>
+
+    <div class="hud-item goal-card goal-quarterly" id="goal-quarterly-card">
+      <div class="goal-meta">
+        <span class="goal-period">This Quarter</span>
+        <span class="goal-status">Quarterly Target</span>
+      </div>
+      <div class="goal-amount" id="goal-quarterly-amount">PHP 0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-quarterly-progress"></div>
+      </div>
+      <div class="goal-input-row">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-quarterly-input"
+          placeholder="Set quarterly target"
+          min="0"
+        />
+        <button class="goal-btn" id="goal-quarterly-save">Set</button>
+      </div>
+      <div class="goal-footnote" id="goal-quarterly-window">Q1 / ----</div>
+    </div>
+
+    <div class="hud-item goal-card goal-yearly" id="goal-yearly-card">
+      <div class="goal-meta">
+        <span class="goal-period">This Year</span>
+        <span class="goal-status">Yearly Target</span>
+      </div>
+      <div class="goal-amount" id="goal-yearly-amount">PHP 0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-yearly-progress"></div>
+      </div>
+      <div class="goal-input-row">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-yearly-input"
+          placeholder="Set yearly target"
+          min="0"
+        />
+        <button class="goal-btn" id="goal-yearly-save">Set</button>
+      </div>
+      <div class="goal-footnote" id="goal-yearly-window">Year ----</div>
+    </div>
+
+  </div>
+
+  <div class="goal-custom-zone">
+    <div class="goal-custom-title">Custom Campaign Target</div>
+    <div class="goal-custom-caution">
+      CAUTION: Use Custom only for temporary campaigns. Set a target amount, choose a start and end
+      date using the calendar, then press SET. Keep this separate from Daily/Weekly/Monthly routine
+      targets to avoid mixed reporting.
+    </div>
+    <div class="hud-item goal-card goal-custom" id="goal-custom-card">
+      <div class="goal-meta">
+        <span class="goal-period">Custom</span>
+        <span class="goal-status">Manual Range</span>
+      </div>
+      <div class="goal-amount" id="goal-custom-amount">PHP 0</div>
+      <div class="goal-progress">
+        <div class="goal-progress-fill" id="goal-custom-progress"></div>
+      </div>
+      <div class="goal-input-row goal-input-row-custom">
+        <input
+          type="number"
+          class="goal-input"
+          id="goal-custom-input"
+          placeholder="Set custom target"
+          min="1"
+        />
+        <div class="chrono-center-group goal-custom-chrono">
+          <button
+            type="button"
+            class="date-status-pill"
+            id="goal-custom-range-trigger"
+          >
+            <span class="protocol-label">Custom Date Range</span>
+            <span id="goal-custom-range-display">-- --- -> -- ---</span>
+          </button>
+        </div>
+        <button class="goal-btn" id="goal-custom-save">Set</button>
+      </div>
+      <input
+        type="date"
+        id="goal-custom-start-input"
+        style="position: absolute; opacity: 0; pointer-events: none"
+      />
+      <input
+        type="date"
+        id="goal-custom-end-input"
+        style="position: absolute; opacity: 0; pointer-events: none"
+      />
+      <input
+        type="text"
+        id="goal-custom-range-input"
+        style="position: absolute; opacity: 0; pointer-events: none"
+      />
+      <div class="goal-footnote" id="goal-custom-window">-- --- -> -- ---</div>
     </div>
   </div>
 </div>

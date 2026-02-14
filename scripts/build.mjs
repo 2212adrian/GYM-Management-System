@@ -45,6 +45,33 @@ async function minifyJs() {
   return jsFiles.length;
 }
 
+async function injectPublicSupabaseConfig() {
+  const cfgPath = path.join(outDir, "assets", "js", "utils", "supabase-public-config.js");
+  const hasCfg = await fileExists(cfgPath);
+  if (!hasCfg) return false;
+
+  const supabaseUrl = (
+    process.env.PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    ""
+  ).trim();
+  const supabaseAnonKey = (
+    process.env.PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_KEY ||
+    ""
+  ).trim();
+
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+
+  let source = await fs.readFile(cfgPath, "utf8");
+  source = source
+    .replaceAll("__WOLF_SUPABASE_URL__", supabaseUrl)
+    .replaceAll("__WOLF_SUPABASE_ANON_KEY__", supabaseAnonKey);
+  await fs.writeFile(cfgPath, source, "utf8");
+  return true;
+}
+
 function toPosix(p) {
   return p.split(path.sep).join("/");
 }
@@ -180,9 +207,11 @@ async function hashAssetFilenames() {
 
 async function main() {
   await copyPublic();
+  const injectedPublicConfig = await injectPublicSupabaseConfig();
   const minifiedCount = await minifyJs();
   const hashedCount = await hashAssetFilenames();
   console.log(`[build] Copied public -> dist/public`);
+  console.log(`[build] Injected Supabase public config: ${injectedPublicConfig ? "yes" : "no"}`);
   console.log(`[build] Minified ${minifiedCount} JS files`);
   console.log(`[build] Hashed ${hashedCount} asset filenames`);
 }

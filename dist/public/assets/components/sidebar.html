@@ -39,16 +39,44 @@
       width: var(--expanded-width);
     }
 
-    /* HIDE CONTENT IN MINI-RAIL MODE (When .active is NOT present) */
-    .sidebar-panel:not(.active) .profile-area,
-    .sidebar-panel:not(.active) .target-box,
+    /* MINI-RAIL MODE */
+    .sidebar-panel:not(.active) .target-box {
+      display: none !important;
+    }
     .sidebar-panel:not(.active) .nav-text,
-    .sidebar-panel:not(.active) .sidebar-section-label,
     .sidebar-panel:not(.active) .chevron-icon {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
       transition: opacity 0.2s ease;
+    }
+    .sidebar-panel:not(.active) .nav-list {
+      padding-top: 8px;
+    }
+    .sidebar-panel:not(.active) .sidebar-divider {
+      margin: 10px 16px;
+    }
+    .sidebar-panel:not(.active) .sidebar-section-label {
+      opacity: 1;
+      visibility: visible;
+      display: block;
+      pointer-events: none;
+      font-size: 0.56rem;
+      font-weight: 900;
+      letter-spacing: 1.1px;
+      text-align: center;
+      padding: 7px 6px;
+      margin: 6px 8px;
+      border-radius: 999px;
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      text-transform: uppercase;
+    }
+    body.light-theme .sidebar-panel:not(.active) .sidebar-section-label {
+      border-color: rgba(56, 45, 34, 0.2);
+      background: rgba(255, 255, 255, 0.38);
+      color: rgba(56, 45, 34, 0.86);
     }
     /* Hide sub-item primary icons when minimized (keep sub-bg-icon) */
     .sidebar-panel:not(.active) .sub-item i:first-child {
@@ -256,39 +284,8 @@
     pointer-events: none;
     display: none;
   }
-  .profile-area {
-    margin: 0 20px 14px;
-    padding: 12px 12px 10px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background:
-      linear-gradient(155deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-      var(--shell-sidebar-card-bg);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-  }
-  .profile-area .user-name {
-    font-size: 1.03rem;
-    font-weight: 900;
-    letter-spacing: 0.8px;
-    color: var(--text-main);
-    text-transform: uppercase;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .profile-area .user-email {
-    margin-top: 4px;
-    font-size: 0.77rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .target-box {
-    margin: 0 20px 20px;
+    margin: 0 20px 16px;
     padding: 13px 12px 12px;
     border-radius: 14px;
     background:
@@ -303,9 +300,20 @@
   .target-box-head {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 10px;
     font-size: 0.68rem;
     color: var(--text-muted);
+  }
+  .target-box-head-left {
+    min-width: 0;
+    flex: 1;
+  }
+  .target-box-head-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
   }
   #sidebar-target-label {
     letter-spacing: 0.95px;
@@ -331,12 +339,31 @@
     color: var(--text-main);
     letter-spacing: 0.4px;
   }
-  body.light-theme .profile-area {
-    border-color: rgba(51, 65, 85, 0.16);
-    background:
-      linear-gradient(155deg, rgba(255, 255, 255, 0.74), rgba(248, 250, 252, 0.7)),
-      var(--shell-sidebar-card-bg);
-    box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.05);
+  #sidebar-target-select {
+    width: 118px;
+    max-width: 100%;
+    background: rgba(8, 12, 20, 0.9);
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 5px 8px;
+    font-size: 0.56rem;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    text-align: right;
+  }
+  #sidebar-target-select:focus {
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
+    box-shadow: 0 0 0 2px rgba(var(--wolf-red-rgb), 0.15);
+  }
+  body.light-theme #sidebar-target-select {
+    background: rgba(255, 255, 255, 0.86);
+    color: #1f2937;
+    border-color: rgba(51, 65, 85, 0.22);
   }
   body.light-theme .target-box {
     background:
@@ -570,21 +597,23 @@
     </button>
   </div>
 
-  <!-- PROFILE AREA -->
-  <div class="profile-area">
-    <div class="user-name">
-      PALOMAR ADMIN
-    </div>
-    <div class="user-email">
-      admin@palomargym.com
-    </div>
-  </div>
-
   <!-- TARGET BOX -->
   <div id="sidebar-target-box" class="target-box">
     <div class="target-box-head">
-      <span id="sidebar-target-label">TODAY TARGET</span>
-      <b id="sidebar-target-percent">0%</b>
+      <div class="target-box-head-left">
+        <span id="sidebar-target-label">TODAY TARGET</span>
+      </div>
+      <div class="target-box-head-right">
+        <select id="sidebar-target-select" aria-label="Select goal target type">
+          <option value="DAILY">Daily</option>
+          <option value="WEEKLY">Weekly</option>
+          <option value="MONTHLY">Monthly</option>
+          <option value="QUARTERLY">Quarterly</option>
+          <option value="YEARLY">Yearly</option>
+          <option value="CUSTOM">Custom</option>
+        </select>
+        <b id="sidebar-target-percent">0%</b>
+      </div>
     </div>
     <div class="target-track">
       <div id="sidebar-target-ghost" class="target-ghost"></div>

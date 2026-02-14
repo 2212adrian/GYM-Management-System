@@ -63,7 +63,21 @@
     setRememberDevice,
   };
 
-  async function bootSupabase() {
+  function isNonEmptyRuntimeValue(value) {
+    const raw = String(value || '').trim();
+    return raw.length > 0 && !raw.startsWith('__WOLF_SUPABASE_');
+  }
+
+  function getPublicSupabaseConfig() {
+    const cfg = window.WOLF_SUPABASE_PUBLIC_CONFIG || {};
+    const supabaseUrl = String(cfg.supabaseUrl || '').trim();
+    const supabaseAnonKey = String(cfg.supabaseAnonKey || '').trim();
+    if (!isNonEmptyRuntimeValue(supabaseUrl)) return null;
+    if (!isNonEmptyRuntimeValue(supabaseAnonKey)) return null;
+    return { supabaseUrl, supabaseAnonKey };
+  }
+
+  async function fetchSupabaseConfigFromFunction() {
     const res = await fetch('/.netlify/functions/supabase-config', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -89,6 +103,13 @@
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase runtime config is incomplete');
     }
+    return { supabaseUrl, supabaseAnonKey };
+  }
+
+  async function bootSupabase() {
+    const directConfig = getPublicSupabaseConfig();
+    const { supabaseUrl, supabaseAnonKey } =
+      directConfig || (await fetchSupabaseConfigFromFunction());
 
     window.supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
