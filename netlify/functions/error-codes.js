@@ -50,7 +50,7 @@ const ERROR_CODES = Object.freeze({
     meaning: 'Unexpected internal server error.',
   },
   LINK_OFFLINE: {
-    code: '503',
+    code: '521',
     label: 'LINK_OFFLINE',
     meaning: 'Dependency or gateway is unavailable.',
   },

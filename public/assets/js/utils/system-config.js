@@ -154,15 +154,16 @@ function extractVersionFromSystemConfigSource(source) {
 }
 
 async function fetchRemoteSystemConfigSource() {
-  try {
-    return await fetchNoStoreText('/assets/js/utils/system-config.js');
-  } catch (_) {
-    // Fallback to manifest-resolved hashed path.
-  }
-
   const host = String(window.location.hostname || '').toLowerCase();
-  const shouldProbeManifest = host !== 'localhost' && host !== '127.0.0.1';
-  if (!shouldProbeManifest) return null;
+  const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+
+  if (isLocalhost) {
+    try {
+      return await fetchNoStoreText('/assets/js/utils/system-config.js');
+    } catch (_) {
+      return null;
+    }
+  }
 
   try {
     const manifestText = await fetchNoStoreText('/asset-manifest.json');
@@ -171,8 +172,15 @@ async function fetchRemoteSystemConfigSource() {
       manifest &&
       typeof manifest === 'object' &&
       manifest['/assets/js/utils/system-config.js'];
-    if (!resolvedPath) return null;
-    return await fetchNoStoreText(String(resolvedPath));
+    if (resolvedPath) {
+      return await fetchNoStoreText(String(resolvedPath));
+    }
+  } catch (_) {
+    // Fall back to direct path probe below.
+  }
+
+  try {
+    return await fetchNoStoreText('/assets/js/utils/system-config.js');
   } catch (_) {
     return null;
   }
@@ -198,13 +206,23 @@ function buildUpdateBannerMessage(currentVersion, latestVersion) {
 
 async function fetchCurrentPageSignature() {
   const host = String(window.location.hostname || '').toLowerCase();
-  const probes = [
-    '/assets/js/utils/system-config.js',
-    `${window.location.pathname}${window.location.search}`,
-    '/index.html',
-  ];
+  const probes = [`${window.location.pathname}${window.location.search}`, '/index.html'];
+
   if (host !== 'localhost' && host !== '127.0.0.1') {
-    probes.push('/asset-manifest.json');
+    try {
+      const manifestText = await fetchNoStoreText('/asset-manifest.json');
+      const manifest = JSON.parse(manifestText);
+      const resolvedPath =
+        manifest &&
+        typeof manifest === 'object' &&
+        manifest['/assets/js/utils/system-config.js'];
+      if (resolvedPath) probes.unshift(String(resolvedPath));
+      probes.push('/asset-manifest.json');
+    } catch (_) {
+      // ignore and continue with default probes
+    }
+  } else {
+    probes.unshift('/assets/js/utils/system-config.js');
   }
 
   for (const probe of probes) {
@@ -690,7 +708,7 @@ function ensureNetworkOverlay() {
         <span class="wolf-net-dot" aria-hidden="true"></span>
         <div class="wolf-net-head-copy">
           <h3 class="wolf-net-title">Connection Lost</h3>
-          <p class="wolf-net-code">[ERR_503] LINK_OFFLINE</p>
+          <p class="wolf-net-code">[ERR_521] LINK_OFFLINE</p>
         </div>
         <button type="button" class="wolf-net-toggle" aria-expanded="false" aria-label="Show network details">
           <span class="wolf-net-toggle-text">Show details</span>

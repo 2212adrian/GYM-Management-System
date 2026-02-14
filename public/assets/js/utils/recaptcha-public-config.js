@@ -3,6 +3,6 @@
 (function () {
   window.WOLF_RECAPTCHA_PUBLIC_CONFIG = {
     siteKey: '__WOLF_RECAPTCHA_SITE_KEY__',
-    requiredAt: 0, // 0 = require on every login attempt
+    requiredAt: 3, // show on 3rd attempt (after 2 failed attempts)
   };
 })();

@@ -27,9 +27,18 @@ async function ensureSupabaseClient() {
 }
 
 // --- 1b. RECAPTCHA (on-demand, only after repeated failed logins) ---
-const RECAPTCHA_REQUIRED_AT = 6; // show/require captcha starting on 6th failed attempt
+const RECAPTCHA_REQUIRED_AT = 3; // show/require captcha starting on 3rd attempt (after 2 failed attempts)
 let recaptchaWidgetId = null;
 let recaptchaScriptPromise = null;
+let recaptchaLastInitError = '';
+
+function setRecaptchaInitError(message) {
+  recaptchaLastInitError = String(message || '').trim();
+}
+
+function getRecaptchaInitError() {
+  return recaptchaLastInitError;
+}
 
 function getRecaptchaSiteKey() {
   const key = String(window.WOLF_RECAPTCHA_PUBLIC_CONFIG?.siteKey || '').trim();
@@ -56,25 +65,47 @@ function loadRecaptchaScriptOnce() {
 async function ensureRecaptchaRendered() {
   const wrap = document.getElementById('recaptchaWrap');
   const widgetEl = document.getElementById('recaptchaWidget');
-  if (!wrap || !widgetEl) return false;
-
-  wrap.hidden = false;
+  if (!wrap || !widgetEl) {
+    setRecaptchaInitError('reCAPTCHA container is missing in DOM.');
+    return false;
+  }
 
   const siteKey = getRecaptchaSiteKey();
-  if (!siteKey) return false;
+  if (!siteKey) {
+    wrap.hidden = true;
+    setRecaptchaInitError('Missing PUBLIC_RECAPTCHA_SITE_KEY in build env.');
+    return false;
+  }
 
-  await loadRecaptchaScriptOnce();
+  try {
+    await loadRecaptchaScriptOnce();
+  } catch (err) {
+    wrap.hidden = true;
+    setRecaptchaInitError(err?.message || 'Failed to load reCAPTCHA script.');
+    return false;
+  }
+
   if (!window.grecaptcha || typeof window.grecaptcha.render !== 'function') {
+    wrap.hidden = true;
+    setRecaptchaInitError('reCAPTCHA API loaded without render() function.');
     return false;
   }
 
   if (recaptchaWidgetId == null) {
-    recaptchaWidgetId = window.grecaptcha.render(widgetEl, {
-      sitekey: siteKey,
-      theme: 'dark',
-    });
+    try {
+      recaptchaWidgetId = window.grecaptcha.render(widgetEl, {
+        sitekey: siteKey,
+        theme: 'dark',
+      });
+    } catch (err) {
+      wrap.hidden = true;
+      setRecaptchaInitError(err?.message || 'reCAPTCHA render failed.');
+      return false;
+    }
   }
 
+  setRecaptchaInitError('');
+  wrap.hidden = false;
   return true;
 }
 
@@ -117,7 +148,7 @@ async function verifyRecaptchaToken(token) {
 }
 
 // --- 2. CONFIGURATION ---
-const MAX_ATTEMPTS = 12;
+const MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MINUTES = 5;
 const OTP_CLICK_SPAM_WINDOW_MS = 1000;
 const OTP_CLICK_SPAM_THRESHOLD = 3;
@@ -567,8 +598,11 @@ async function checkLoginLockoutStatus(
 
   if (!rendered) {
     if (enforceCaptcha) {
+      const recaptchaError = getRecaptchaInitError();
       showLoginOutput(
-        '[ERR_503] CAPTCHA_UNAVAILABLE: Verification module failed to initialize.',
+        recaptchaError
+          ? `[ERR_503] CAPTCHA_UNAVAILABLE: ${recaptchaError}`
+          : '[ERR_503] CAPTCHA_UNAVAILABLE: Verification module failed to initialize.',
         { color: 'var(--wolf-red)' },
       );
       if (window.wolfAudio) window.wolfAudio.play('error');
@@ -1308,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (error) {
         if (isConnectivityAuthError(error)) {
           showLoginOutput(
-            '[ERR_503] LINK_OFFLINE: Security gateway is unreachable. Check internet connection.',
+            '[ERR_521] LINK_OFFLINE: Security gateway is unreachable. Check internet connection.',
             { color: 'var(--wolf-red)' },
           );
           if (window.wolfAudio) window.wolfAudio.play('error');
