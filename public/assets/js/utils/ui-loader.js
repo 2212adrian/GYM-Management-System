@@ -1171,7 +1171,6 @@ async function initUI() {
   }
 
   // PATH B: CINEMATIC BOOT
-  console.log('Wolf OS: Cinematic Boot Initialized.');
 
   setTimeout(async () => {
     if (starsContainer) starsContainer.style.display = 'none';
@@ -1268,20 +1267,25 @@ function setupGlobalClickHandlers() {
       if (!tryLock('dropdown', 260)) return;
       e.preventDefault();
       const sidebar = document.getElementById('wolfSidebar');
+      const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
       const dropdownParent = dropdownToggle.parentElement;
       const closeIcon = document.getElementById('closeIcon');
       const versionLabel = sidebar ? sidebar.querySelector('.version') : null;
 
-      // 1. If sidebar is collapsed (mini), expand it first
-      if (sidebar && !sidebar.classList.contains('active')) {
+      // 1. Expand first only on mobile overlay mode.
+      // Desktop mini-rail should stay collapsed and show icon-only sub-items.
+      if (sidebar && !sidebar.classList.contains('active') && isMobileViewport) {
         sidebar.classList.add('active');
         document.body.classList.add('sidebar-open');
         syncMoreButtonState(true);
       }
 
-      // 2. SYNC UI: Sidebar is now expanded, flip icon to LEFT and hide .version
-      if (closeIcon) closeIcon.className = 'bxf bx-caret-big-left';
-      if (versionLabel) versionLabel.style.display = 'none';
+      // 2. SYNC UI only when truly expanded.
+      const isExpanded = Boolean(sidebar && sidebar.classList.contains('active'));
+      if (isExpanded) {
+        if (closeIcon) closeIcon.className = 'bxf bx-caret-big-left';
+        if (versionLabel) versionLabel.style.display = 'none';
+      }
 
       // 3. Close all other dropdowns to keep UI clean
       document.querySelectorAll('.nav-dropdown').forEach((other) => {
@@ -1325,21 +1329,7 @@ function setupGlobalClickHandlers() {
       return;
     }
 
-    // 2.1 TRASH / ARCHIVE (Ledger header)
-    const clearSalesBtn = e.target.closest('#clear-sales-btn');
-    if (clearSalesBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (
-        window.salesManager &&
-        typeof window.salesManager.openTrashBin === 'function'
-      ) {
-        window.salesManager.openTrashBin();
-      } else {
-        console.warn('Wolf OS: salesManager not available for trash modal.');
-      }
-      return;
-    }
+    // 2.1 TRASH / ARCHIVE is handled in data-loader.js for ledger context.
 
     // 3. NAVIGATION
     const navBtn = e.target.closest('[data-page]');

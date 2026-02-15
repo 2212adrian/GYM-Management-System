@@ -78,9 +78,43 @@
       background: rgba(255, 255, 255, 0.38);
       color: rgba(56, 45, 34, 0.86);
     }
-    /* Hide sub-item primary icons when minimized (keep sub-bg-icon) */
+    /* Mini-rail dropdowns: keep sub-item icons visible and clickable (icon-only) */
+    .sidebar-panel:not(.active) .sub-item {
+      justify-content: center;
+      padding: 0;
+    }
+    .sidebar-panel:not(.active) .sub-item .nav-text {
+      display: none !important;
+    }
     .sidebar-panel:not(.active) .sub-item i:first-child {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      opacity: 0.92;
+    }
+    .sidebar-panel:not(.active) .sub-item .sub-bg-icon {
       display: none;
+    }
+    .sidebar-panel:not(.active) .sub-item.active i:first-child {
+      display: none;
+    }
+    .sidebar-panel:not(.active) .sub-item.active .sub-bg-icon {
+      display: flex;
+      position: static !important;
+      right: auto;
+      top: auto;
+      transform: none;
+      min-width: var(--rail-width);
+      justify-content: center;
+      align-items: center;
+      font-size: 20px !important;
+      filter: none;
+      opacity: 1;
+      color: var(--accent-red) !important;
+      text-shadow: 0 0 14px rgba(var(--wolf-red-rgb), 0.35);
     }
   }
 
@@ -544,6 +578,56 @@
     text-transform: uppercase;
     color: rgba(233, 240, 252, 0.8);
   }
+  #wolf-target-cinematic .wtc-confetti {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    height: 170px;
+    pointer-events: none;
+    overflow: visible;
+  }
+  #wolf-target-cinematic .wtc-confetti-piece {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 9px;
+    height: 14px;
+    border-radius: 2px;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    opacity: 0;
+    transform: translate(-50%, 0);
+    filter: saturate(1.1);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.35);
+    will-change: transform, opacity;
+  }
+  #wolf-target-confetti-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 16060;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  #wolf-target-confetti-stage.is-active {
+    opacity: 1;
+  }
+  #wolf-target-confetti-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #wolf-target-confetti-stage .wtc-confetti-piece-global {
+    position: absolute;
+    border-radius: 2px;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+    filter: saturate(1.12);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.38);
+    will-change: transform, opacity;
+  }
   @keyframes wolfFireFlow {
     0% {
       background-position: 0% 50%;
@@ -577,6 +661,14 @@
       margin-top: 6px;
       font-size: 9px;
       letter-spacing: 0.8px;
+    }
+    #wolf-target-cinematic .wtc-confetti {
+      height: 136px;
+      bottom: 6px;
+    }
+    #wolf-target-cinematic .wtc-confetti-piece {
+      width: 7px;
+      height: 11px;
     }
   }
 </style>

@@ -258,6 +258,14 @@
     transition: 0.3s;
   }
 
+  body:not(.light-theme) .day-btn:not(.active):not(:disabled):hover {
+    border-color: rgba(var(--wolf-red-rgb), 0.75);
+    color: #ffd9d4;
+    box-shadow:
+      0 0 0 1px rgba(var(--wolf-red-rgb), 0.28) inset,
+      0 0 16px rgba(var(--wolf-red-rgb), 0.45);
+  }
+
   .day-btn.active {
     background: #111;
     color: #fff;
@@ -543,9 +551,10 @@
     white-space: nowrap;
     background: #161616;
     color: #fff;
-    border-radius: 14px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     flex: 0 0 0;
     pointer-events: none;
@@ -560,28 +569,27 @@
   }
 
   .snap-today-btn.visible {
-    width: 105px !important; /* Enough to fit "TODAY" and Icon */
-    max-width: 105px !important;
-    min-width: 105px !important;
+    width: 50px !important;
+    max-width: 50px !important;
+    min-width: 50px !important;
     height: 50px !important;
     min-height: 50px !important;
     opacity: 1;
     margin-left: 12px;
-    padding: 10px 18px; /* EXACT MATCH to your reference */
-    border: 1px solid #222; /* EXACT MATCH to your reference */
-    flex: 0 0 105px;
+    padding: 0;
+    border: 1px solid #222;
+    flex: 0 0 50px;
     pointer-events: auto;
   }
 
   /* Icons & Labels (Exact Match) */
   .snap-today-btn i {
     color: var(--wolf-red);
-    font-size: 1.6rem;
+    font-size: 1.25rem;
+    margin: 0;
   }
   .snap-today-btn .btn-label {
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: 1px;
+    display: none;
   }
 
   /* Hover (Exact Match) */
@@ -820,6 +828,631 @@
     padding: 0 !important;
   }
 
+  /* --- DESKTOP SALES SPLIT LAYOUT (LEFT CONTROLS | RIGHT RECORDS) --- */
+  .ledger-desktop-grid {
+    display: block;
+  }
+
+  .sales-insight-grid {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .sales-insight-card {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 12, 18, 0.75);
+    padding: 10px 12px;
+    transition:
+      transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.26s ease,
+      border-color 0.26s ease,
+      filter 0.26s ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .sales-insight-grid:hover .sales-insight-card:not(:hover) {
+      transform: translateY(1px);
+      filter: saturate(0.82);
+      opacity: 0.9;
+    }
+
+    .sales-insight-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      border-color: rgba(var(--wolf-red-rgb), 0.42);
+      box-shadow:
+        0 10px 20px rgba(0, 0, 0, 0.34),
+        0 0 0 1px rgba(var(--wolf-red-rgb), 0.2) inset;
+    }
+  }
+
+  #ledger-most-sold-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .insight-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .insight-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .insight-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .insight-label {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8e99ad;
+    font-weight: 800;
+  }
+
+  .insight-label.insight-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .insight-label.insight-with-icon i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(var(--wolf-red-rgb), 0.2);
+    color: #ff9d8e;
+    font-size: 0.7rem;
+    box-shadow: 0 0 0 1px rgba(var(--wolf-red-rgb), 0.35) inset;
+  }
+
+  .insight-value {
+    display: block;
+    margin-top: 4px;
+    font-size: 1rem;
+    font-weight: 900;
+    color: #f2f6ff;
+    text-transform: uppercase;
+  }
+
+  .insight-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.68rem;
+    color: #9aa5b8;
+    text-transform: uppercase;
+  }
+
+  #ledger-prev-day-card {
+    border-color: rgba(var(--wolf-red-rgb), 0.35);
+    background:
+      linear-gradient(165deg, rgba(30, 13, 13, 0.78), rgba(12, 11, 18, 0.92)),
+      rgba(10, 12, 18, 0.75);
+  }
+
+  .insight-trend {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 0.58rem;
+    letter-spacing: 0.6px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #9aa5b8;
+  }
+
+  .insight-trend i {
+    font-size: 0.75rem;
+  }
+
+  .insight-trend.up {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.35);
+    background: rgba(74, 222, 128, 0.12);
+  }
+
+  .insight-trend.down {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.38);
+    background: rgba(248, 113, 113, 0.12);
+  }
+
+  .insight-trend.flat {
+    color: #facc15;
+    border-color: rgba(250, 204, 21, 0.38);
+    background: rgba(250, 204, 21, 0.1);
+  }
+
+  .sales-filter-panel {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 10, 15, 0.68);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .sales-filter-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .sales-filter-chip {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #dbe5f7;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 8px 6px;
+  }
+
+  .sales-filter-chip.is-active {
+    background: rgba(var(--wolf-red-rgb), 0.18);
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
+    color: #ffe3df;
+  }
+
+  .sales-filter-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .sales-filter-controls input,
+  .sales-filter-controls select {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #e9eef9;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 8px 10px;
+    outline: none;
+  }
+
+  .sales-filter-controls select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #e9eef9 50%),
+      linear-gradient(135deg, #e9eef9 50%, transparent 50%);
+    background-position:
+      calc(100% - 16px) calc(50% - 2px),
+      calc(100% - 11px) calc(50% - 2px);
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+  }
+
+  .sales-filter-controls select option {
+    color: #f4f8ff;
+    background: #121823;
+  }
+
+  #sales-sort-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23e9eef9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+    padding-right: 34px !important;
+    line-height: 1.25;
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+
+  #sales-sort-select::-ms-expand {
+    display: none;
+  }
+
+  .sales-guide-card {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(160deg, rgba(12, 15, 22, 0.86), rgba(8, 10, 14, 0.95));
+    padding: 10px 12px;
+  }
+
+  .ledger-right-rail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 6px 10px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .ledger-right-rail-head h4 {
+    margin: 0;
+    font-size: 0.84rem;
+    letter-spacing: 1.4px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #d6dfef;
+  }
+
+  .ledger-right-rail-head span {
+    font-size: 0.64rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8892a5;
+    font-weight: 800;
+  }
+
+  .sales-guide-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #f6d27a;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 900;
+  }
+
+  .sales-guide-copy {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: #a8b4c9;
+  }
+
+  @media (min-width: 1100px) {
+    #ledger-page.sales-mode .ledger-desktop-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+      gap: 16px;
+      align-items: stretch;
+      --sales-rail-height: min(74vh, 760px);
+    }
+
+    #ledger-page.sales-mode .ledger-left-rail {
+      position: relative;
+      display: grid;
+      gap: 10px;
+      border-radius: 18px;
+      padding: 14px;
+      height: var(--sales-rail-height);
+      overflow-y: auto;
+      background:
+        linear-gradient(180deg, rgba(14, 18, 24, 0.92), rgba(10, 12, 17, 0.96)),
+        url('/assets/images/textures/grid-me.png');
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 16px 26px rgba(0, 0, 0, 0.42);
+      animation: ledgerRailReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    #ledger-page.sales-mode .ledger-right-rail {
+      min-width: 0;
+      border-radius: 18px;
+      padding: 12px;
+      height: var(--sales-rail-height);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      gap: 8px;
+      background:
+        linear-gradient(180deg, rgba(14, 18, 24, 0.8), rgba(10, 12, 17, 0.94)),
+        url('/assets/images/textures/dark-mosaic.png');
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 16px 26px rgba(0, 0, 0, 0.42);
+      animation: ledgerRailReveal 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    #ledger-page.sales-mode .sales-insight-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+
+    #ledger-page.sales-mode .sales-insight-card {
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(160deg, rgba(15, 19, 26, 0.9), rgba(8, 10, 14, 0.94)),
+        url('/assets/images/textures/dark-mosaic.png');
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
+    }
+
+    #ledger-page.sales-mode .insight-label {
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #8792a6;
+    }
+
+    #ledger-page.sales-mode .insight-value {
+      display: block;
+      margin-top: 5px;
+      font-size: 1.12rem;
+      font-weight: 900;
+      color: #f4f7ff;
+      text-transform: uppercase;
+      line-height: 1.15;
+    }
+
+    #ledger-page.sales-mode .insight-meta {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.66rem;
+      color: #9aa5b8;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    #ledger-page.sales-mode .sales-filter-panel {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(8, 10, 15, 0.78);
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+    }
+
+    #ledger-page.sales-mode .sales-filter-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    #ledger-page.sales-mode .sales-filter-chip {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #dbe5f7;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 8px 6px;
+      transition: all 0.22s ease;
+    }
+
+    #ledger-page.sales-mode .sales-filter-chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(var(--wolf-red-rgb), 0.5);
+    }
+
+    #ledger-page.sales-mode .sales-filter-chip.is-active {
+      background: rgba(var(--wolf-red-rgb), 0.18);
+      border-color: rgba(var(--wolf-red-rgb), 0.6);
+      color: #ffe3df;
+      box-shadow: 0 0 0 1px rgba(var(--wolf-red-rgb), 0.2) inset;
+    }
+
+    #ledger-page.sales-mode .sales-filter-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    #ledger-page.sales-mode .sales-filter-controls input,
+    #ledger-page.sales-mode .sales-filter-controls select {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #e9eef9;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    #ledger-page.sales-mode .sales-filter-controls input:focus,
+    #ledger-page.sales-mode .sales-filter-controls select:focus {
+      border-color: rgba(var(--wolf-red-rgb), 0.6);
+    }
+
+    #ledger-page.sales-mode .sales-filter-controls select option {
+      background: #121823;
+      color: #f4f8ff;
+    }
+
+    #ledger-page.sales-mode .ledger-right-rail-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 6px 10px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #ledger-page.sales-mode .ledger-right-rail-head h4 {
+      margin: 0;
+      font-size: 0.84rem;
+      letter-spacing: 1.4px;
+      font-weight: 900;
+      text-transform: uppercase;
+      color: #d6dfef;
+    }
+
+    #ledger-page.sales-mode .ledger-right-rail-head span {
+      font-size: 0.64rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8892a5;
+      font-weight: 800;
+    }
+
+    #ledger-page.sales-mode .week-nav-container {
+      margin-bottom: 10px;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(
+        160deg,
+        rgba(13, 17, 24, 0.82),
+        rgba(9, 12, 18, 0.9)
+      );
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 8px 16px rgba(0, 0, 0, 0.24);
+    }
+
+    #ledger-page.sales-mode .chrono-nav-btn {
+      min-width: 118px;
+    }
+
+    #ledger-page.sales-mode .chrono-center-group {
+      min-width: 0;
+    }
+
+    #ledger-page.sales-mode .chrono-hud-node {
+      min-width: 0;
+      width: 100%;
+    }
+
+    #ledger-page.sales-mode .day-selector-outer-box {
+      margin-bottom: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(
+        160deg,
+        rgba(13, 17, 24, 0.82),
+        rgba(9, 12, 18, 0.9)
+      );
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 8px 16px rgba(0, 0, 0, 0.24);
+    }
+
+    #ledger-page.sales-mode #ledger-search-container {
+      max-height: 120px;
+      opacity: 1;
+      transform: none;
+      margin-bottom: 0;
+      display: block !important;
+    }
+
+    #ledger-page.sales-mode #toggle-search-btn {
+      display: none !important;
+    }
+
+    #ledger-page.sales-mode #ledger-list-container {
+      min-height: 0;
+      max-height: none;
+      height: 100%;
+      overflow-y: auto;
+      padding: 6px;
+      border-radius: 14px;
+      background: rgba(8, 10, 14, 0.52);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+      isolation: isolate;
+    }
+
+    #ledger-page.sales-mode #ledger-list-container::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, rgba(4, 7, 10, 0.04), rgba(4, 7, 10, 0.82) 72%),
+        url('/assets/images/logo.jpg') center/330px 330px no-repeat;
+      opacity: 0.09;
+      filter: grayscale(1) contrast(0.86) brightness(1.18);
+      mix-blend-mode: screen;
+      -webkit-mask-image: radial-gradient(circle at center, #000 0 44%, transparent 72%);
+      mask-image: radial-gradient(circle at center, #000 0 44%, transparent 72%);
+      z-index: 0;
+    }
+
+    #ledger-page.sales-mode #ledger-list-container > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    #ledger-page.sales-mode .sale-row-card {
+      transition:
+        transform 0.24s ease,
+        border-color 0.24s ease,
+        box-shadow 0.24s ease;
+    }
+
+    #ledger-page.sales-mode .sale-row-card:hover {
+      transform: translateY(-2px) scale(1.006);
+      border-color: rgba(var(--wolf-red-rgb), 0.45);
+      box-shadow:
+        0 14px 24px rgba(0, 0, 0, 0.32),
+        0 0 0 1px rgba(var(--wolf-red-rgb), 0.14) inset;
+    }
+  }
+
+  @media (max-width: 1099px) {
+    #ledger-page.sales-mode .sales-insight-grid,
+    #ledger-page.sales-mode #sales-filter-panel {
+      display: none !important;
+    }
+
+    #ledger-page.sales-mode #toggle-search-btn {
+      display: flex !important;
+    }
+
+    #ledger-page.sales-mode #sales-guide-card {
+      display: none !important;
+    }
+  }
+
+  @keyframes ledgerRailReveal {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+      filter: blur(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
   /* --- TABLET RESPONSIVENESS --- */
   @media (min-width: 601px) and (max-width: 1024px) {
     .ledger-page-wrapper {
@@ -901,8 +1534,271 @@
     color: var(--text-main);
   }
 
+  body.light-theme .day-btn:not(.active):not(:disabled):hover {
+    border-color: rgba(37, 99, 235, 0.62);
+    color: #1e40af;
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.22) inset,
+      0 0 16px rgba(37, 99, 235, 0.32);
+  }
+
   body.light-theme .date-status-pill:hover {
     background: rgba(56, 45, 34, 0.08);
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-insight-card,
+  body.light-theme #ledger-page.sales-mode .sales-filter-panel {
+    background: linear-gradient(155deg, rgba(246, 241, 233, 0.96), rgba(238, 231, 220, 0.96));
+    border-color: rgba(56, 45, 34, 0.16);
+    box-shadow: 0 8px 18px rgba(56, 45, 34, 0.08);
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-insight-grid,
+  body.light-theme #ledger-page.sales-mode .sales-filter-row {
+    color: #2a231c;
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-label,
+  body.light-theme #ledger-page.sales-mode .insight-meta {
+    color: #6b6258;
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-value,
+  body.light-theme #ledger-page.sales-mode .sales-filter-chip {
+    color: #2a231c;
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-thumb {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(56, 45, 34, 0.16);
+  }
+
+  body.light-theme #ledger-page.sales-mode #ledger-prev-day-card {
+    background: linear-gradient(160deg, rgba(255, 245, 238, 0.98), rgba(246, 234, 224, 0.98));
+    border-color: rgba(165, 79, 64, 0.34);
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-insight-card:hover {
+    box-shadow:
+      0 10px 18px rgba(56, 45, 34, 0.15),
+      0 0 0 1px rgba(165, 79, 64, 0.2) inset;
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-trend {
+    border-color: rgba(56, 45, 34, 0.2);
+    background: rgba(255, 255, 255, 0.72);
+    color: #6b6258;
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-trend.up {
+    color: #1d7a43;
+    border-color: rgba(29, 122, 67, 0.3);
+    background: rgba(34, 197, 94, 0.13);
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-trend.down {
+    color: #b42318;
+    border-color: rgba(180, 35, 24, 0.28);
+    background: rgba(239, 68, 68, 0.11);
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-trend.flat {
+    color: #9a6a06;
+    border-color: rgba(154, 106, 6, 0.3);
+    background: rgba(245, 158, 11, 0.12);
+  }
+
+  body.light-theme #ledger-page.sales-mode .insight-label.insight-with-icon i {
+    background: rgba(165, 79, 64, 0.14);
+    color: #9d3f2d;
+    box-shadow: 0 0 0 1px rgba(165, 79, 64, 0.3) inset;
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-filter-chip {
+    background: rgba(255, 255, 255, 0.65);
+    border-color: rgba(56, 45, 34, 0.18);
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-filter-chip.is-active {
+    background: rgba(var(--wolf-red-rgb), 0.14);
+    color: var(--wolf-red);
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-filter-controls input,
+  body.light-theme #ledger-page.sales-mode .sales-filter-controls select {
+    background: rgba(255, 255, 255, 0.78);
+    color: #241f1a;
+    border-color: rgba(56, 45, 34, 0.2);
+  }
+
+  body.light-theme #ledger-page.sales-mode .ledger-left-rail,
+  body.light-theme #ledger-page.sales-mode .ledger-right-rail {
+    background:
+      linear-gradient(160deg, rgba(246, 241, 233, 0.96), rgba(238, 231, 220, 0.96)),
+      url('/assets/images/textures/grid-me.png');
+    border-color: rgba(56, 45, 34, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 12px 22px rgba(56, 45, 34, 0.12);
+  }
+
+  body.light-theme #ledger-page.sales-mode #ledger-list-container {
+    background: rgba(247, 242, 234, 0.9);
+    border-color: rgba(56, 45, 34, 0.16);
+  }
+
+  body.light-theme #ledger-page.sales-mode .week-nav-container,
+  body.light-theme #ledger-page.sales-mode .day-selector-outer-box {
+    background: linear-gradient(
+      160deg,
+      rgba(246, 241, 233, 0.96),
+      rgba(238, 231, 220, 0.96)
+    );
+    border-color: rgba(56, 45, 34, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 8px 16px rgba(56, 45, 34, 0.1);
+  }
+
+  body.light-theme #ledger-page.sales-mode .ledger-right-rail-head {
+    border-bottom-color: rgba(56, 45, 34, 0.16);
+  }
+
+  body.light-theme #ledger-page.sales-mode .ledger-right-rail-head h4 {
+    color: #2f2822;
+  }
+
+  body.light-theme #ledger-page.sales-mode .ledger-right-rail-head span {
+    color: #6d6156;
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-filter-controls select {
+    background-image:
+      linear-gradient(45deg, transparent 50%, #241f1a 50%),
+      linear-gradient(135deg, #241f1a 50%, transparent 50%);
+  }
+
+  body.light-theme #sales-sort-select {
+    background-color: rgba(255, 255, 255, 0.78) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23241f1a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    color: #241f1a !important;
+  }
+
+  body.light-theme #ledger-page.sales-mode .sales-filter-controls select option {
+    background: #f4efe8;
+    color: #241f1a;
+  }
+
+  body.light-theme #ledger-page.sales-mode #ledger-list-container::before {
+    opacity: 0.06;
+    background:
+      radial-gradient(circle at center, rgba(241, 236, 228, 0.25), rgba(241, 236, 228, 0.94) 76%),
+      url('/assets/images/logo.jpg') center/360px 360px no-repeat;
+    mix-blend-mode: multiply;
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 42%, transparent 72%);
+    mask-image: radial-gradient(circle at center, #000 0 42%, transparent 72%);
+  }
+
+  #ledger-page img.zoomable-image {
+    cursor: zoom-in;
+    transition: transform 0.22s ease, filter 0.22s ease;
+  }
+
+  #ledger-page img.zoomable-image:hover {
+    transform: scale(1.03);
+    filter: brightness(1.05);
+  }
+
+  .wolf-image-zoom-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(5, 8, 14, 0.86);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 9999;
+  }
+
+  .wolf-image-zoom-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #wolf-image-zoom-target {
+    max-width: min(92vw, 1280px);
+    max-height: 88vh;
+    width: auto;
+    height: auto;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 24px 44px rgba(0, 0, 0, 0.45);
+    object-fit: contain;
+    cursor: zoom-out;
+    user-select: none;
+    -webkit-user-drag: none;
+    animation: zoomPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .wolf-image-zoom-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(15, 19, 26, 0.9);
+    color: #f3f6ff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .wolf-image-zoom-close:hover {
+    transform: scale(1.06);
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
+  }
+
+  .wolf-image-zoom-close i {
+    font-size: 1.3rem;
+  }
+
+  body.image-zoom-open {
+    overflow: hidden;
+  }
+
+  @keyframes zoomPopIn {
+    from {
+      opacity: 0;
+      transform: scale(0.93);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  body.light-theme .wolf-image-zoom-overlay {
+    background: rgba(40, 32, 24, 0.52);
+  }
+
+  body.light-theme #wolf-image-zoom-target {
+    border-color: rgba(56, 45, 34, 0.24);
+    box-shadow: 0 20px 34px rgba(56, 45, 34, 0.25);
+  }
+
+  body.light-theme .wolf-image-zoom-close {
+    background: rgba(255, 255, 255, 0.94);
+    color: #231d17;
+    border-color: rgba(56, 45, 34, 0.24);
   }
 </style>
 <script src="/assets/js/utils/gatekeeper.js"></script>
@@ -927,97 +1823,160 @@
     </div>
   </header>
 
-  <!-- SUMMARY -->
-  <section class="ledger-summary-card">
-    <span class="summary-label" id="ledger-summary-label">DATA_SUMMARY</span>
-    <div class="summary-value" id="ledger-summary-amount">₱0.00</div>
-  </section>
+  <div class="ledger-desktop-grid">
+    <div class="ledger-left-rail">
+      <!-- SUMMARY -->
+      <section class="ledger-summary-card">
+        <span class="summary-label" id="ledger-summary-label">DATA_SUMMARY</span>
+        <div class="summary-value" id="ledger-summary-amount">₱0.00</div>
+      </section>
 
-  <!-- WEEK NAVIGATOR -->
-  <nav class="week-nav-container">
-    <!-- FAR LEFT -->
-    <button class="chrono-nav-btn" id="prev-week-btn">
-      <i class="bx bx-left-arrow-alt"></i>
-      <span class="btn-label">PREVIOUS</span>
-    </button>
+      <section class="sales-insight-grid" aria-label="Sales insights">
+        <article class="sales-insight-card" id="ledger-prev-day-card">
+          <span class="insight-label insight-with-icon"><i class="bx bx-calendar-minus"></i>Previous Day Income</span>
+          <span class="insight-trend up" id="ledger-prevday-trend"><i class="bx bx-up-arrow-alt"></i><span>Yesterday</span></span>
+          <strong class="insight-value" id="ledger-prevday-amount">₱0.00</strong>
+          <span class="insight-meta">Yesterday total sales</span>
+        </article>
+        <article class="sales-insight-card" id="ledger-most-sold-card">
+          <div class="insight-main">
+            <span class="insight-label">Most Sold Today</span>
+            <strong class="insight-value" id="ledger-most-sold-name">NO SALES YET</strong>
+            <span class="insight-meta" id="ledger-most-sold-meta">Units: 0</span>
+          </div>
+          <div class="insight-thumb">
+            <img
+              id="ledger-most-sold-image"
+              src="/assets/images/placeholder.png"
+              alt="Most sold product"
+              onerror="this.onerror=null;this.src='/assets/images/placeholder.png';"
+            />
+          </div>
+        </article>
+        </section>
 
-    <!-- CENTER (STRETCHES) -->
-    <div class="chrono-center-group">
-      <div class="chrono-hud-node" id="chrono-picker-trigger">
-        <div class="hud-status">
-          <div class="hud-dot"></div>
-          <span class="hud-protocol">7-DAYS RECORD</span>
+      <!-- SEARCH HUB -->
+      <div id="ledger-search-container" class="search-collapsible">
+        <div id="ledger-search-wrapper" class="ledger-search-box">
+          <i class="bx bx-search" style="color: var(--wolf-red)"></i>
+          <input
+            type="text"
+            id="ledger-main-search"
+            placeholder="FILTER RECORDS..."
+            autocomplete="off"
+          />
+          <i
+            class="bx bx-x"
+            id="search-clear-btn"
+            style="cursor: pointer; display: none; font-size: 1.2rem; color: #666"
+          ></i>
         </div>
-        <div class="hud-data">
-          <i class="bx bx-calendar-check"></i>
-          <span id="week-range-display">--- - ---</span>
-        </div>
-        <div class="hud-scanline"></div>
       </div>
 
-      <!-- TODAY (POPS OUT ON THE RIGHT OF HUD) -->
-      <button id="snap-today-btn" class="snap-today-btn">
-        <i class="bx bx-redo"></i>
-        <span class="btn-label">TODAY</span>
-      </button>
+      <section class="sales-filter-panel" id="sales-filter-panel">
+        <div class="sales-filter-row">
+          <button type="button" class="sales-filter-chip is-active" data-sales-filter="all">All</button>
+          <button type="button" class="sales-filter-chip" data-sales-filter="high-value">High Value</button>
+          <button type="button" class="sales-filter-chip" data-sales-filter="bulk">Bulk Qty</button>
+        </div>
+        <div class="sales-filter-controls">
+          <input
+            type="number"
+            id="sales-min-amount"
+            min="0"
+            step="1"
+            placeholder="Min amount"
+            title="Minimum transaction amount"
+          />
+          <select id="sales-sort-select" title="Sort sales">
+            <option value="latest">Latest first</option>
+            <option value="amount-desc">Highest amount</option>
+            <option value="name-asc">Name A-Z</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="sales-guide-card" id="sales-guide-card" aria-label="Sales guide">
+        <div class="sales-guide-head">
+          <i class="bx bx-info-circle"></i>
+          Sales Guide
+        </div>
+        <div class="sales-guide-copy">
+          Left side shows summary and filters. Right side shows sales records for the selected day.
+          Most Sold Today is computed from units sold on this selected day.
+        </div>
+      </section>
+
     </div>
 
-    <!-- FAR RIGHT -->
-    <button class="chrono-nav-btn" id="next-week-btn">
-      <span class="btn-label">NEXT</span>
-      <i class="bx bx-right-arrow-alt"></i>
-    </button>
-  </nav>
+    <div class="ledger-right-rail">
+      <!-- WEEK NAVIGATOR -->
+      <nav class="week-nav-container">
+        <button class="chrono-nav-btn" id="prev-week-btn">
+          <i class="bx bx-left-arrow-alt"></i>
+          <span class="btn-label">PREVIOUS</span>
+        </button>
 
-  <!-- HIDDEN PICKER -->
-  <input
-    type="text"
-    id="hidden-chrono-input"
-    title="Select week date"
-    style="
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-      height: 0;
-      width: 0;
-    "
-  />
-  <!-- DAY SELECTOR SECTION -->
-  <div class="day-selector-outer-box">
-    <div class="day-selector" id="ledger-day-picker">
-      <button class="day-btn" data-day="0">SUN</button>
-      <button class="day-btn" data-day="1">MON</button>
-      <button class="day-btn" data-day="2">TUE</button>
-      <button class="day-btn" data-day="3">WED</button>
-      <button class="day-btn" data-day="4">THU</button>
-      <button class="day-btn" data-day="5">FRI</button>
-      <button class="day-btn" data-day="6">SAT</button>
-    </div>
-  </div>
+        <div class="chrono-center-group">
+          <div class="chrono-hud-node" id="chrono-picker-trigger">
+            <div class="hud-status">
+              <div class="hud-dot"></div>
+              <span class="hud-protocol">7-DAYS RECORD</span>
+            </div>
+            <div class="hud-data">
+              <i class="bx bx-calendar-check"></i>
+              <span id="week-range-display">--- - ---</span>
+            </div>
+            <div class="hud-scanline"></div>
+          </div>
 
-  <!-- SEARCH HUB (Moved & Modified for Toggle/Clear) -->
-  <div id="ledger-search-container" class="search-collapsible">
-    <div id="ledger-search-wrapper" class="ledger-search-box">
-      <i class="bx bx-search" style="color: var(--wolf-red)"></i>
+          <button id="snap-today-btn" class="snap-today-btn">
+            <i class="bx bx-redo"></i>
+            <span class="btn-label">TODAY</span>
+          </button>
+        </div>
+
+        <button class="chrono-nav-btn" id="next-week-btn">
+          <span class="btn-label">NEXT</span>
+          <i class="bx bx-right-arrow-alt"></i>
+        </button>
+      </nav>
+
       <input
         type="text"
-        id="ledger-main-search"
-        placeholder="FILTER RECORDS..."
-        autocomplete="off"
+        id="hidden-chrono-input"
+        title="Select week date"
+        style="
+          position: absolute;
+          opacity: 0;
+          pointer-events: none;
+          height: 0;
+          width: 0;
+        "
       />
-      <!-- CLEAR BUTTON -->
-      <i
-        class="bx bx-x"
-        id="search-clear-btn"
-        style="cursor: pointer; display: none; font-size: 1.2rem; color: #666"
-      ></i>
-    </div>
-  </div>
 
-  <!-- UNIFIED LIST DATA (CRITICAL FIX: ONE ID FOR BOTH) -->
-  <div id="ledger-list-container">
-    <div style="text-align: center; padding: 100px 0; opacity: 0.2">
-      <i class="bx bx-loader-alt bx-spin" style="font-size: 2rem"></i>
+      <div class="day-selector-outer-box">
+        <div class="day-selector" id="ledger-day-picker">
+          <button class="day-btn" data-day="0">SUN</button>
+          <button class="day-btn" data-day="1">MON</button>
+          <button class="day-btn" data-day="2">TUE</button>
+          <button class="day-btn" data-day="3">WED</button>
+          <button class="day-btn" data-day="4">THU</button>
+          <button class="day-btn" data-day="5">FRI</button>
+          <button class="day-btn" data-day="6">SAT</button>
+        </div>
+      </div>
+
+      <div class="ledger-right-rail-head">
+        <h4 id="ledger-records-title">Transactions</h4>
+        <span id="ledger-filter-count">0 record(s)</span>
+      </div>
+
+      <div id="ledger-list-container">
+        <div style="text-align: center; padding: 100px 0; opacity: 0.2">
+          <i class="bx bx-loader-alt bx-spin" style="font-size: 2rem"></i>
+        </div>
+      </div>
     </div>
   </div>
 </div>

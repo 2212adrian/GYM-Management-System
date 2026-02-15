@@ -6,6 +6,21 @@
   const LOCAL_FEEDBACK_KEY = 'wolf_local_feedback_entries';
   const LOCAL_GOAL_KEY = 'wolf_local_goal_targets';
   const LOCAL_GOAL_CUSTOM_KEY = 'wolf_local_goal_custom_config';
+  const LOCAL_DASH_BUSY_HOUR_KEY = 'wolf_dashboard_busiest_hour_tracker';
+  const LOGBOOK_REVENUE_COLUMN_CANDIDATES = [
+    'id,entry_fee,paid_amount,is_paid,notes,time_in,time_out,profile_id,created_at',
+    'id,entry_fee,paid_amount,is_paid,paid_at,notes,time_in,time_out,profile_id,created_at',
+    'id,entry_fee,paid_amount,is_paid,time_in,created_at',
+    'id,entry_fee,time_in,created_at',
+  ];
+  let resolvedLogbookRevenueColumns = LOGBOOK_REVENUE_COLUMN_CANDIDATES[0];
+  const LOGBOOK_DASHBOARD_COLUMN_CANDIDATES = [
+    'id,entry_fee,paid_amount,is_paid,notes,time_in,time_out,profile_id,created_at',
+    'id,entry_fee,paid_amount,is_paid,time_in,time_out,profile_id,created_at',
+    'id,entry_fee,paid_amount,is_paid,time_in,created_at',
+    'id,entry_fee,time_in,created_at',
+  ];
+  let resolvedDashboardLogbookColumns = LOGBOOK_DASHBOARD_COLUMN_CANDIDATES[0];
   const SETTINGS_ACTION_SOUNDS_KEY = 'wolf_action_sounds_muted';
   const SETTINGS_VICTORY_VISUALS_KEY = 'wolf_victory_visuals_enabled';
   const SETTINGS_UI_SCALE_KEY = 'wolf_ui_scale_percent';
@@ -219,6 +234,31 @@
     return value;
   }
 
+  function toManilaDateKey(dateLike) {
+    const date = new Date(dateLike);
+    if (Number.isNaN(date.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const year = parts.find((p) => p.type === 'year')?.value || '1970';
+    const month = parts.find((p) => p.type === 'month')?.value || '01';
+    const day = parts.find((p) => p.type === 'day')?.value || '01';
+    return `${year}-${month}-${day}`;
+  }
+
+  function getManilaRangeStart(dateLike) {
+    const key = toManilaDateKey(dateLike);
+    return new Date(`${key}T00:00:00+08:00`);
+  }
+
+  function getManilaRangeEnd(dateLike) {
+    const start = getManilaRangeStart(dateLike);
+    return new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  }
+
   function getWeekStart(date) {
     const value = getRangeStart(date);
     value.setDate(value.getDate() - value.getDay());
@@ -286,51 +326,3061 @@
   }
 
   function computeLogbookRevenue(rows) {
+    const parseAmountFromNotes = (notesValue) => {
+      const notes = String(notesValue || '');
+      if (!notes) return 0;
+      const explicit =
+        notes.match(/\bPAID:([0-9]+(?:\.[0-9]+)?)/i) ||
+        notes.match(/\bPAID_AMOUNT:([0-9]+(?:\.[0-9]+)?)/i) ||
+        notes.match(/\bAMOUNT:([0-9]+(?:\.[0-9]+)?)/i) ||
+        notes.match(/\bENTRY_FEE:([0-9]+(?:\.[0-9]+)?)/i);
+      if (explicit && explicit[1]) return toNumber(explicit[1]);
+      return 0;
+    };
+
     return (rows || []).reduce((sum, row) => {
       const paid = toNumber(row.paid_amount);
       if (paid > 0) return sum + paid;
-      if (row.is_paid) return sum + toNumber(row.entry_fee);
+
+      const fee = toNumber(row.entry_fee);
+      const notesAmount = parseAmountFromNotes(row?.notes);
+      const baseAmount = fee > 0 ? fee : notesAmount;
+      if (baseAmount <= 0) return sum;
+
+      const notes = String(row?.notes || '');
+      const paidByNotes =
+        /\bPAID:(YES|TRUE|1)\b/i.test(notes) ||
+        /\bPAID:[0-9]+(?:\.[0-9]+)?\b/i.test(notes);
+      const paidByTimestamp = Boolean(row?.paid_at);
+
+      if (row.is_paid === true || paidByNotes || paidByTimestamp) {
+        return sum + baseAmount;
+      }
+
+      // Respect explicit unpaid rows.
+      if (row.is_paid === false) {
+        return sum;
+      }
+
+      // Legacy fallback: only when paid flag column is missing/null.
+      if (row.is_paid == null) {
+        return sum + baseAmount;
+      }
+
       return sum;
     }, 0);
   }
 
-  async function fetchRevenueSnapshot(client, startDate, endDate) {
+  async function fetchRevenueSnapshot(
+    client,
+    startDate,
+    endDate,
+    options = {},
+  ) {
+    const includeRows = Boolean(options?.includeRows);
     const startIso = startDate.toISOString();
     const endIso = endDate.toISOString();
 
     const salesResult = await fetchRowsByDateRange(
       client,
       'sales',
-      'id,total_amount,qty,unit_price,created_at',
+      'id,product_id,total_amount,qty,unit_price,created_at',
       startIso,
       endIso,
       ['created_at'],
     );
-    const logbookResult = await fetchRowsByDateRange(
-      client,
-      'check_in_logs',
-      'id,entry_fee,paid_amount,is_paid,time_in,created_at',
-      startIso,
-      endIso,
-      ['time_in', 'created_at'],
-    );
+    const logbookColumnCandidates = [
+      resolvedLogbookRevenueColumns,
+      ...LOGBOOK_REVENUE_COLUMN_CANDIDATES.filter(
+        (columns) => columns !== resolvedLogbookRevenueColumns,
+      ),
+    ];
+    let logbookResult = { data: [], error: null };
+    for (const columns of logbookColumnCandidates) {
+      const attempt = await fetchRowsByDateRange(
+        client,
+        'check_in_logs',
+        columns,
+        startIso,
+        endIso,
+        ['time_in', 'created_at'],
+      );
+      if (!attempt.error) {
+        logbookResult = attempt;
+        resolvedLogbookRevenueColumns = columns;
+        break;
+      }
+      if (!isMissingColumnError(attempt.error)) {
+        logbookResult = attempt;
+        break;
+      }
+    }
 
-    return {
+    const salesRows = salesResult.data || [];
+    const logbookRows = logbookResult.data || [];
+    const response = {
       salesAmount: computeSalesAmount(salesResult.data),
       logbookAmount: computeLogbookRevenue(logbookResult.data),
-      salesCount: (salesResult.data || []).length,
-      trafficCount: (logbookResult.data || []).length,
+      salesCount: salesRows.length,
+      trafficCount: logbookRows.length,
       salesError: salesResult.error,
       logbookError: logbookResult.error,
     };
+    if (includeRows) {
+      response.salesRows = salesRows;
+      response.logbookRows = logbookRows;
+    }
+    return response;
+  }
+
+  function filterRowsByDateRange(rows, startDate, endDate, dateColumns) {
+    const startTs = new Date(startDate).getTime();
+    const endTs = new Date(endDate).getTime();
+    if (
+      !Number.isFinite(startTs) ||
+      !Number.isFinite(endTs) ||
+      endTs <= startTs
+    ) {
+      return [];
+    }
+    return (rows || []).filter((row) => {
+      const parsed = parseRowDate(row, dateColumns);
+      if (!parsed) return false;
+      const ts = parsed.getTime();
+      return ts >= startTs && ts < endTs;
+    });
+  }
+
+  function buildRevenueSnapshotFromRows(
+    salesRows,
+    logbookRows,
+    startDate,
+    endDate,
+    options = {},
+  ) {
+    const includeRows = Boolean(options?.includeRows);
+    const scopedSalesRows = filterRowsByDateRange(
+      salesRows,
+      startDate,
+      endDate,
+      ['created_at'],
+    );
+    const scopedLogbookRows = filterRowsByDateRange(
+      logbookRows,
+      startDate,
+      endDate,
+      ['time_in', 'created_at'],
+    );
+    const response = {
+      salesAmount: computeSalesAmount(scopedSalesRows),
+      logbookAmount: computeLogbookRevenue(scopedLogbookRows),
+      salesCount: scopedSalesRows.length,
+      trafficCount: scopedLogbookRows.length,
+      salesError: null,
+      logbookError: null,
+    };
+    if (includeRows) {
+      response.salesRows = scopedSalesRows;
+      response.logbookRows = scopedLogbookRows;
+    }
+    return response;
+  }
+
+  async function fetchDashboardLogbookRows(client, startIso, endIso) {
+    const candidates = [
+      resolvedDashboardLogbookColumns,
+      ...LOGBOOK_DASHBOARD_COLUMN_CANDIDATES.filter(
+        (columns) => columns !== resolvedDashboardLogbookColumns,
+      ),
+    ];
+    let fallback = { data: [], error: null };
+    for (const columns of candidates) {
+      const attempt = await fetchRowsByDateRange(
+        client,
+        'check_in_logs',
+        columns,
+        startIso,
+        endIso,
+        ['time_in', 'created_at'],
+      );
+      if (!attempt.error) {
+        resolvedDashboardLogbookColumns = columns;
+        return attempt;
+      }
+      fallback = attempt;
+      if (!isMissingColumnError(attempt.error)) break;
+    }
+    return fallback;
   }
 
   window.DashboardManager = {
     _timer: null,
+    _lastPayload: null,
+    _hybridModes: ['daily', 'weekly', 'monthly', 'yearly'],
+    _dashboardMode: 'weekly',
+    _layoutStorageKey: 'wolf_dashboard_layout_v4_unified',
+    _activeDashboardLayoutMode: '',
+    _sessionLayoutsByMode: {},
+    _defaultWidgetOrderByZone: null,
+    _sortableReady: false,
+    _dashboardGrid: null,
+    _mobileSortable: null,
+    _mobileDragActive: false,
+    _mobileDragTouchY: null,
+    _mobileEdgeAutoScrollRaf: null,
+    _mobileEdgeAutoScrollDir: 0,
+    _mobileEdgeAutoScrollSpeed: 0,
+    _mobileEdgeTouchMoveHandler: null,
+    _mobileEdgeTouchEndHandler: null,
+    _mobileEdgePointerMoveHandler: null,
+    _mobileAutoSizeTimer: null,
+    _mobileAutoSizing: false,
+    _suspendDashboardLayoutCapture: false,
+    _layoutEditing: false,
+    _lastSavedLayoutSignature: '',
+    _tippyReady: false,
+    _mobileSaveDockBtn: null,
+    _dashboardNavigateGuardPatched: false,
+    updateDashboardSaveDockOffset() {
+      if (!this.isDashboardMobileViewport()) return;
+      const topbarHost = document.getElementById('topbar-container');
+      let dockTop = 10;
+      if (topbarHost) {
+        const topbarEl = topbarHost.querySelector('.topbar') || topbarHost;
+        const rect = topbarEl.getBoundingClientRect();
+        if (Number.isFinite(rect.bottom)) {
+          dockTop = Math.max(10, Math.round(rect.bottom + 8));
+        }
+      }
+      document.documentElement.style.setProperty(
+        '--dashboard-save-dock-top',
+        `${dockTop}px`,
+      );
+    },
+    ensureMobileSaveDockButton() {
+      if (this._mobileSaveDockBtn && this._mobileSaveDockBtn.isConnected)
+        return this._mobileSaveDockBtn;
+      const topbarHost = document.getElementById('topbar-container');
+      if (!topbarHost) return null;
+      const topbar = topbarHost.querySelector('.topbar') || topbarHost;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'dashboard-mobile-save-dock-btn';
+      btn.className = 'dashboard-pill dashboard-mobile-save-dock';
+      btn.innerHTML = "<i class='bx bx-save'></i> Save Changes";
+      btn.addEventListener('click', () => {
+        if (!this.isDashboardMobileViewport() || !this._layoutEditing) return;
+        btn.classList.remove('is-saving-flash');
+        void btn.offsetWidth;
+        btn.classList.add('is-saving-flash');
+        this.persistDashboardLayout({ animate: true });
+        notify('Dashboard layout saved.', 'success');
+        this.setLayoutEditing(false);
+        window.setTimeout(() => btn.classList.remove('is-saving-flash'), 520);
+      });
+      topbar.appendChild(btn);
+      this._mobileSaveDockBtn = btn;
+      return btn;
+    },
+    syncMobileSaveDockButton() {
+      const toolbarToggleBtn = document.getElementById(
+        'dashboard-toolbar-toggle-btn',
+      );
+      const shouldDock = this.isDashboardMobileViewport() && this._layoutEditing;
+      const btn = this.ensureMobileSaveDockButton();
+      if (toolbarToggleBtn) {
+        toolbarToggleBtn.classList.toggle('is-hidden-by-dock', shouldDock);
+      }
+      if (!btn) return;
+      btn.style.display = shouldDock ? 'inline-flex' : 'none';
+    },
+    updateDashboardToolbarToggleState() {
+      const toolbarActions = document.getElementById('dashboard-toolbar-actions');
+      const toolbarToggleBtn = document.getElementById(
+        'dashboard-toolbar-toggle-btn',
+      );
+      if (!toolbarActions || !toolbarToggleBtn) return;
+      this.updateDashboardSaveDockOffset();
+      const doneMode = this.isDashboardMobileViewport() && this._layoutEditing;
+      if (doneMode) {
+        toolbarActions.classList.remove('is-open');
+        toolbarToggleBtn.innerHTML =
+          "<i class='bx bx-check-double'></i> Save Changes";
+        toolbarToggleBtn.setAttribute('aria-expanded', 'false');
+        toolbarToggleBtn.classList.add('is-save-state');
+      } else {
+        toolbarToggleBtn.innerHTML =
+          "<i class='bx bx-menu-alt-right'></i> Tools";
+        toolbarToggleBtn.classList.remove('is-save-state');
+      }
+      this.syncMobileSaveDockButton();
+    },
+    bindActions() {
+      if (
+        !this._dashboardNavigateGuardPatched &&
+        typeof window.navigateTo === 'function'
+      ) {
+        this._dashboardNavigateGuardPatched = true;
+        const originalNavigateTo = window.navigateTo.bind(window);
+        window.navigateTo = async (...args) => {
+          const shell = this.getDashboardShell();
+          const dashboardVisible =
+            !!shell &&
+            document.body.contains(shell) &&
+            window.getComputedStyle(shell).display !== 'none';
+          if (dashboardVisible && this._layoutEditing) {
+            const confirmed = await this.confirmDashboardLayoutAction({
+              title: 'Leave dashboard arrange mode?',
+              text: 'Save Changes is active. Switching tabs will cancel this request and discard unsaved layout changes.',
+              confirmLabel: 'Leave Tab',
+            });
+            if (!confirmed) return;
+            this.setLayoutEditing(false);
+            notify('Arrange mode canceled.', 'warning');
+          }
+          return originalNavigateTo(...args);
+        };
+      }
+
+      const toolbarActions = document.getElementById('dashboard-toolbar-actions');
+      const toolbarToggleBtn = document.getElementById(
+        'dashboard-toolbar-toggle-btn',
+      );
+      if (toolbarActions && toolbarToggleBtn && !toolbarToggleBtn.dataset.bound) {
+        toolbarToggleBtn.dataset.bound = '1';
+        const closeToolbarMenu = () => {
+          toolbarActions.classList.remove('is-open');
+          toolbarToggleBtn.setAttribute('aria-expanded', 'false');
+        };
+        const toggleToolbarMenu = () => {
+          const willOpen = !toolbarActions.classList.contains('is-open');
+          toolbarActions.classList.toggle('is-open', willOpen);
+          toolbarToggleBtn.setAttribute(
+            'aria-expanded',
+            willOpen ? 'true' : 'false',
+          );
+        };
+        toolbarToggleBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (this.isDashboardMobileViewport() && this._layoutEditing) {
+            toolbarToggleBtn.classList.remove('is-saving-flash');
+            // replay animation on repeated saves
+            void toolbarToggleBtn.offsetWidth;
+            toolbarToggleBtn.classList.add('is-saving-flash');
+            this.persistDashboardLayout({ animate: true });
+            notify('Dashboard layout saved.', 'success');
+            this.setLayoutEditing(false);
+            this.updateDashboardToolbarToggleState();
+            window.setTimeout(
+              () => toolbarToggleBtn.classList.remove('is-saving-flash'),
+              520,
+            );
+            return;
+          }
+          toggleToolbarMenu();
+        });
+        document.addEventListener('click', (event) => {
+          if (!toolbarActions.contains(event.target)) closeToolbarMenu();
+        });
+        toolbarActions.addEventListener('click', (event) => {
+          const actionBtn = event.target.closest(
+            '.dashboard-toolbar-menu .dashboard-pill',
+          );
+          if (!actionBtn) return;
+          if (this.isDashboardMobileViewport()) closeToolbarMenu();
+        });
+        window.addEventListener(
+          'resize',
+          () => {
+            if (!this.isDashboardMobileViewport()) closeToolbarMenu();
+            this.updateDashboardToolbarToggleState();
+          },
+          { passive: true },
+        );
+        window.addEventListener(
+          'scroll',
+          () => this.updateDashboardSaveDockOffset(),
+          { passive: true },
+        );
+        this.updateDashboardToolbarToggleState();
+      }
+
+      const printBtn = document.getElementById('dashboard-print-btn');
+      if (printBtn && !printBtn.dataset.bound) {
+        printBtn.dataset.bound = '1';
+        printBtn.addEventListener('click', () => {
+          this.preparePrintReport();
+          window.print();
+        });
+      }
+
+      const downloadBtn = document.getElementById('dashboard-download-btn');
+      if (downloadBtn && !downloadBtn.dataset.bound) {
+        downloadBtn.dataset.bound = '1';
+        downloadBtn.addEventListener('click', () => this.downloadSnapshot());
+      }
+
+      const resetLayoutBtnToolbar = document.getElementById(
+        'dashboard-layout-reset-btn-toolbar',
+      );
+      if (resetLayoutBtnToolbar && !resetLayoutBtnToolbar.dataset.bound) {
+        resetLayoutBtnToolbar.dataset.bound = '1';
+        resetLayoutBtnToolbar.addEventListener('click', async () => {
+          const confirmed = await this.confirmDashboardLayoutAction({
+            title: 'Reset dashboard layout to default?',
+            text: 'This will replace your current saved layout for this device mode.',
+            confirmLabel: 'Reset',
+          });
+          if (!confirmed) return;
+          this.resetDashboardLayout({ persist: true });
+        });
+      }
+
+      const layoutToggleBtn = document.getElementById(
+        'dashboard-layout-toggle-btn',
+      );
+      if (layoutToggleBtn && !layoutToggleBtn.dataset.bound) {
+        layoutToggleBtn.dataset.bound = '1';
+        layoutToggleBtn.addEventListener('click', async () => {
+          const nextEditing = !this._layoutEditing;
+          if (!nextEditing) {
+            const hasUnsaved =
+              this.getDashboardLayoutSignature() !==
+              String(this._lastSavedLayoutSignature || '');
+            if (hasUnsaved) {
+              const confirmed = await this.confirmDashboardLayoutAction({
+                title: 'Done arranging?',
+                text: 'You have unsaved layout changes. Exit Arrange Mode anyway?',
+                confirmLabel: 'Done',
+              });
+              if (!confirmed) return;
+              this.persistDashboardLayout({ animate: true });
+            }
+          }
+          this.setLayoutEditing(nextEditing);
+        });
+      }
+
+      if (!this._printHookBound) {
+        this._printHookBound = true;
+        window.addEventListener('beforeprint', () => this.preparePrintReport());
+      }
+
+      const busiestCard = document.getElementById('dashboard-busiest-kpi-card');
+      if (busiestCard && !busiestCard.dataset.bound) {
+        busiestCard.dataset.bound = '1';
+        busiestCard.addEventListener('click', () => {
+          busiestCard.classList.toggle('is-flipped');
+          if (window.wolfAudio) window.wolfAudio.play('swipe');
+        });
+      }
+
+      const modeButtons = Array.from(
+        document.querySelectorAll('[data-dashboard-mode]'),
+      );
+      modeButtons.forEach((button) => {
+        if (button.dataset.bound === '1') return;
+        button.dataset.bound = '1';
+        button.addEventListener('click', () => {
+          const nextMode = String(
+            button.getAttribute('data-dashboard-mode') || '',
+          ).toLowerCase();
+          this.setDashboardMode(nextMode, { withAudio: true, withPulse: true });
+        });
+      });
+
+      const quickRefreshBtn = document.getElementById(
+        'dashboard-quick-refresh-btn',
+      );
+      if (quickRefreshBtn && !quickRefreshBtn.dataset.bound) {
+        quickRefreshBtn.dataset.bound = '1';
+        quickRefreshBtn.addEventListener('click', () => {
+          if (window.wolfAudio) window.wolfAudio.play('notif');
+          this.load();
+        });
+      }
+
+      const quickPrintBtn = document.getElementById(
+        'dashboard-quick-print-btn',
+      );
+      if (quickPrintBtn && !quickPrintBtn.dataset.bound) {
+        quickPrintBtn.dataset.bound = '1';
+        quickPrintBtn.addEventListener('click', () => {
+          this.preparePrintReport();
+          if (window.wolfAudio) window.wolfAudio.play('notif');
+          window.print();
+        });
+      }
+
+      const quickDownloadBtn = document.getElementById(
+        'dashboard-quick-download-btn',
+      );
+      if (quickDownloadBtn && !quickDownloadBtn.dataset.bound) {
+        quickDownloadBtn.dataset.bound = '1';
+        quickDownloadBtn.addEventListener('click', () =>
+          this.downloadSnapshot(),
+        );
+      }
+
+      const quickProductsBtn = document.getElementById(
+        'dashboard-open-products-btn',
+      );
+      if (quickProductsBtn && !quickProductsBtn.dataset.bound) {
+        quickProductsBtn.dataset.bound = '1';
+        quickProductsBtn.addEventListener('click', () => {
+          if (window.wolfAudio) window.wolfAudio.play('swipe');
+          if (typeof window.navigateTo === 'function')
+            window.navigateTo('products');
+        });
+      }
+
+      const quickSalesBtn = document.getElementById('dashboard-open-sales-btn');
+      if (quickSalesBtn && !quickSalesBtn.dataset.bound) {
+        quickSalesBtn.dataset.bound = '1';
+        quickSalesBtn.addEventListener('click', () => {
+          if (window.wolfAudio) window.wolfAudio.play('swipe');
+          if (typeof window.navigateTo === 'function')
+            window.navigateTo('sales');
+        });
+      }
+
+      const quickLogbookBtn = document.getElementById(
+        'dashboard-open-logbook-btn',
+      );
+      if (quickLogbookBtn && !quickLogbookBtn.dataset.bound) {
+        quickLogbookBtn.dataset.bound = '1';
+        quickLogbookBtn.addEventListener('click', () => {
+          if (window.wolfAudio) window.wolfAudio.play('swipe');
+          if (typeof window.navigateTo === 'function')
+            window.navigateTo('logbook');
+        });
+      }
+    },
+
+    preparePrintReport() {
+      const stampEl = document.getElementById('dashboard-report-generated-at');
+      if (!stampEl) return;
+
+      const now = new Date();
+      stampEl.textContent = `Generated: ${now.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`;
+    },
+
+    async confirmDashboardLayoutAction({ title, text, confirmLabel }) {
+      if (window.Swal && typeof window.Swal.fire === 'function') {
+        try {
+          const result = await window.Swal.fire({
+            title: String(title || 'Confirm action'),
+            text: String(text || ''),
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: String(confirmLabel || 'Confirm'),
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+          });
+          return Boolean(result?.isConfirmed);
+        } catch (_) {
+          // fall through to native confirm
+        }
+      }
+      return window.confirm(
+        `${String(title || 'Confirm action')}\n\n${String(text || '')}`,
+      );
+    },
+
+    async ensureExternalScript(src, globalName) {
+      if (globalName && window[globalName]) return true;
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        await new Promise((resolve) => {
+          if (globalName && window[globalName]) return resolve();
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', resolve, { once: true });
+        });
+        return Boolean(!globalName || window[globalName]);
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      document.head.appendChild(script);
+      await new Promise((resolve) => {
+        script.addEventListener('load', resolve, { once: true });
+        script.addEventListener('error', resolve, { once: true });
+      });
+      return Boolean(!globalName || window[globalName]);
+    },
+
+    ensureExternalStyle(href, id) {
+      if (id && document.getElementById(id)) return;
+      if (document.querySelector(`link[href="${href}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      if (id) link.id = id;
+      document.head.appendChild(link);
+    },
+
+    async ensureDashboardEnhancers() {
+      // Libraries are self-hosted and loaded in pages/main.html to satisfy CSP.
+      return {
+        gridstack: Boolean(
+          window.GridStack && typeof window.GridStack.init === 'function',
+        ),
+        tippy: typeof window.tippy === 'function',
+      };
+    },
+
+    getDashboardShell() {
+      return document.querySelector('#page-wrapper .dashboard-shell');
+    },
+
+    getDashboardWorkspace() {
+      return document.getElementById('dashboard-workspace-grid');
+    },
+
+    getDefaultDashboardGridLayout() {
+      return {
+        hero: { x: 0, y: 0, w: 8, h: 7 },
+        'hybrid-trend': { x: 8, y: 0, w: 4, h: 7 },
+        'kpi-active-members': { x: 0, y: 7, w: 4, h: 4 },
+        'kpi-busiest-hour': { x: 4, y: 7, w: 4, h: 4 },
+        'kpi-products-sold': { x: 8, y: 7, w: 4, h: 4 },
+        'analytics-peak-hours': { x: 0, y: 11, w: 4, h: 5 },
+        'analytics-income-stats': { x: 4, y: 11, w: 4, h: 5 },
+        'analytics-ops-console': { x: 8, y: 11, w: 4, h: 10 },
+        'analytics-products-share': { x: 0, y: 16, w: 4, h: 6 },
+        'analytics-members-share': { x: 4, y: 16, w: 4, h: 6 },
+        'relevant-products': { x: 0, y: 22, w: 12, h: 5 },
+      };
+    },
+
+    getDefaultWidgetOrder() {
+      return [
+        'hero',
+        'hybrid-trend',
+        'kpi-active-members',
+        'kpi-busiest-hour',
+        'kpi-products-sold',
+        'analytics-peak-hours',
+        'analytics-income-stats',
+        'analytics-ops-console',
+        'analytics-products-share',
+        'analytics-members-share',
+        'relevant-products',
+      ];
+    },
+
+    getDashboardColumnCount() {
+      return 12;
+    },
+
+    getDashboardCellHeight() {
+      return this.isDashboardMobileViewport() ? 32 : 34;
+    },
+
+    getDashboardMaxRowsForPixelCap() {
+      const cellH = Math.max(1, Number(this.getDashboardCellHeight()) || 1);
+      return Math.max(1, Math.floor(2000 / cellH));
+    },
+
+    getDashboardMaxYForHeight(height = 1) {
+      const maxRows = this.getDashboardMaxRowsForPixelCap();
+      const h = Math.max(1, Number(height) || 1);
+      return Math.max(0, maxRows - h);
+    },
+
+    updateDashboardHeightLimitFx() {
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace || !this._dashboardGrid)
+        return;
+      const layer = workspace.querySelector('.dashboard-edge-glow-layer');
+      if (!this._layoutEditing) {
+        workspace.classList.remove('is-boundary-near');
+        if (layer) layer.innerHTML = '';
+        return;
+      }
+      const workspaceRect = workspace.getBoundingClientRect();
+      const touchTolerancePx = 1;
+      const cards = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      const topSegments = [];
+      const rightSegments = [];
+      const bottomSegments = [];
+      const leftSegments = [];
+
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const mergeRanges = (ranges) => {
+        const sorted = ranges
+          .map(([start, end]) => [Math.min(start, end), Math.max(start, end)])
+          .filter(([start, end]) => end - start > 1)
+          .sort((a, b) => a[0] - b[0]);
+        if (!sorted.length) return [];
+        const merged = [sorted[0]];
+        for (let i = 1; i < sorted.length; i += 1) {
+          const [start, end] = sorted[i];
+          const last = merged[merged.length - 1];
+          if (start <= last[1] + 1) last[1] = Math.max(last[1], end);
+          else merged.push([start, end]);
+        }
+        return merged;
+      };
+
+      let activeLayer = layer;
+      if (!activeLayer) {
+        activeLayer = document.createElement('div');
+        activeLayer.className = 'dashboard-edge-glow-layer';
+        workspace.appendChild(activeLayer);
+      }
+
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const topDist = Math.max(0, rect.top - workspaceRect.top);
+        const leftDist = Math.max(0, rect.left - workspaceRect.left);
+        const rightDist = Math.max(0, workspaceRect.right - rect.right);
+        const bottomDist = Math.max(0, workspaceRect.bottom - rect.bottom);
+
+        if (topDist <= touchTolerancePx) {
+          topSegments.push([
+            clamp(rect.left - workspaceRect.left, 0, workspaceRect.width),
+            clamp(rect.right - workspaceRect.left, 0, workspaceRect.width),
+          ]);
+        }
+        if (bottomDist <= touchTolerancePx) {
+          bottomSegments.push([
+            clamp(rect.left - workspaceRect.left, 0, workspaceRect.width),
+            clamp(rect.right - workspaceRect.left, 0, workspaceRect.width),
+          ]);
+        }
+        if (leftDist <= touchTolerancePx) {
+          leftSegments.push([
+            clamp(rect.top - workspaceRect.top, 0, workspaceRect.height),
+            clamp(rect.bottom - workspaceRect.top, 0, workspaceRect.height),
+          ]);
+        }
+        if (rightDist <= touchTolerancePx) {
+          rightSegments.push([
+            clamp(rect.top - workspaceRect.top, 0, workspaceRect.height),
+            clamp(rect.bottom - workspaceRect.top, 0, workspaceRect.height),
+          ]);
+        }
+      });
+      const appendSegments = (edge, mergedRanges) => {
+        mergedRanges.forEach(([start, end]) => {
+          const segment = document.createElement('span');
+          segment.className = `dashboard-edge-segment edge-${edge}`;
+          if (edge === 'top' || edge === 'bottom') {
+            segment.style.left = `${start}px`;
+            segment.style.width = `${Math.max(2, end - start)}px`;
+          } else {
+            segment.style.top = `${start}px`;
+            segment.style.height = `${Math.max(2, end - start)}px`;
+          }
+          activeLayer.appendChild(segment);
+        });
+      };
+
+      activeLayer.innerHTML = '';
+      appendSegments('top', mergeRanges(topSegments));
+      appendSegments('right', mergeRanges(rightSegments));
+      appendSegments('bottom', mergeRanges(bottomSegments));
+      appendSegments('left', mergeRanges(leftSegments));
+
+      const hasAny = activeLayer.childElementCount > 0;
+      workspace.classList.toggle('is-boundary-near', hasAny);
+    },
+
+    syncDashboardGridVisualColumns(cols = null) {
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const resolved =
+        Number.isFinite(Number(cols)) && Number(cols) > 0
+          ? Math.round(Number(cols))
+          : this.getDashboardActiveColumnCount();
+      workspace.style.setProperty('--dashboard-grid-columns', String(resolved));
+    },
+
+    getDashboardActiveColumnCount() {
+      if (
+        this._dashboardGrid &&
+        typeof this._dashboardGrid.getColumn === 'function'
+      ) {
+        const live = Number(this._dashboardGrid.getColumn());
+        if (Number.isFinite(live) && live > 0) return live;
+      }
+      return this.isDashboardMobileViewport()
+        ? 1
+        : this.getDashboardColumnCount();
+    },
+
+    getDashboardRuntimeLayoutMode() {
+      return this.getDashboardActiveColumnCount() === 1 ? 'mobile' : 'desktop';
+    },
+
+    shouldCaptureDashboardLayoutForMode(mode) {
+      if (this._suspendDashboardLayoutCapture) return false;
+      const currentMode = this.getDashboardRuntimeLayoutMode();
+      if (mode && currentMode !== mode) return false;
+      const activeCols = this.getDashboardActiveColumnCount();
+      if (currentMode === 'desktop')
+        return activeCols === this.getDashboardColumnCount();
+      if (currentMode === 'mobile') return activeCols === 1;
+      return false;
+    },
+
+    isDashboardMobileViewport() {
+      return window.matchMedia('(max-width: 767px)').matches;
+    },
+
+    getDashboardLayoutMode() {
+      return this.isDashboardMobileViewport() ? 'mobile' : 'desktop';
+    },
+
+    getDashboardLayoutStorageKey(mode = null) {
+      const resolved =
+        String(
+          mode ||
+            this._activeDashboardLayoutMode ||
+            this.getDashboardRuntimeLayoutMode() ||
+            this.getDashboardLayoutMode(),
+        ).toLowerCase() === 'mobile'
+          ? 'mobile'
+          : 'desktop';
+      return `${this._layoutStorageKey}_${resolved}`;
+    },
+
+    getDashboardDragPauseMs() {
+      return this.isDashboardMobileViewport() ? 120 : 0;
+    },
+
+    destroyMobileDashboardSortable() {
+      this.stopMobileEdgeAutoScroll();
+      if (
+        this._mobileSortable &&
+        typeof this._mobileSortable.destroy === 'function'
+      ) {
+        this._mobileSortable.destroy();
+      }
+      this._mobileSortable = null;
+    },
+
+    getDashboardScrollContainer() {
+      const workspace = this.getDashboardWorkspace();
+      const isScrollable = (node) => {
+        if (
+          !node ||
+          node === document.body ||
+          node === document.documentElement
+        )
+          return false;
+        const style = window.getComputedStyle(node);
+        const overflowY = String(style?.overflowY || '').toLowerCase();
+        if (!(overflowY === 'auto' || overflowY === 'scroll')) return false;
+        return node.scrollHeight > node.clientHeight;
+      };
+      let current = workspace?.parentElement || null;
+      while (current) {
+        if (isScrollable(current)) return current;
+        current = current.parentElement;
+      }
+      return document.scrollingElement || document.documentElement;
+    },
+
+    stopMobileEdgeAutoScroll() {
+      this._mobileDragActive = false;
+      this._mobileDragTouchY = null;
+      this._mobileEdgeAutoScrollDir = 0;
+      this._mobileEdgeAutoScrollSpeed = 0;
+      if (this._mobileEdgeAutoScrollRaf) {
+        window.cancelAnimationFrame(this._mobileEdgeAutoScrollRaf);
+      }
+      this._mobileEdgeAutoScrollRaf = null;
+      if (this._mobileEdgeTouchMoveHandler) {
+        document.removeEventListener(
+          'touchmove',
+          this._mobileEdgeTouchMoveHandler,
+        );
+      }
+      if (this._mobileEdgeTouchEndHandler) {
+        document.removeEventListener(
+          'touchend',
+          this._mobileEdgeTouchEndHandler,
+        );
+        document.removeEventListener(
+          'touchcancel',
+          this._mobileEdgeTouchEndHandler,
+        );
+      }
+      if (this._mobileEdgePointerMoveHandler) {
+        document.removeEventListener(
+          'pointermove',
+          this._mobileEdgePointerMoveHandler,
+          true,
+        );
+      }
+      this._mobileEdgeTouchMoveHandler = null;
+      this._mobileEdgeTouchEndHandler = null;
+      this._mobileEdgePointerMoveHandler = null;
+    },
+
+    evaluateMobileEdgeAutoScroll() {
+      if (!this._mobileDragActive || !Number.isFinite(this._mobileDragTouchY)) {
+        this._mobileEdgeAutoScrollDir = 0;
+        this._mobileEdgeAutoScrollSpeed = 0;
+        return;
+      }
+      const y = Number(this._mobileDragTouchY);
+      const scroller = this.getDashboardScrollContainer();
+      const rect =
+        scroller && typeof scroller.getBoundingClientRect === 'function'
+          ? scroller.getBoundingClientRect()
+          : {
+              top: 0,
+              bottom: Math.max(1, window.innerHeight || 1),
+              height: Math.max(1, window.innerHeight || 1),
+            };
+      const edgeSize = Math.max(54, Math.round((rect.height || 1) * 0.14));
+      let dir = 0;
+      let speed = 0;
+      const topEdge = (rect.top || 0) + edgeSize;
+      const bottomEdge =
+        (rect.bottom || Math.max(1, window.innerHeight || 1)) - edgeSize;
+      if (y <= topEdge) {
+        const ratio = Math.max(0, Math.min(1, (topEdge - y) / edgeSize));
+        dir = -1;
+        speed = 12 + ratio * 34;
+      } else if (y >= bottomEdge) {
+        const ratio = Math.max(0, Math.min(1, (y - bottomEdge) / edgeSize));
+        dir = 1;
+        speed = 12 + ratio * 34;
+      }
+      this._mobileEdgeAutoScrollDir = dir;
+      this._mobileEdgeAutoScrollSpeed = speed;
+    },
+
+    runMobileEdgeAutoScroll() {
+      if (!this._mobileDragActive) {
+        this._mobileEdgeAutoScrollRaf = null;
+        return;
+      }
+      if (
+        this._mobileEdgeAutoScrollDir !== 0 &&
+        this._mobileEdgeAutoScrollSpeed > 0
+      ) {
+        const scroller = this.getDashboardScrollContainer();
+        const delta =
+          this._mobileEdgeAutoScrollDir * this._mobileEdgeAutoScrollSpeed;
+        if (
+          scroller &&
+          scroller !== document.documentElement &&
+          scroller !== document.body &&
+          Number.isFinite(Number(scroller.scrollTop))
+        ) {
+          scroller.scrollTop = Number(scroller.scrollTop) + delta;
+        } else if (scroller && typeof scroller.scrollBy === 'function') {
+          scroller.scrollBy(0, delta);
+        } else {
+          window.scrollBy(0, delta);
+        }
+      }
+      this._mobileEdgeAutoScrollRaf = window.requestAnimationFrame(() =>
+        this.runMobileEdgeAutoScroll(),
+      );
+    },
+
+    applyMobileDashboardStackFromDom() {
+      if (!this._dashboardGrid) return;
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      let nextY = 0;
+      items.forEach((item) => {
+        const node = item.gridstackNode;
+        const h = Math.max(1, Number(node?.h) || 1);
+        const clampedY = Math.min(nextY, this.getDashboardMaxYForHeight(h));
+        this._dashboardGrid.update(item, {
+          x: 0,
+          y: clampedY,
+          w: 1,
+        });
+        nextY += h;
+      });
+      this.updateDashboardHeightLimitFx();
+    },
+
+    reflowDesktopDashboardYAxis() {
+      if (!this._dashboardGrid || this.isDashboardMobileViewport()) return;
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const cols = Math.max(1, this.getDashboardColumnCount());
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      if (!items.length) return;
+
+      const nodes = items
+        .map((item) => ({ item, node: item.gridstackNode || null }))
+        .filter((entry) => entry.node)
+        .sort((a, b) => {
+          const ay = Number(a.node.y) || 0;
+          const by = Number(b.node.y) || 0;
+          if (ay !== by) return ay - by;
+          const ax = Number(a.node.x) || 0;
+          const bx = Number(b.node.x) || 0;
+          return ax - bx;
+        });
+
+      const colHeights = new Array(cols).fill(0);
+      let changed = false;
+      this._dashboardGrid.batchUpdate();
+      nodes.forEach(({ item, node }) => {
+        const w = Math.max(1, Math.min(cols, Number(node.w) || 1));
+        const x = Math.max(0, Math.min(cols - w, Number(node.x) || 0));
+        let nextY = 0;
+        for (let c = x; c < x + w; c += 1) {
+          nextY = Math.max(nextY, Number(colHeights[c]) || 0);
+        }
+        const h = Math.max(1, Number(node.h) || 1);
+        const prevY = Number(node.y) || 0;
+        if (nextY !== prevY || x !== (Number(node.x) || 0)) {
+          changed = true;
+          this._dashboardGrid.update(item, { x, y: nextY, w, h });
+        }
+        const committedY = nextY;
+        for (let c = x; c < x + w; c += 1) {
+          colHeights[c] = committedY + h;
+        }
+      });
+      this._dashboardGrid.commit();
+      if (changed) this.applyWidgetAdaptiveScale();
+      this.updateDashboardHeightLimitFx();
+    },
+
+    ensureMobileDashboardSortable() {
+      const workspace = this.getDashboardWorkspace();
+      if (
+        !workspace ||
+        this._mobileSortable ||
+        typeof window.Sortable !== 'function'
+      )
+        return;
+      this._mobileSortable = window.Sortable.create(workspace, {
+        animation: 0,
+        draggable: '.grid-stack-item[gs-id]',
+        handle: '.dashboard-drag-surface',
+        delay: 300,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 4,
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 3,
+        ghostClass: 'dashboard-mobile-sort-ghost',
+        chosenClass: 'dashboard-mobile-sort-chosen',
+        dragClass: 'dashboard-mobile-sort-drag',
+        swapThreshold: 0.65,
+        scroll: true,
+        bubbleScroll: true,
+        scrollSensitivity: 110,
+        scrollSpeed: 100,
+        filter:
+          'button, input, select, textarea, a, [role="button"], .dashboard-mode-controls, .dashboard-mode-btn, .dashboard-ops-btn, .dashboard-pill',
+        preventOnFilter: false,
+        onStart: (event) => {
+          const touch = event?.originalEvent?.touches?.[0];
+          this._mobileDragActive = true;
+          this._mobileDragTouchY = Number.isFinite(Number(touch?.clientY))
+            ? Number(touch.clientY)
+            : null;
+          this.evaluateMobileEdgeAutoScroll();
+          if (!this._mobileEdgeAutoScrollRaf) {
+            this._mobileEdgeAutoScrollRaf = window.requestAnimationFrame(() =>
+              this.runMobileEdgeAutoScroll(),
+            );
+          }
+          if (!this._mobileEdgeTouchMoveHandler) {
+            this._mobileEdgeTouchMoveHandler = (touchEvent) => {
+              const point =
+                touchEvent?.touches?.[0] || touchEvent?.changedTouches?.[0];
+              if (!point) return;
+              this._mobileDragTouchY = Number(point.clientY);
+              this.evaluateMobileEdgeAutoScroll();
+            };
+            document.addEventListener(
+              'touchmove',
+              this._mobileEdgeTouchMoveHandler,
+              { passive: true },
+            );
+          }
+          if (!this._mobileEdgePointerMoveHandler) {
+            this._mobileEdgePointerMoveHandler = (pointerEvent) => {
+              if (!this._mobileDragActive) return;
+              const y = Number(pointerEvent?.clientY);
+              if (!Number.isFinite(y)) return;
+              this._mobileDragTouchY = y;
+              this.evaluateMobileEdgeAutoScroll();
+            };
+            document.addEventListener(
+              'pointermove',
+              this._mobileEdgePointerMoveHandler,
+              { passive: true, capture: true },
+            );
+          }
+          if (!this._mobileEdgeTouchEndHandler) {
+            this._mobileEdgeTouchEndHandler = () =>
+              this.stopMobileEdgeAutoScroll();
+            document.addEventListener(
+              'touchend',
+              this._mobileEdgeTouchEndHandler,
+              { passive: true },
+            );
+            document.addEventListener(
+              'touchcancel',
+              this._mobileEdgeTouchEndHandler,
+              { passive: true },
+            );
+          }
+        },
+        onMove: (event) => {
+          const touch =
+            event?.originalEvent?.touches?.[0] ||
+            event?.originalEvent?.changedTouches?.[0];
+          if (!touch) return;
+          this._mobileDragTouchY = Number(touch.clientY);
+          this.evaluateMobileEdgeAutoScroll();
+        },
+        onEnd: () => {
+          this.stopMobileEdgeAutoScroll();
+          this.applyMobileDashboardStackFromDom();
+          this.applyWidgetAdaptiveScale();
+        },
+      });
+    },
+
+    scheduleMobileDashboardAutoSize() {
+      if (!this.isDashboardMobileViewport()) return;
+      if (this._layoutEditing) return;
+      if (this._mobileAutoSizeTimer)
+        window.clearTimeout(this._mobileAutoSizeTimer);
+      this._mobileAutoSizeTimer = window.setTimeout(() => {
+        this.autoSizeDashboardCardsForMobile();
+      }, 90);
+    },
+
+    autoSizeDashboardCardsForMobile() {
+      if (!this._dashboardGrid || !this.isDashboardMobileViewport()) return;
+      if (this._mobileAutoSizing) return;
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      if (!items.length) return;
+      items.sort((a, b) => {
+        const an = a.gridstackNode || {};
+        const bn = b.gridstackNode || {};
+        const ay = Number(an.y) || 0;
+        const by = Number(bn.y) || 0;
+        if (ay !== by) return ay - by;
+        const ax = Number(an.x) || 0;
+        const bx = Number(bn.x) || 0;
+        return ax - bx;
+      });
+      this._mobileAutoSizing = true;
+      const cellH = Math.max(
+        1,
+        Math.round(
+          this._dashboardGrid.getCellHeight
+            ? this._dashboardGrid.getCellHeight(true)
+            : this._dashboardGrid.opts?.cellHeight || 1,
+        ),
+      );
+      let nextY = 0;
+      this._dashboardGrid.batchUpdate();
+      items.forEach((item) => {
+        const node = item.gridstackNode;
+        if (!node) return;
+        const id = String(item.getAttribute('gs-id') || '').trim();
+        const constraints = this.getDashboardWidgetConstraints(id);
+        const widget = item.querySelector('.dashboard-widget[data-widget-id]');
+        const contentHeight = widget
+          ? Math.max(widget.scrollHeight, widget.clientHeight)
+          : cellH;
+        const paddingAllowance = 24;
+        const neededH = Math.min(
+          constraints.maxH,
+          Math.max(
+            constraints.minH,
+            Math.ceil((contentHeight + paddingAllowance) / cellH),
+          ),
+        );
+        this._dashboardGrid.update(item, {
+          x: 0,
+          y: nextY,
+          w: 1,
+          h: neededH,
+        });
+        nextY += neededH;
+      });
+      this._dashboardGrid.commit();
+      this.applyWidgetAdaptiveScale(items);
+      this._mobileAutoSizing = false;
+      this.updateDashboardHeightLimitFx();
+    },
+
+    applyDashboardDragPauseToItems() {
+      const workspace = this.getDashboardWorkspace();
+      if (
+        !workspace ||
+        !(window.GridStack && typeof window.GridStack.getDD === 'function')
+      )
+        return;
+      const pauseMs = this.getDashboardDragPauseMs();
+      const dd = window.GridStack.getDD();
+      if (!dd || typeof dd.draggable !== 'function') return;
+      const items = Array.from(workspace.querySelectorAll('.grid-stack-item'));
+      items.forEach((item) => {
+        try {
+          dd.draggable(item, 'option', 'pause', pauseMs);
+        } catch (_) {
+          // ignore unsupported driver option changes
+        }
+      });
+    },
+
+    getDashboardWidgetConstraints(id) {
+      const widgetId = String(id || '').trim();
+      const isMobile = this.getDashboardActiveColumnCount() === 1;
+      const minHByWidget = {
+        'hybrid-trend': isMobile ? 9 : 7,
+        'analytics-products-share': isMobile ? 8 : 6,
+        'analytics-members-share': isMobile ? 8 : 6,
+      };
+      return {
+        minW: 1,
+        minH: minHByWidget[widgetId] || 1,
+        maxW: this.getDashboardColumnCount(),
+        maxH: this.getDashboardMaxRowsForPixelCap(),
+      };
+    },
+
+    enforceDashboardWidgetConstraints() {
+      if (!this._dashboardGrid) return;
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const cols = this.getDashboardActiveColumnCount();
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      if (!items.length) return;
+      let changed = false;
+      this._dashboardGrid.batchUpdate();
+      items.forEach((item) => {
+        const id = String(item.getAttribute('gs-id') || '').trim();
+        if (!id) return;
+        const node = item.gridstackNode || {};
+        const constraints = this.getDashboardWidgetConstraints(id);
+        const nextW = Math.min(
+          constraints.maxW,
+          Math.max(constraints.minW, Number(node.w) || constraints.minW),
+        );
+        const nextH = Math.min(
+          constraints.maxH,
+          Math.max(constraints.minH, Number(node.h) || constraints.minH),
+        );
+        const nextX = Math.min(
+          Math.max(0, Number(node.x) || 0),
+          Math.max(0, cols - nextW),
+        );
+        const nextY = Math.min(
+          Math.max(0, Number(node.y) || 0),
+          this.getDashboardMaxYForHeight(nextH),
+        );
+        if (
+          nextW !== Number(node.w) ||
+          nextH !== Number(node.h) ||
+          nextX !== Number(node.x) ||
+          nextY !== Number(node.y)
+        ) {
+          changed = true;
+          this._dashboardGrid.update(item, {
+            x: nextX,
+            y: nextY,
+            w: nextW,
+            h: nextH,
+          });
+        }
+      });
+      this._dashboardGrid.commit();
+      if (changed) this.applyWidgetAdaptiveScale();
+      this.updateDashboardHeightLimitFx();
+    },
+
+    serializeDashboardLayout() {
+      if (!this._dashboardGrid || !this._dashboardGrid.engine) return [];
+      return (this._dashboardGrid.engine.nodes || [])
+        .map((node) => {
+          const rawId =
+            node?.id ||
+            node?.el?.getAttribute('gs-id') ||
+            node?.el?.getAttribute('data-widget-id') ||
+            node?.el
+              ?.querySelector('.dashboard-widget[data-widget-id]')
+              ?.getAttribute('data-widget-id') ||
+            '';
+          const id = String(rawId || '').trim();
+          if (!id) return null;
+          return {
+            id,
+            x: Number(node.x) || 0,
+            y: Number(node.y) || 0,
+            w: Math.max(1, Number(node.w) || 1),
+            h: Math.max(1, Number(node.h) || 1),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.id.localeCompare(b.id));
+    },
+
+    getDashboardLayoutSignature(layout = null) {
+      const payload = Array.isArray(layout)
+        ? layout
+        : this.serializeDashboardLayout();
+      return JSON.stringify(payload);
+    },
+
+    getStoredDashboardLayoutSignatureForMode(mode) {
+      const safeMode =
+        String(mode || '').toLowerCase() === 'mobile' ? 'mobile' : 'desktop';
+      const key = this.getDashboardLayoutStorageKey(safeMode);
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return '';
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.layout)) return '';
+        const normalized = parsed.layout
+          .map((entry) => ({
+            id: String(entry?.id || '').trim(),
+            x: Number(entry?.x) || 0,
+            y: Number(entry?.y) || 0,
+            w: Math.max(1, Number(entry?.w) || 1),
+            h: Math.max(1, Number(entry?.h) || 1),
+          }))
+          .filter((entry) => entry.id)
+          .sort((a, b) => a.id.localeCompare(b.id));
+        return JSON.stringify(normalized);
+      } catch (_) {
+        return '';
+      }
+    },
+
+    readSavedDashboardLayoutForMode(mode) {
+      const safeMode =
+        String(mode || '').toLowerCase() === 'mobile' ? 'mobile' : 'desktop';
+      const key = this.getDashboardLayoutStorageKey(safeMode);
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.layout)) return [];
+        const layout = parsed.layout
+          .map((entry) => ({
+            id: String(entry?.id || '').trim(),
+            x: Number(entry?.x) || 0,
+            y: Number(entry?.y) || 0,
+            w: Math.max(1, Number(entry?.w) || 1),
+            h: Math.max(1, Number(entry?.h) || 1),
+          }))
+          .filter((entry) => entry.id);
+        if (!layout.length) return [];
+        const maxCols = layout.reduce(
+          (max, entry) => Math.max(max, Number(entry.x) + Number(entry.w)),
+          0,
+        );
+        if (safeMode === 'desktop' && maxCols > this.getDashboardColumnCount())
+          return [];
+        if (safeMode === 'mobile' && maxCols > 1) {
+          const ordered = [...layout].sort((a, b) => {
+            if (a.y === b.y) return a.x - b.x;
+            return a.y - b.y;
+          });
+          let nextY = 0;
+          return ordered.map((entry) => {
+            const h = Math.max(1, Number(entry.h) || 1);
+            const mapped = { id: entry.id, x: 0, y: nextY, w: 1, h };
+            nextY += h;
+            return mapped;
+          });
+        }
+        return layout;
+      } catch (_) {
+        return [];
+      }
+    },
+
+    readSavedDashboardLayout() {
+      return this.readSavedDashboardLayoutForMode(
+        this.getDashboardLayoutMode(),
+      );
+    },
+
+    setLayoutEditing(enabled) {
+      const shell = this.getDashboardShell();
+      if (!shell) return;
+      const isEditing = Boolean(enabled);
+      const isMobile = this.isDashboardMobileViewport();
+      this._layoutEditing = isEditing;
+      shell.classList.toggle('layout-editing', isEditing);
+      const layoutToggleBtn = document.getElementById(
+        'dashboard-layout-toggle-btn',
+      );
+      if (layoutToggleBtn) {
+        layoutToggleBtn.classList.toggle('is-layout-active', isEditing);
+        layoutToggleBtn.innerHTML = isEditing
+          ? "<i class='bx bx-check'></i> Done"
+          : "<i class='bx bx-move'></i> Arrange Mode";
+      }
+      if (this._dashboardGrid) {
+        if (isMobile) {
+          // Mobile drag is controlled by Sortable long-press; resize stays vertical-only via CSS handles.
+          this._dashboardGrid.enableMove(false);
+          this._dashboardGrid.enableResize(isEditing);
+        } else {
+          this._dashboardGrid.enableMove(isEditing);
+          this._dashboardGrid.enableResize(isEditing);
+        }
+      }
+      if (isMobile) {
+        if (isEditing) this.ensureMobileDashboardSortable();
+        else this.destroyMobileDashboardSortable();
+      }
+      this.updateDashboardToolbarToggleState();
+      this.updateDashboardHeightLimitFx();
+    },
+
+    applyDashboardResponsiveGridMode(options = {}) {
+      if (!this._dashboardGrid) return;
+      const isMobile = this.isDashboardMobileViewport();
+      const mode = this.getDashboardLayoutMode();
+      const previousMode = this._activeDashboardLayoutMode || '';
+      const modeChanged = previousMode !== mode;
+
+      if (modeChanged || options.forceLoad === true) {
+        this._suspendDashboardLayoutCapture = true;
+        if (modeChanged && previousMode) {
+          const currentColsBeforeSwitch = this.getDashboardActiveColumnCount();
+          const prevIsStableDesktop =
+            previousMode === 'desktop' &&
+            currentColsBeforeSwitch === this.getDashboardColumnCount();
+          const prevIsStableMobile =
+            previousMode === 'mobile' && currentColsBeforeSwitch === 1;
+          if (prevIsStableDesktop || prevIsStableMobile) {
+            this._sessionLayoutsByMode[previousMode] =
+              this.serializeDashboardLayout();
+          }
+        }
+        const targetCols = isMobile ? 1 : this.getDashboardColumnCount();
+        if (typeof this._dashboardGrid.cellHeight === 'function') {
+          this._dashboardGrid.cellHeight(this.getDashboardCellHeight());
+        } else if (this._dashboardGrid.opts) {
+          this._dashboardGrid.opts.cellHeight = this.getDashboardCellHeight();
+        }
+        if (this._dashboardGrid.opts) {
+          this._dashboardGrid.opts.maxRow = this.getDashboardMaxRowsForPixelCap();
+        }
+        this._dashboardGrid.column(targetCols, 'none');
+        this.syncDashboardGridVisualColumns(targetCols);
+        const sessionLayout = Array.isArray(this._sessionLayoutsByMode[mode])
+          ? this._sessionLayoutsByMode[mode]
+          : [];
+        const savedLayout = this.readSavedDashboardLayoutForMode(mode);
+        let layoutToApply = [];
+        if (options.forceLoad === true) {
+          layoutToApply = savedLayout.length ? savedLayout : sessionLayout;
+        } else {
+          layoutToApply = sessionLayout.length ? sessionLayout : savedLayout;
+        }
+        if (!layoutToApply.length && mode === 'mobile') {
+          const desktopLayout = this._sessionLayoutsByMode.desktop?.length
+            ? this._sessionLayoutsByMode.desktop
+            : this.readSavedDashboardLayoutForMode('desktop');
+          if (desktopLayout.length) {
+            const orderedDesktop = [...desktopLayout].sort((a, b) => {
+              if (a.y === b.y) return a.x - b.x;
+              return a.y - b.y;
+            });
+            let nextY = 0;
+            layoutToApply = orderedDesktop.map((entry) => {
+              const h = Math.max(1, Number(entry.h) || 1);
+              const mapped = { id: entry.id, x: 0, y: nextY, w: 1, h };
+              nextY += h;
+              return mapped;
+            });
+          }
+        }
+        this.applyDashboardLayout(layoutToApply, {
+          compact: false,
+          targetCols,
+        });
+        this._sessionLayoutsByMode[mode] = this.serializeDashboardLayout();
+        this._lastSavedLayoutSignature =
+          this.getStoredDashboardLayoutSignatureForMode(mode);
+        this._activeDashboardLayoutMode = mode;
+        this._suspendDashboardLayoutCapture = false;
+      }
+
+      if (isMobile) {
+        this._dashboardGrid.enableResize(Boolean(this._layoutEditing));
+        this._dashboardGrid.enableMove(false);
+        if (this._layoutEditing) this.ensureMobileDashboardSortable();
+        else this.destroyMobileDashboardSortable();
+      } else {
+        this.destroyMobileDashboardSortable();
+        this._dashboardGrid.enableResize(Boolean(this._layoutEditing));
+        this._dashboardGrid.enableMove(Boolean(this._layoutEditing));
+      }
+
+      this.applyWidgetAdaptiveScale();
+      if (isMobile && !this._layoutEditing)
+        this.scheduleMobileDashboardAutoSize();
+
+      this.enforceDashboardWidgetConstraints();
+    },
+
+    applyDashboardLayout(layout = [], options = {}) {
+      if (!this._dashboardGrid) return;
+      const useLayout =
+        Array.isArray(layout) && layout.length > 0 ? layout : [];
+      const map = new Map(
+        useLayout.map((entry) => [String(entry?.id || '').trim(), entry]),
+      );
+      const defaults = this.getDefaultDashboardGridLayout();
+      const forcedCols = Number(options?.targetCols);
+      const cols =
+        Number.isFinite(forcedCols) && forcedCols > 0
+          ? forcedCols
+          : this.getDashboardActiveColumnCount();
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      const normalizedForHealthCheck = [];
+      items.forEach((item) => {
+        const id = String(item.getAttribute('gs-id') || '').trim();
+        if (!id) return;
+        const saved = map.get(id);
+        const fallback = defaults[id];
+        const next = saved || fallback || { w: 4, h: 4 };
+        const constraints = this.getDashboardWidgetConstraints(id);
+        const nextX = Number(next.x);
+        const nextY = Number(next.y);
+        const clampedW = Math.min(
+          constraints.maxW,
+          Math.max(constraints.minW, Number(next.w) || constraints.minW),
+        );
+        const clampedH = Math.min(
+          constraints.maxH,
+          Math.max(constraints.minH, Number(next.h) || constraints.minH),
+        );
+        const clampedX = Number.isFinite(nextX)
+          ? Math.min(Math.max(0, nextX), Math.max(0, cols - clampedW))
+          : undefined;
+        const clampedY = Number.isFinite(nextY)
+          ? Math.min(
+              Math.max(0, nextY),
+              this.getDashboardMaxYForHeight(clampedH),
+            )
+          : undefined;
+        normalizedForHealthCheck.push({
+          id,
+          x: Number.isFinite(clampedX) ? clampedX : 0,
+          y: Number.isFinite(clampedY) ? clampedY : 0,
+          w: clampedW,
+          h: clampedH,
+        });
+        this._dashboardGrid.update(item, {
+          x: clampedX,
+          y: clampedY,
+          w: clampedW,
+          h: clampedH,
+        });
+      });
+
+      if (useLayout.length > 0 && cols > 1) {
+        const tinyCards = normalizedForHealthCheck.filter(
+          (entry) => entry.w <= 2,
+        ).length;
+        const leftStack = normalizedForHealthCheck.filter(
+          (entry) => entry.x === 0,
+        ).length;
+        const tooCompressed =
+          tinyCards >= Math.ceil(normalizedForHealthCheck.length * 0.4) ||
+          leftStack >= Math.ceil(normalizedForHealthCheck.length * 0.8);
+        if (tooCompressed) {
+          try {
+            window.localStorage.removeItem(this.getDashboardLayoutStorageKey());
+          } catch (_) {
+            // ignore storage failures
+          }
+          this.applyDashboardLayout([], options);
+          return;
+        }
+      }
+
+      if (options.compact) {
+        this._dashboardGrid.compact();
+      }
+      this.applyWidgetAdaptiveScale(items);
+      this.updateDashboardHeightLimitFx();
+    },
+
+    enforceWidgetNoScroll(item) {
+      if (!this._dashboardGrid || !item) return false;
+      const node = item.gridstackNode;
+      if (!node) return false;
+      const widget = item.querySelector('.dashboard-widget[data-widget-id]');
+      if (!widget) return false;
+
+      const cellW = Math.max(
+        1,
+        Math.round(this._dashboardGrid.cellWidth() || 1),
+      );
+      const cellH = Math.max(
+        1,
+        Math.round(
+          this._dashboardGrid.getCellHeight
+            ? this._dashboardGrid.getCellHeight(true)
+            : this._dashboardGrid.opts?.cellHeight || 1,
+        ),
+      );
+
+      let w = Math.max(1, Number(node.w) || 1);
+      let h = Math.max(1, Number(node.h) || 1);
+      const minW = Math.max(1, Number(node.minW) || 1);
+      const minH = Math.max(1, Number(node.minH) || 1);
+      const maxW = Math.max(
+        minW,
+        Number(node.maxW) || this.getDashboardColumnCount(),
+      );
+      const maxH = Math.max(minH, Number(node.maxH) || 24);
+      let changed = false;
+
+      for (let i = 0; i < 8; i += 1) {
+        const hasYOverflow = widget.scrollHeight > widget.clientHeight + 1;
+        const hasXOverflow = widget.scrollWidth > widget.clientWidth + 1;
+        if (!hasYOverflow && !hasXOverflow) break;
+
+        let nextW = w;
+        let nextH = h;
+        if (hasXOverflow && nextW < maxW) {
+          const needW = Math.ceil((widget.scrollWidth + 2) / cellW);
+          nextW = Math.min(maxW, Math.max(nextW + 1, needW));
+        }
+        if (hasYOverflow && nextH < maxH) {
+          const needH = Math.ceil((widget.scrollHeight + 2) / cellH);
+          nextH = Math.min(maxH, Math.max(nextH + 1, needH));
+        }
+        if (nextW === w && nextH === h) break;
+        this._dashboardGrid.update(item, { w: nextW, h: nextH });
+        w = nextW;
+        h = nextH;
+        changed = true;
+      }
+      return changed;
+    },
+
+    applyWidgetAdaptiveScale(itemsOrItem = null) {
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace) return;
+      const lockMobileScale = this.isDashboardMobileViewport();
+      const defaults = this.getDefaultDashboardGridLayout();
+      let items = [];
+      if (!itemsOrItem) {
+        items = Array.from(
+          workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+        );
+      } else if (Array.isArray(itemsOrItem)) {
+        items = itemsOrItem.filter(Boolean);
+      } else {
+        items = [itemsOrItem];
+      }
+      items.forEach((item) => {
+        const node = item?.gridstackNode;
+        if (!node) return;
+        const id = String(item.getAttribute('gs-id') || '').trim();
+        const widget = item.querySelector('.dashboard-widget[data-widget-id]');
+        if (!id || !widget) return;
+        if (lockMobileScale) {
+          widget.style.setProperty('--widget-ui-scale', '1');
+          return;
+        }
+        const base = defaults[id] || {
+          w: Math.max(1, Number(node.w) || 1),
+          h: Math.max(1, Number(node.h) || 1),
+        };
+        const wr =
+          Math.max(1, Number(node.w) || 1) / Math.max(1, Number(base.w) || 1);
+        const hr =
+          Math.max(1, Number(node.h) || 1) / Math.max(1, Number(base.h) || 1);
+        const areaRatio = Math.sqrt(Math.max(0.2, wr * hr));
+        const scale = Math.max(0.5, Math.min(1.6, areaRatio));
+        widget.style.setProperty('--widget-ui-scale', scale.toFixed(3));
+      });
+    },
+
+    enforceAllWidgetsNoScroll() {
+      const workspace = this.getDashboardWorkspace();
+      if (!workspace || !this._dashboardGrid) return;
+      const items = Array.from(
+        workspace.querySelectorAll('.grid-stack-item[gs-id]'),
+      );
+      let changed = false;
+      items.forEach((item) => {
+        changed = this.enforceWidgetNoScroll(item) || changed;
+      });
+      if (changed) this._dashboardGrid.compact('compact', false);
+      this.applyWidgetAdaptiveScale(items);
+      this.updateDashboardHeightLimitFx();
+    },
+
+    persistDashboardLayout(options = {}) {
+      const mode = this.getDashboardRuntimeLayoutMode();
+      this._activeDashboardLayoutMode = mode;
+      const layout = this.serializeDashboardLayout();
+      const signature = this.getDashboardLayoutSignature(layout);
+      const previous = String(
+        this._lastSavedLayoutSignature ||
+          this.getStoredDashboardLayoutSignatureForMode(mode) ||
+          '',
+      );
+      const hasChanges = signature !== previous;
+      try {
+        window.localStorage.setItem(
+          this.getDashboardLayoutStorageKey(mode),
+          JSON.stringify({
+            version: 3,
+            savedAt: new Date().toISOString(),
+            layout,
+          }),
+        );
+      } catch (_) {
+        return false;
+      }
+      this._sessionLayoutsByMode[mode] = layout;
+      this._lastSavedLayoutSignature = signature;
+      if (options.animate) this.playDashboardSaveAnimation();
+      return true;
+    },
+
+    playDashboardSaveAnimation() {
+      const shell = this.getDashboardShell();
+      if (!shell) return;
+      const widgets = Array.from(
+        shell.querySelectorAll('.dashboard-widget[data-widget-id]'),
+      );
+      if (!widgets.length) return;
+      widgets.forEach((widget) => {
+        widget.classList.remove('dashboard-widget-saved');
+        // force reflow so repeat saves replay animation
+        void widget.offsetWidth;
+        widget.classList.add('dashboard-widget-saved');
+      });
+      window.setTimeout(() => {
+        widgets.forEach((widget) =>
+          widget.classList.remove('dashboard-widget-saved'),
+        );
+      }, 820);
+    },
+
+    decorateDashboardWidgets() {
+      const shell = this.getDashboardShell();
+      if (!shell) return [];
+      const widgets = Array.from(
+        shell.querySelectorAll('.dashboard-widget[data-widget-id]'),
+      );
+      if (!widgets.length) return [];
+
+      if (
+        !this._defaultWidgetOrderByZone ||
+        typeof this._defaultWidgetOrderByZone !== 'object'
+      ) {
+        this._defaultWidgetOrderByZone = { grid: this.getDefaultWidgetOrder() };
+      }
+
+      widgets.forEach((widget) => {
+        if (!widget.querySelector('.dashboard-drag-surface')) {
+          const dragSurface = document.createElement('div');
+          dragSurface.className = 'dashboard-drag-surface';
+          dragSurface.setAttribute('aria-hidden', 'true');
+          widget.prepend(dragSurface);
+        }
+        if (!widget.querySelector('.dashboard-widget-controls')) {
+          const controls = document.createElement('div');
+          controls.className = 'dashboard-widget-controls';
+          controls.setAttribute('data-no-sort', 'true');
+          controls.innerHTML = `
+            <button type="button" class="dashboard-widget-tool-btn dashboard-widget-handle" data-dashboard-widget-action="drag" title="Drag widget">
+              <i class='bx bx-move'></i>
+            </button>
+            <button type="button" class="dashboard-widget-tool-btn" data-dashboard-widget-action="resize" title="Reset widget size">
+              <i class='bx bx-reset'></i>
+            </button>
+          `;
+          widget.prepend(controls);
+        }
+      });
+
+      if (!shell.dataset.widgetEventsBound) {
+        shell.dataset.widgetEventsBound = '1';
+        shell.addEventListener('contextmenu', (event) => {
+          const dragSurface = event.target.closest('.dashboard-drag-surface');
+          if (!dragSurface) return;
+          event.preventDefault();
+        });
+        shell.addEventListener('click', (event) => {
+          const dragBtn = event.target.closest(
+            '[data-dashboard-widget-action="drag"]',
+          );
+          if (dragBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.setLayoutEditing(!this._layoutEditing);
+            return;
+          }
+
+          const resizeBtn = event.target.closest(
+            '[data-dashboard-widget-action="resize"]',
+          );
+          if (!resizeBtn) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const widget = resizeBtn.closest('.dashboard-widget[data-widget-id]');
+          const id = String(
+            widget?.getAttribute('data-widget-id') || '',
+          ).trim();
+          if (!id || !this._dashboardGrid) return;
+          const defaults = this.getDefaultDashboardGridLayout();
+          const item = widget.closest('.grid-stack-item');
+          if (!item) return;
+          const next = defaults[id] || { w: 4, h: 4 };
+          this._dashboardGrid.update(item, {
+            w: Math.max(1, Number(next.w) || 1),
+            h: Math.max(1, Number(next.h) || 1),
+          });
+        });
+      }
+
+      return widgets;
+    },
+
+    ensureDashboardWorkspaceGrid() {
+      const shell = this.getDashboardShell();
+      if (!shell) return null;
+      const toolbar = shell.querySelector('.dashboard-layout-toolbar');
+      if (!toolbar) return null;
+      let workspace = this.getDashboardWorkspace();
+      if (!workspace) {
+        workspace = document.createElement('div');
+        workspace.id = 'dashboard-workspace-grid';
+        workspace.className = 'grid-stack dashboard-workspace-grid';
+        toolbar.insertAdjacentElement('afterend', workspace);
+      }
+
+      const widgets = Array.from(
+        shell.querySelectorAll('.dashboard-widget[data-widget-id]'),
+      );
+      const defaultOrder = this.getDefaultWidgetOrder();
+      widgets.sort((a, b) => {
+        const aId = String(a.getAttribute('data-widget-id') || '').trim();
+        const bId = String(b.getAttribute('data-widget-id') || '').trim();
+        const aIndex = defaultOrder.indexOf(aId);
+        const bIndex = defaultOrder.indexOf(bId);
+        const safeA = aIndex >= 0 ? aIndex : 999;
+        const safeB = bIndex >= 0 ? bIndex : 999;
+        return safeA - safeB;
+      });
+
+      widgets.forEach((widget) => {
+        const id = String(widget.getAttribute('data-widget-id') || '').trim();
+        if (!id) return;
+        let item = workspace.querySelector(`.grid-stack-item[gs-id="${id}"]`);
+        if (!item) {
+          item = document.createElement('div');
+          item.className = 'grid-stack-item';
+          item.setAttribute('gs-id', id);
+          const constraints = this.getDashboardWidgetConstraints(id);
+          item.setAttribute('gs-min-w', String(constraints.minW));
+          item.setAttribute('gs-min-h', String(constraints.minH));
+          item.setAttribute('gs-max-w', String(constraints.maxW));
+          item.setAttribute('gs-max-h', String(constraints.maxH));
+          const content = document.createElement('div');
+          content.className =
+            'grid-stack-item-content dashboard-grid-item-content';
+          item.appendChild(content);
+          workspace.appendChild(item);
+        }
+        const content = item.querySelector('.dashboard-grid-item-content');
+        if (content && widget.parentElement !== content)
+          content.appendChild(widget);
+      });
+
+      const cleanupSelectors = [
+        '#dashboard-kpi-zone',
+        '#dashboard-analytics-left-zone',
+        '.dashboard-metrics-composite',
+      ];
+      cleanupSelectors.forEach((selector) => {
+        const node = shell.querySelector(selector);
+        if (!node || node === workspace || node === toolbar) return;
+        if (node.contains(workspace)) return;
+        if (!node.querySelector('.dashboard-widget[data-widget-id]')) {
+          node.remove();
+        }
+      });
+      return workspace;
+    },
+
+    resetDashboardLayout(options = {}) {
+      if (!this._dashboardGrid) return;
+      const mode = this.getDashboardRuntimeLayoutMode();
+      this._activeDashboardLayoutMode = mode;
+      this.applyDashboardLayout([], { compact: false });
+      this._dashboardGrid.compact();
+      this._sessionLayoutsByMode[mode] = this.serializeDashboardLayout();
+      this._lastSavedLayoutSignature = this.getDashboardLayoutSignature();
+      if (options.persist) {
+        this.persistDashboardLayout({ animate: true });
+      } else {
+        try {
+          window.localStorage.removeItem(
+            this.getDashboardLayoutStorageKey(mode),
+          );
+        } catch (_) {
+          // ignore storage failures
+        }
+      }
+      notify('Dashboard layout reset to default.', 'success');
+    },
+
+    initSortableLayout() {
+      if (!(window.GridStack && typeof window.GridStack.init === 'function')) {
+        this._sortableReady = false;
+        return;
+      }
+      const workspace = this.ensureDashboardWorkspaceGrid();
+      if (!workspace) {
+        this._sortableReady = false;
+        return;
+      }
+
+      if (
+        this._dashboardGrid &&
+        typeof this._dashboardGrid.destroy === 'function'
+      ) {
+        this._dashboardGrid.destroy(false);
+      }
+
+      this._dashboardGrid = window.GridStack.init(
+        {
+          column: this.getDashboardColumnCount(),
+          float: true,
+          margin: 6,
+          cellHeight: this.getDashboardCellHeight(),
+          animate: false,
+          disableOneColumnMode: true,
+          minRow: 1,
+          maxRow: this.getDashboardMaxRowsForPixelCap(),
+          draggable: {
+            handle: '.dashboard-drag-surface',
+            cancel:
+              'button, input, select, textarea, a, [role="button"], .dashboard-mode-controls, .dashboard-mode-btn, .dashboard-ops-btn, .dashboard-pill',
+            pause: this.getDashboardDragPauseMs(),
+            scroll: true,
+          },
+          resizable: {
+            handles: 'n,e,s,w,se,sw,ne,nw',
+          },
+        },
+        workspace,
+      );
+      this.syncDashboardGridVisualColumns(this.getDashboardColumnCount());
+
+      this._dashboardGrid.on('dragstop', () => {
+        this.enforceDashboardWidgetConstraints();
+        if (this.shouldCaptureDashboardLayoutForMode()) {
+          this._sessionLayoutsByMode[this.getDashboardLayoutMode()] =
+            this.serializeDashboardLayout();
+        }
+        this.applyWidgetAdaptiveScale();
+        this.updateDashboardHeightLimitFx();
+      });
+      this._dashboardGrid.on('resizestop', (_event, element) => {
+        this.enforceDashboardWidgetConstraints();
+        if (this.isDashboardMobileViewport()) {
+          this.applyMobileDashboardStackFromDom();
+        } else {
+          this.reflowDesktopDashboardYAxis();
+        }
+        if (this.shouldCaptureDashboardLayoutForMode()) {
+          this._sessionLayoutsByMode[this.getDashboardLayoutMode()] =
+            this.serializeDashboardLayout();
+        }
+        this.applyWidgetAdaptiveScale(element || null);
+        this.updateDashboardHeightLimitFx();
+      });
+      this._dashboardGrid.on('change', (_event, changedItems) => {
+        if (this.shouldCaptureDashboardLayoutForMode()) {
+          this._sessionLayoutsByMode[this.getDashboardLayoutMode()] =
+            this.serializeDashboardLayout();
+        }
+        this.applyWidgetAdaptiveScale(
+          Array.isArray(changedItems)
+            ? changedItems.map((node) => node?.el).filter(Boolean)
+            : null,
+        );
+        this.updateDashboardHeightLimitFx();
+      });
+
+      window.setTimeout(() => {
+        this.applyWidgetAdaptiveScale();
+        this.updateDashboardHeightLimitFx();
+      }, 60);
+      if (!this._dashboardResponsiveResizeBound) {
+        this._dashboardResponsiveResizeBound = true;
+        window.addEventListener(
+          'resize',
+          () => {
+            if (!this._dashboardGrid) return;
+            this._dashboardGrid.opts.draggable.pause =
+              this.getDashboardDragPauseMs();
+            this.applyDashboardDragPauseToItems();
+            this.applyDashboardResponsiveGridMode();
+          },
+          { passive: true },
+        );
+      }
+      this._dashboardGrid.opts.draggable.pause = this.getDashboardDragPauseMs();
+      this.applyDashboardDragPauseToItems();
+      this.applyDashboardResponsiveGridMode({ forceLoad: true });
+      this.setLayoutEditing(false);
+      this._sortableReady = true;
+    },
+
+    applyTooltips() {
+      if (typeof window.tippy !== 'function') return;
+      const tips = [
+        [
+          '#dashboard-total-net',
+          'Total combined income (sales + logbook) for selected day.',
+        ],
+        [
+          '#dashboard-active-members',
+          'Checked-in members today divided by total members.',
+        ],
+        [
+          '#dashboard-busiest-hour',
+          'Time above threshold (>5 active check-ins).',
+        ],
+        [
+          '#dashboard-products-qty-sold',
+          'Total quantity sold from sales records today.',
+        ],
+        ['#dashboard-sales-income', 'Sales-only income for selected range.'],
+        [
+          '#dashboard-logbook-income',
+          'Logbook-only paid income for selected range.',
+        ],
+        [
+          '#dashboard-mode-controls',
+          'Select dashboard range mode: daily, weekly, monthly, yearly.',
+        ],
+        [
+          '#dashboard-products-income-mode',
+          'Current range applied to products income share.',
+        ],
+        [
+          '#dashboard-members-attendance-mode',
+          'Current range applied to member attendance share.',
+        ],
+      ];
+      tips.forEach(([selector, content]) => {
+        const node = document.querySelector(selector);
+        if (!node) return;
+        node.setAttribute('data-tippy-content', content);
+      });
+
+      const nodes = Array.from(
+        document.querySelectorAll('[data-tippy-content]'),
+      );
+      nodes.forEach((node) => {
+        if (node.dataset.tippyBound === '1') return;
+        window.tippy(node, {
+          theme: 'light-border',
+          animation: 'shift-away-subtle',
+          delay: [90, 40],
+          maxWidth: 280,
+          appendTo: () => document.body,
+        });
+        node.dataset.tippyBound = '1';
+      });
+      this._tippyReady = true;
+    },
+
+    async initDashboardWorkspace() {
+      this.decorateDashboardWidgets();
+      await this.ensureDashboardEnhancers();
+      this.initSortableLayout();
+      this.applyTooltips();
+      if (!this._sortableReady) {
+        notify('Dashboard grid engine unavailable in this session.', 'warning');
+      }
+    },
+
+    toDateKey(dateLike) {
+      const date = new Date(dateLike);
+      if (Number.isNaN(date.getTime())) return '';
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+
+    formatHourLabel(hour) {
+      const safeHour = Number.isFinite(Number(hour)) ? Number(hour) : 0;
+      const display = safeHour % 12 || 12;
+      const meridian = safeHour >= 12 ? 'PM' : 'AM';
+      return `${display}:00 ${meridian}`;
+    },
+
+    getHybridMode() {
+      const mode = String(this._dashboardMode || '').toLowerCase();
+      return this._hybridModes.includes(mode) ? mode : 'weekly';
+    },
+
+    getProductsPieMode() {
+      return this.getHybridMode();
+    },
+
+    setDashboardMode(mode, options = {}) {
+      const normalized = String(mode || '').toLowerCase();
+      if (!this._hybridModes.includes(normalized)) return;
+      const previous = this.getHybridMode();
+      if (previous === normalized) return;
+      this._dashboardMode = normalized;
+
+      document.querySelectorAll('[data-dashboard-mode]').forEach((button) => {
+        const btnMode = String(
+          button.getAttribute('data-dashboard-mode') || '',
+        ).toLowerCase();
+        button.classList.toggle('is-active', btnMode === normalized);
+      });
+
+      if (options.withPulse) {
+        const hybridPanel = document.getElementById('dashboard-hybrid-panel');
+        const productsPanel = document.getElementById(
+          'dashboard-products-income-panel',
+        );
+        [hybridPanel, productsPanel].forEach((panel) => {
+          if (!panel) return;
+          panel.classList.add('is-switching');
+          window.setTimeout(() => panel.classList.remove('is-switching'), 320);
+        });
+      }
+
+      if (options.withAudio && previous !== normalized && window.wolfAudio) {
+        window.wolfAudio.play('notif');
+      }
+      this.load();
+    },
+
+    loadBusyHourTracker() {
+      try {
+        const raw = window.localStorage.getItem(LOCAL_DASH_BUSY_HOUR_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return {
+          currentSessionStart: parsed?.currentSessionStart || null,
+          currentSessionMaxActive: toNumber(
+            parsed?.currentSessionMaxActive || 0,
+          ),
+          records: Array.isArray(parsed?.records) ? parsed.records : [],
+        };
+      } catch (_) {
+        return {
+          currentSessionStart: null,
+          currentSessionMaxActive: 0,
+          records: [],
+        };
+      }
+    },
+
+    saveBusyHourTracker(state) {
+      try {
+        window.localStorage.setItem(
+          LOCAL_DASH_BUSY_HOUR_KEY,
+          JSON.stringify({
+            currentSessionStart: state?.currentSessionStart || null,
+            currentSessionMaxActive: toNumber(
+              state?.currentSessionMaxActive || 0,
+            ),
+            records: Array.isArray(state?.records)
+              ? state.records.slice(-180)
+              : [],
+          }),
+        );
+      } catch (_) {
+        // ignore storage write failure
+      }
+    },
+
+    updateBusyHourTracker(activeCount, now = new Date()) {
+      const threshold = 5;
+      const state = this.loadBusyHourTracker();
+      const isAboveThreshold = toNumber(activeCount) > threshold;
+
+      if (isAboveThreshold && !state.currentSessionStart) {
+        state.currentSessionStart = now.toISOString();
+        state.currentSessionMaxActive = toNumber(activeCount);
+      } else if (isAboveThreshold && state.currentSessionStart) {
+        state.currentSessionMaxActive = Math.max(
+          toNumber(state.currentSessionMaxActive || 0),
+          toNumber(activeCount),
+        );
+      } else if (!isAboveThreshold && state.currentSessionStart) {
+        const startedAt = new Date(state.currentSessionStart);
+        const elapsedMs = Math.max(0, now.getTime() - startedAt.getTime());
+        const durationHours = elapsedMs / 3600000;
+        if (durationHours > 0) {
+          const record = {
+            date: startedAt.toISOString().slice(0, 10),
+            start_iso: startedAt.toISOString(),
+            end_iso: now.toISOString(),
+            duration_hours: Number(durationHours.toFixed(3)),
+            peak_active: Math.max(
+              0,
+              Math.round(state.currentSessionMaxActive || 0),
+            ),
+          };
+          state.records.push(record);
+        }
+        state.currentSessionStart = null;
+        state.currentSessionMaxActive = 0;
+      }
+
+      state.records = (state.records || []).slice(-180);
+      this.saveBusyHourTracker(state);
+      return state;
+    },
+
+    renderBusyHourArea(records = []) {
+      const svgEl = document.getElementById('dashboard-busiest-area-chart');
+      const axisEl = document.getElementById('dashboard-busiest-axis');
+      const metaEl = document.getElementById('dashboard-busiest-back-meta');
+      if (!svgEl || !axisEl || !metaEl) return;
+
+      const byDate = new Map();
+      (records || []).forEach((entry) => {
+        const key = String(entry?.date || '').trim();
+        if (!key) return;
+        const prev = byDate.get(key) || { date: key, duration: 0, peak: 0 };
+        prev.duration = Math.max(
+          prev.duration,
+          toNumber(entry?.duration_hours),
+        );
+        prev.peak = Math.max(prev.peak, toNumber(entry?.peak_active));
+        byDate.set(key, prev);
+      });
+
+      const series = Array.from(byDate.values())
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-7);
+
+      if (!series.length) {
+        svgEl.innerHTML = `
+          <polygon points="0,100 100,100 100,100 0,100" fill="rgba(42,178,247,0.16)"></polygon>
+          <polyline points="0,100 100,100" fill="none" stroke="rgba(148,163,184,0.55)" stroke-width="1.2"></polyline>
+        `;
+        axisEl.innerHTML = Array.from({ length: 7 })
+          .map(() => '<span>--</span>')
+          .join('');
+        metaEl.textContent = 'No recorded peak day yet';
+        return;
+      }
+
+      const maxVal = Math.max(...series.map((s) => s.duration), 0.1);
+      const points = series.map((item, idx) => {
+        const x = series.length > 1 ? (idx / (series.length - 1)) * 100 : 50;
+        const y = 100 - (item.duration / maxVal) * 100;
+        return { x, y };
+      });
+      const polyline = points
+        .map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`)
+        .join(' ');
+      const polygon = `0,100 ${polyline} 100,100`;
+
+      svgEl.innerHTML = `
+        <defs>
+          <linearGradient id="busyAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(42,178,247,0.48)"></stop>
+            <stop offset="100%" stop-color="rgba(42,178,247,0.08)"></stop>
+          </linearGradient>
+        </defs>
+        <polygon points="${polygon}" fill="url(#busyAreaGradient)"></polygon>
+        <polyline points="${polyline}" fill="none" stroke="#8dd9ff" stroke-width="1.45"></polyline>
+      `;
+
+      axisEl.innerHTML = series
+        .map((item) => {
+          const dt = new Date(item.date);
+          const label = Number.isNaN(dt.getTime())
+            ? item.date.slice(5)
+            : dt.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+              });
+          return `<span>${escapeHtml(label)}</span>`;
+        })
+        .join('');
+
+      const best = series.reduce(
+        (top, row) => (row.duration > top.duration ? row : top),
+        series[0],
+      );
+      metaEl.textContent = `${best.date} | ${best.duration.toFixed(1)}h above threshold | peak ${Math.round(best.peak)} active`;
+    },
+
+    setBusiestActiveHourFromTracker(logRows = []) {
+      const valueEl = document.getElementById('dashboard-busiest-hour');
+      const metaEl = document.getElementById('dashboard-busiest-hour-meta');
+      if (!valueEl || !metaEl) return;
+
+      const activeNow = (logRows || []).filter((row) => !row?.time_out).length;
+      const now = new Date();
+      const state = this.updateBusyHourTracker(activeNow, now);
+
+      if (state.currentSessionStart) {
+        const startedAt = new Date(state.currentSessionStart);
+        const elapsedHours = Math.max(
+          0,
+          (now.getTime() - startedAt.getTime()) / 3600000,
+        );
+        valueEl.textContent = `${elapsedHours.toFixed(1)}h`;
+        metaEl.textContent = `${activeNow} active check-ins | threshold >5`;
+      } else {
+        const bestRecord = (state.records || []).slice().sort((a, b) => {
+          if (toNumber(b.duration_hours) !== toNumber(a.duration_hours)) {
+            return toNumber(b.duration_hours) - toNumber(a.duration_hours);
+          }
+          return toNumber(b.peak_active) - toNumber(a.peak_active);
+        })[0];
+
+        if (bestRecord) {
+          valueEl.textContent = `${toNumber(bestRecord.duration_hours).toFixed(1)}h`;
+          metaEl.textContent = `${bestRecord.date} | peak ${Math.round(toNumber(bestRecord.peak_active))} active`;
+        } else {
+          valueEl.textContent = '0.0h';
+          metaEl.textContent = 'Waiting for >5 active check-ins';
+        }
+      }
+
+      this.renderBusyHourArea(state.records || []);
+    },
+
+    getHybridRange(now, mode) {
+      const today = getManilaRangeStart(now);
+      const tomorrow = getManilaRangeEnd(now);
+      if (mode === 'daily') {
+        return {
+          start: today,
+          end: tomorrow,
+          mode,
+          label: 'Today (24 hours)',
+        };
+      }
+      if (mode === 'monthly') {
+        return {
+          start: getMonthStart(now),
+          end: tomorrow,
+          mode,
+          label: `${today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+        };
+      }
+      if (mode === 'yearly') {
+        const start = new Date(today.getFullYear(), 0, 1);
+        return {
+          start,
+          end: tomorrow,
+          mode,
+          label: `${today.getFullYear()}`,
+        };
+      }
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      return {
+        start,
+        end: tomorrow,
+        mode: 'weekly',
+        label: 'Last 7 days',
+      };
+    },
+
+    getRowIncomeValue(row) {
+      const total = toNumber(row?.total_amount);
+      if (total > 0) return total;
+      const qty = toNumber(row?.qty);
+      const unitPrice = toNumber(row?.unit_price);
+      const paidAmount = toNumber(row?.paid_amount);
+      if (paidAmount > 0) return paidAmount;
+      if (row?.is_paid) return toNumber(row?.entry_fee);
+      return qty * unitPrice;
+    },
+
+    buildHybridSeries(rows = [], mode, anchorDate = new Date()) {
+      const today = getRangeStart(anchorDate);
+      const labels = [];
+      const series = [];
+      const buckets = [];
+
+      if (mode === 'daily') {
+        for (let hour = 0; hour < 24; hour += 1) {
+          labels.push(`${String(hour).padStart(2, '0')}:00`);
+          buckets.push({ hour });
+          series.push(0);
+        }
+      } else if (mode === 'monthly') {
+        const monthStart = getMonthStart(anchorDate);
+        const cursor = new Date(monthStart);
+        while (cursor <= today) {
+          labels.push(String(cursor.getDate()).padStart(2, '0'));
+          buckets.push({ key: this.toDateKey(cursor) });
+          series.push(0);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      } else if (mode === 'yearly') {
+        for (let m = 0; m < 12; m += 1) {
+          const dt = new Date(today.getFullYear(), m, 1);
+          labels.push(
+            dt.toLocaleDateString('en-US', {
+              month: 'short',
+            }),
+          );
+          buckets.push({ month: m, year: dt.getFullYear() });
+          series.push(0);
+        }
+      } else {
+        for (let offset = 6; offset >= 0; offset -= 1) {
+          const dt = new Date(today);
+          dt.setDate(today.getDate() - offset);
+          labels.push(
+            dt.toLocaleDateString('en-US', {
+              weekday: 'short',
+            }),
+          );
+          buckets.push({ key: this.toDateKey(dt) });
+          series.push(0);
+        }
+      }
+
+      (rows || []).forEach((row) => {
+        const parsed = parseRowDate(row, ['created_at', 'time_in']);
+        if (!parsed) return;
+        const income = this.getRowIncomeValue(row);
+        if (income <= 0) return;
+
+        if (mode === 'daily') {
+          const hour = parsed.getHours();
+          if (hour >= 0 && hour < series.length) series[hour] += income;
+          return;
+        }
+        if (mode === 'monthly' || mode === 'weekly') {
+          const key = this.toDateKey(parsed);
+          const idx = buckets.findIndex((b) => b.key === key);
+          if (idx >= 0) series[idx] += income;
+          return;
+        }
+        if (mode === 'yearly') {
+          const idx = buckets.findIndex(
+            (b) =>
+              b.year === parsed.getFullYear() && b.month === parsed.getMonth(),
+          );
+          if (idx >= 0) series[idx] += income;
+        }
+      });
+
+      return {
+        labels,
+        values: series,
+      };
+    },
+
+    renderHybridChart(rows = [], mode = 'weekly', rangeMeta = null) {
+      const barsEl = document.getElementById('dashboard-hybrid-bars');
+      const xAxisEl = document.getElementById('dashboard-hybrid-x-axis');
+      const yAxisEl = document.getElementById('dashboard-hybrid-y-axis');
+      const svgEl = document.getElementById('dashboard-hybrid-svg');
+      const gridEl = document.getElementById('dashboard-hybrid-grid');
+      const captionEl = document.getElementById('dashboard-week-caption');
+      const modeEl = document.getElementById('dashboard-hybrid-mode');
+      const plotEl = document.querySelector('.dashboard-hybrid-plot');
+      if (!barsEl || !xAxisEl || !yAxisEl || !svgEl || !gridEl) return;
+
+      const chart = this.buildHybridSeries(rows, mode, new Date());
+      const values = chart.values || [];
+      const labels = chart.labels || [];
+      const maxRaw = Math.max(...values, 0);
+      const maxVal = maxRaw > 0 ? Math.ceil(maxRaw / 100) * 100 : 100;
+
+      const modeLabelMap = {
+        daily: 'Daily',
+        weekly: 'Weekly',
+        monthly: 'Monthly',
+        yearly: 'Yearly',
+      };
+      if (modeEl) modeEl.textContent = modeLabelMap[mode] || 'Weekly';
+      const opsChartModeEl = document.getElementById(
+        'dashboard-ops-chart-mode',
+      );
+      if (opsChartModeEl)
+        opsChartModeEl.textContent = modeLabelMap[mode] || 'Weekly';
+
+      const yTicks = [maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0];
+      yAxisEl.innerHTML = yTicks
+        .map((value) => `<span>${escapeHtml(formatCurrency(value))}</span>`)
+        .join('');
+      gridEl.innerHTML =
+        '<span></span><span></span><span></span><span></span><span></span>';
+
+      const columns = Math.max(1, labels.length);
+      barsEl.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+      xAxisEl.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+
+      barsEl.innerHTML = values
+        .map((value, idx) => {
+          const pct = maxVal > 0 ? (value / maxVal) * 100 : 0;
+          const height = `${Math.max(6, Math.round(pct))}%`;
+          return `<div class="dashboard-hybrid-bar" style="--h:${height}; --i:${idx}" title="${escapeHtml(formatCurrency(value))}"></div>`;
+        })
+        .join('');
+
+      xAxisEl.innerHTML = labels
+        .map((label) => `<span>${escapeHtml(label)}</span>`)
+        .join('');
+
+      const points = values.map((value, idx) => {
+        const x = values.length > 1 ? (idx / (values.length - 1)) * 100 : 50;
+        const y = maxVal > 0 ? 100 - (value / maxVal) * 100 : 100;
+        return { x, y, value };
+      });
+
+      const plotBox = svgEl.getBoundingClientRect();
+      const ratioFix =
+        plotBox.width > 0 && plotBox.height > 0
+          ? plotBox.height / plotBox.width
+          : 0.2;
+      const dotRy = 1.05;
+      const dotRx = Math.max(0.28, dotRy * ratioFix);
+
+      const pointsText = points
+        .map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`)
+        .join(' ');
+      const areaPoints = `0,100 ${pointsText} 100,100`;
+      const dots = points
+        .map(
+          (p) =>
+            `<ellipse class="dashboard-hybrid-dot" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" rx="${dotRx.toFixed(3)}" ry="${dotRy.toFixed(3)}"></ellipse>`,
+        )
+        .join('');
+
+      svgEl.innerHTML = `
+        <defs>
+          <linearGradient id="dashboardHybridAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(42,178,247,0.42)"></stop>
+            <stop offset="100%" stop-color="rgba(239,68,68,0.08)"></stop>
+          </linearGradient>
+        </defs>
+        <polygon class="dashboard-hybrid-area" points="${areaPoints}"></polygon>
+        <polyline class="dashboard-hybrid-line-glow" points="${pointsText}"></polyline>
+        <polyline class="dashboard-hybrid-line" points="${pointsText}"></polyline>
+        ${dots}
+      `;
+
+      const total = values.reduce((sum, value) => sum + value, 0);
+      if (captionEl) {
+        const scope = rangeMeta?.label || '';
+        captionEl.textContent = `${scope} | Total ${formatCurrency(total)}`;
+      }
+
+      if (plotEl) {
+        plotEl.classList.remove('is-animating');
+        void plotEl.offsetWidth;
+        plotEl.classList.add('is-animating');
+        window.setTimeout(() => plotEl.classList.remove('is-animating'), 760);
+      }
+    },
+
+    renderPieChart({
+      donutEl,
+      legendEl,
+      captionEl,
+      items = [],
+      valueFormatter = (v) => String(v),
+      totalFormatter = (v) => String(v),
+      totalLabel = 'Total',
+      emptyText = 'No data yet',
+    }) {
+      if (!donutEl || !legendEl) return;
+      const palette = [
+        '#2ab2f7',
+        '#ef4444',
+        '#22c55e',
+        '#f59e0b',
+        '#8b5cf6',
+        '#14b8a6',
+        '#f97316',
+        '#6366f1',
+      ];
+
+      const normalized = (items || [])
+        .map((item) => ({
+          name: String(item?.name || 'Unknown'),
+          value: toNumber(item?.value),
+        }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value);
+
+      if (!normalized.length) {
+        donutEl.style.background =
+          'conic-gradient(rgba(100,116,139,0.42) 0 100%)';
+        donutEl.innerHTML = `<div class="dashboard-pie-center"><strong>0</strong><span>${escapeHtml(totalLabel)}</span></div>`;
+        legendEl.innerHTML = `
+          <div class="dashboard-pie-row">
+            <span class="dashboard-pie-dot" style="background:#64748b"></span>
+            <span class="dashboard-pie-name">${escapeHtml(emptyText)}</span>
+            <span class="dashboard-pie-value">${escapeHtml(valueFormatter(0))}</span>
+          </div>
+        `;
+        if (captionEl) captionEl.textContent = emptyText;
+        return;
+      }
+
+      const collapsed = normalized.slice(0, 6);
+      const overflow = normalized.slice(6);
+      if (overflow.length) {
+        collapsed.push({
+          name: `Other (${overflow.length})`,
+          value: overflow.reduce((sum, item) => sum + item.value, 0),
+        });
+      }
+
+      const total = collapsed.reduce((sum, item) => sum + item.value, 0);
+      let cursor = 0;
+      const gradientParts = collapsed.map((item, index) => {
+        const share = total > 0 ? (item.value / total) * 100 : 0;
+        const start = cursor;
+        const end = Math.min(100, cursor + share);
+        cursor = end;
+        item.share = share;
+        item.color = palette[index % palette.length];
+        return `${item.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+      });
+
+      donutEl.style.background = `conic-gradient(${gradientParts.join(',')})`;
+      donutEl.innerHTML = `
+        <div class="dashboard-pie-center">
+          <strong>${escapeHtml(totalFormatter(total))}</strong>
+          <span>${escapeHtml(totalLabel)}</span>
+        </div>
+      `;
+
+      legendEl.innerHTML = collapsed
+        .map(
+          (item) => `
+            <div class="dashboard-pie-row">
+              <span class="dashboard-pie-dot" style="background:${item.color}"></span>
+              <span class="dashboard-pie-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+              <span class="dashboard-pie-value">${escapeHtml(valueFormatter(item.value))}</span>
+            </div>
+          `,
+        )
+        .join('');
+
+      if (captionEl) {
+        captionEl.textContent = `${collapsed.length} segment${collapsed.length === 1 ? '' : 's'} | ${totalFormatter(total)}`;
+      }
+    },
+
+    renderProductsIncomePie(
+      monthSalesRows = [],
+      products = [],
+      mode = 'monthly',
+      rangeMeta = null,
+    ) {
+      const donutEl = document.getElementById('dashboard-products-income-pie');
+      const legendEl = document.getElementById(
+        'dashboard-products-income-legend',
+      );
+      const captionEl = document.getElementById(
+        'dashboard-products-income-caption',
+      );
+      const modeEl = document.getElementById('dashboard-products-income-mode');
+      if (!donutEl || !legendEl) return;
+
+      const modeLabelMap = {
+        daily: 'Daily',
+        weekly: 'Weekly',
+        monthly: 'Monthly',
+        yearly: 'Yearly',
+      };
+      if (modeEl) modeEl.textContent = modeLabelMap[mode] || 'Monthly';
+      const opsProductsModeEl = document.getElementById(
+        'dashboard-ops-products-mode',
+      );
+      if (opsProductsModeEl) {
+        opsProductsModeEl.textContent = modeLabelMap[mode] || 'Monthly';
+      }
+
+      const productNameMap = new Map(
+        (products || []).map((row) => [
+          String(row?.productid || '').trim(),
+          String(row?.name || row?.sku || 'UNKNOWN PRODUCT'),
+        ]),
+      );
+
+      const grouped = new Map();
+      (monthSalesRows || []).forEach((row) => {
+        const productId = String(row?.product_id || '').trim();
+        if (!productId) return;
+        const qty = Math.max(1, toNumber(row?.qty));
+        const amount =
+          toNumber(row?.total_amount) > 0
+            ? toNumber(row?.total_amount)
+            : qty * toNumber(row?.unit_price);
+        grouped.set(productId, (grouped.get(productId) || 0) + amount);
+      });
+
+      const items = Array.from(grouped.entries()).map(([productId, value]) => ({
+        name:
+          productNameMap.get(productId) ||
+          `PRODUCT ${productId.slice(0, 8).toUpperCase()}`,
+        value,
+      }));
+
+      this.renderPieChart({
+        donutEl,
+        legendEl,
+        captionEl,
+        items,
+        valueFormatter: (v) => formatCurrency(v),
+        totalFormatter: (v) => formatCurrency(v),
+        totalLabel: 'Income',
+        emptyText: `No product sales in ${String(modeLabelMap[mode] || 'selected period').toLowerCase()}`,
+      });
+
+      const pieLayout = donutEl.closest('.dashboard-pie-layout');
+      if (pieLayout) pieLayout.classList.toggle('is-empty', items.length === 0);
+      if (captionEl && rangeMeta?.label) {
+        const raw = captionEl.textContent || '';
+        captionEl.textContent = `${rangeMeta.label} | ${raw}`;
+      }
+    },
+
+    renderMembersAttendancePie(
+      logRows = [],
+      membersRows = [],
+      mode = 'weekly',
+      rangeMeta = null,
+    ) {
+      const donutEl = document.getElementById(
+        'dashboard-members-attendance-pie',
+      );
+      const legendEl = document.getElementById(
+        'dashboard-members-attendance-legend',
+      );
+      const captionEl = document.getElementById(
+        'dashboard-members-attendance-caption',
+      );
+      const modeEl = document.getElementById(
+        'dashboard-members-attendance-mode',
+      );
+      const titleEl = document.getElementById(
+        'dashboard-members-attendance-title',
+      );
+      if (!donutEl || !legendEl) return;
+
+      const modeLabelMap = {
+        daily: 'Daily',
+        weekly: 'Weekly',
+        monthly: 'Monthly',
+        yearly: 'Yearly',
+      };
+      if (modeEl) modeEl.textContent = modeLabelMap[mode] || 'Weekly';
+      if (titleEl)
+        titleEl.textContent = `Member Attendance Share (${modeLabelMap[mode] || 'Weekly'})`;
+
+      const activeMembers = (membersRows || []).filter(
+        (row) => row?.is_active !== false,
+      );
+      const memberMap = new Map();
+      activeMembers.forEach((row) => {
+        const profileKey = String(row?.profile_id || '').trim();
+        const memberKey = String(row?.member_id || '').trim();
+        const label = String(
+          row?.full_name || row?.member_code || row?.sku || 'UNKNOWN MEMBER',
+        );
+        if (profileKey) memberMap.set(profileKey, label);
+        if (memberKey) memberMap.set(memberKey, label);
+      });
+
+      const attendance = new Map();
+      (logRows || []).forEach((row) => {
+        const key = String(
+          row?.profile_id || row?.member_id || row?.member_code || '',
+        ).trim();
+        if (!key) return;
+        if (memberMap.size > 0 && !memberMap.has(key)) return;
+        attendance.set(key, (attendance.get(key) || 0) + 1);
+      });
+
+      const items = Array.from(attendance.entries()).map(([key, value]) => ({
+        name: memberMap.get(key) || `MEMBER ${key.slice(0, 8).toUpperCase()}`,
+        value,
+      }));
+
+      this.renderPieChart({
+        donutEl,
+        legendEl,
+        captionEl,
+        items,
+        valueFormatter: (v) =>
+          `${Math.round(v)} check-in${Math.round(v) === 1 ? '' : 's'}`,
+        totalFormatter: (v) => `${Math.round(v)}`,
+        totalLabel: 'Check-ins',
+        emptyText: `No member attendance in ${String(modeLabelMap[mode] || 'selected period').toLowerCase()}`,
+      });
+
+      const pieLayout = donutEl.closest('.dashboard-pie-layout');
+      if (pieLayout) pieLayout.classList.toggle('is-empty', items.length === 0);
+      if (captionEl && rangeMeta?.label) {
+        const raw = captionEl.textContent || '';
+        captionEl.textContent = `${rangeMeta.label} | ${raw}`;
+      }
+    },
+
+    renderWeekChart(rows = []) {
+      const barsEl = document.getElementById('dashboard-week-bars');
+      const labelsEl = document.getElementById('dashboard-week-labels');
+      const captionEl = document.getElementById('dashboard-week-caption');
+      if (!barsEl || !labelsEl) return;
+
+      const today = getManilaRangeStart(new Date());
+      const days = [];
+      for (let offset = 6; offset >= 0; offset -= 1) {
+        const day = new Date(today);
+        day.setDate(today.getDate() - offset);
+        const key = this.toDateKey(day);
+        const dayTotal = (rows || []).reduce((sum, row) => {
+          const parsed = parseRowDate(row, ['created_at', 'time_in']);
+          if (!parsed || this.toDateKey(parsed) !== key) return sum;
+          const total = toNumber(row.total_amount);
+          if (total > 0) return sum + total;
+          const qty = toNumber(row.qty);
+          const unitPrice = toNumber(row.unit_price);
+          const paidAmount = toNumber(row.paid_amount);
+          if (paidAmount > 0) return sum + paidAmount;
+          if (row.is_paid) return sum + toNumber(row.entry_fee);
+          return sum + qty * unitPrice;
+        }, 0);
+        days.push({
+          key,
+          label: day.toLocaleDateString('en-US', { weekday: 'short' }),
+          total: dayTotal,
+        });
+      }
+
+      const maxTotal = Math.max(...days.map((day) => day.total), 0);
+      barsEl.innerHTML = days
+        .map((day, index) => {
+          const ratio = maxTotal > 0 ? day.total / maxTotal : 0;
+          const height = `${Math.max(10, Math.round(ratio * 100))}%`;
+          return `<div class="dashboard-week-bar" style="--bar-height:${height}; --bar-delay:${index * 0.06}s" title="${day.label}: ${formatCurrency(day.total)}"></div>`;
+        })
+        .join('');
+      labelsEl.innerHTML = days
+        .map((day) => `<span>${escapeHtml(day.label)}</span>`)
+        .join('');
+
+      const weekTotal = days.reduce((sum, day) => sum + day.total, 0);
+      if (captionEl) {
+        captionEl.textContent =
+          weekTotal > 0
+            ? `Total ${formatCurrency(weekTotal)}`
+            : 'No revenue this week';
+      }
+    },
+
+    renderTopProducts(salesRows = [], products = []) {
+      const listEl = document.getElementById('dashboard-top-products');
+      if (!listEl) return;
+
+      const productNameMap = new Map(
+        (products || []).map((row) => [
+          String(row?.productid || '').trim(),
+          String(row?.name || row?.sku || 'UNKNOWN PRODUCT'),
+        ]),
+      );
+
+      const grouped = new Map();
+      (salesRows || []).forEach((row) => {
+        const productId = String(row?.product_id || '').trim() || 'unknown';
+        const entry = grouped.get(productId) || { qty: 0, amount: 0 };
+        const qty = Math.max(1, toNumber(row.qty));
+        const amount =
+          toNumber(row.total_amount) > 0
+            ? toNumber(row.total_amount)
+            : qty * toNumber(row.unit_price);
+        entry.qty += qty;
+        entry.amount += amount;
+        grouped.set(productId, entry);
+      });
+
+      const ranked = Array.from(grouped.entries())
+        .map(([productId, stat]) => ({
+          productId,
+          qty: stat.qty,
+          amount: stat.amount,
+          name:
+            productNameMap.get(productId) ||
+            String(
+              productId === 'unknown'
+                ? 'UNLINKED PRODUCT'
+                : `PRODUCT ${productId.slice(0, 8).toUpperCase()}`,
+            ),
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+
+      if (!ranked.length) {
+        listEl.innerHTML = `
+          <div class="dashboard-product-row">
+            <strong>No product activity yet</strong>
+            <span>${formatCurrency(0)}</span>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = ranked
+        .map(
+          (item) => `
+            <div class="dashboard-product-row">
+              <strong title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</strong>
+              <span>${formatCurrency(item.amount)} | x${Math.round(item.qty)}</span>
+            </div>
+          `,
+        )
+        .join('');
+    },
+
+    setPeakHour(logRows = []) {
+      const hourEl = document.getElementById('dashboard-peak-hour');
+      const countEl = document.getElementById('dashboard-peak-count');
+      if (!hourEl || !countEl) return;
+
+      const buckets = new Array(24).fill(0);
+      const activeRows = (logRows || []).filter((row) => !row?.time_out);
+      activeRows.forEach((row) => {
+        const parsed = parseRowDate(row, ['time_in', 'created_at']);
+        if (!parsed) return;
+        buckets[parsed.getHours()] += 1;
+      });
+
+      let bestHour = -1;
+      let bestCount = 0;
+      buckets.forEach((count, hour) => {
+        if (count > bestCount) {
+          bestCount = count;
+          bestHour = hour;
+        }
+      });
+
+      if (bestHour < 0 || bestCount < 1) {
+        hourEl.textContent = 'N/A';
+        countEl.textContent = '0';
+        return;
+      }
+
+      hourEl.textContent = this.formatHourLabel(bestHour);
+      countEl.textContent = String(bestCount);
+    },
+
+    setBusiestActiveHour(logRows = []) {
+      const valueEl = document.getElementById('dashboard-busiest-hour');
+      const metaEl = document.getElementById('dashboard-busiest-hour-meta');
+      if (!valueEl || !metaEl) return;
+
+      const buckets = new Array(24).fill(0);
+      const activeRows = (logRows || []).filter((row) => !row?.time_out);
+
+      activeRows.forEach((row) => {
+        const parsed = parseRowDate(row, ['time_in', 'created_at']);
+        if (!parsed) return;
+        buckets[parsed.getHours()] += 1;
+      });
+
+      let bestHour = -1;
+      let bestCount = 0;
+      buckets.forEach((count, hour) => {
+        if (count > bestCount) {
+          bestCount = count;
+          bestHour = hour;
+        }
+      });
+
+      if (bestHour < 0 || bestCount < 1) {
+        valueEl.textContent = 'N/A';
+        metaEl.textContent = '0 active check-ins';
+        return;
+      }
+
+      valueEl.textContent = this.formatHourLabel(bestHour);
+      metaEl.textContent = `${bestCount} active check-in${bestCount === 1 ? '' : 's'}`;
+    },
+
+    downloadSnapshot() {
+      const payload = this._lastPayload;
+      if (!payload) {
+        notify('Dashboard report is not ready yet.', 'warning');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `dashboard-report-${dateStamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      notify('Dashboard report downloaded.', 'success');
+    },
+
     async init() {
       const root = document.getElementById('page-wrapper');
       if (!root) return;
+      this.bindActions();
       await this.load();
+      await this.initDashboardWorkspace();
       if (this._timer) window.clearInterval(this._timer);
       this._timer = window.setInterval(() => this.load(), 45000);
     },
@@ -346,19 +3396,100 @@
       }
 
       const now = new Date();
-      const todayStart = getRangeStart(now);
-      const tomorrowStart = getRangeEnd(now);
+      const todayStart = getManilaRangeStart(now);
+      const tomorrowStart = getManilaRangeEnd(now);
       const yesterdayStart = new Date(todayStart);
       yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      const weekStart = new Date(todayStart);
+      weekStart.setDate(weekStart.getDate() - 6);
+      const weekEnd = new Date(tomorrowStart);
+      const hybridMode = this.getHybridMode();
+      const hybridRange = this.getHybridRange(now, hybridMode);
+      const dashboardMode = this.getProductsPieMode();
+      const dashboardRange = this.getHybridRange(now, dashboardMode);
 
-      const [todaySnapshot, yesterdaySnapshot, membersCountResult] =
-        await Promise.all([
-          fetchRevenueSnapshot(client, todayStart, tomorrowStart),
-          fetchRevenueSnapshot(client, yesterdayStart, todayStart),
-          client
-            .from('members')
-            .select('member_id', { count: 'exact', head: true }),
-        ]);
+      const earliestStart = new Date(
+        Math.min(
+          yesterdayStart.getTime(),
+          weekStart.getTime(),
+          hybridRange.start.getTime(),
+          dashboardRange.start.getTime(),
+        ),
+      );
+      const earliestStartIso = earliestStart.toISOString();
+      const tomorrowStartIso = tomorrowStart.toISOString();
+
+      const [
+        salesRangeResult,
+        logbookRangeResult,
+        membersRowsResult,
+        productsResult,
+      ] = await Promise.all([
+        fetchRowsByDateRange(
+          client,
+          'sales',
+          'id,product_id,total_amount,qty,unit_price,created_at',
+          earliestStartIso,
+          tomorrowStartIso,
+          ['created_at'],
+        ),
+        fetchDashboardLogbookRows(client, earliestStartIso, tomorrowStartIso),
+        client.from('members').select('*'),
+        client.from('products').select('productid,name,sku'),
+      ]);
+
+      const allSalesRows = salesRangeResult.data || [];
+      const allLogbookRows = logbookRangeResult.data || [];
+
+      const todaySnapshot = buildRevenueSnapshotFromRows(
+        allSalesRows,
+        allLogbookRows,
+        todayStart,
+        tomorrowStart,
+        { includeRows: true },
+      );
+      const yesterdaySnapshot = buildRevenueSnapshotFromRows(
+        allSalesRows,
+        allLogbookRows,
+        yesterdayStart,
+        todayStart,
+      );
+      const weekSalesRows = filterRowsByDateRange(
+        allSalesRows,
+        weekStart,
+        weekEnd,
+        ['created_at'],
+      );
+      const weekLogRows = filterRowsByDateRange(
+        allLogbookRows,
+        weekStart,
+        weekEnd,
+        ['time_in', 'created_at'],
+      );
+      const hybridSalesRows = filterRowsByDateRange(
+        allSalesRows,
+        hybridRange.start,
+        hybridRange.end,
+        ['created_at'],
+      );
+      const hybridLogRows = filterRowsByDateRange(
+        allLogbookRows,
+        hybridRange.start,
+        hybridRange.end,
+        ['time_in', 'created_at'],
+      );
+      const dashboardSalesRows = filterRowsByDateRange(
+        allSalesRows,
+        dashboardRange.start,
+        dashboardRange.end,
+        ['created_at'],
+      );
+      const dashboardLogRows = filterRowsByDateRange(
+        allLogbookRows,
+        dashboardRange.start,
+        dashboardRange.end,
+        ['time_in', 'created_at'],
+      );
 
       const todayTotal =
         todaySnapshot.salesAmount + todaySnapshot.logbookAmount;
@@ -373,35 +3504,119 @@
       const productsEl = document.getElementById('dashboard-products-total');
       const logsEl = document.getElementById('dashboard-log-fees-total');
       const membersEl = document.getElementById('dashboard-active-members');
-      const trafficEl = document.getElementById('dashboard-floor-traffic');
-      const trendIcon = document.getElementById('dashboard-trend-icon');
+      const busiestHourEl = document.getElementById('dashboard-busiest-hour');
+      const salesIncomeEl = document.getElementById('dashboard-sales-income');
+      const logbookIncomeEl = document.getElementById(
+        'dashboard-logbook-income',
+      );
+      const salesCountEl = document.getElementById('dashboard-sales-count');
+      const logbookCountEl = document.getElementById('dashboard-logbook-count');
+      const peakWindowEl = document.getElementById('dashboard-peak-window');
+      const productsQtyEl = document.getElementById(
+        'dashboard-products-qty-sold',
+      );
+
+      const totalMembers = (membersRowsResult.data || []).length;
+      const activeMemberSet = new Set(
+        (todaySnapshot.logbookRows || [])
+          .map((row) => String(row?.profile_id || row?.member_id || '').trim())
+          .filter(Boolean),
+      );
+      const soldQtyToday = (todaySnapshot.salesRows || []).reduce(
+        (sum, row) => sum + Math.max(1, toNumber(row?.qty)),
+        0,
+      );
 
       totalEl.textContent = formatCurrency(todayTotal);
       if (productsEl)
         productsEl.textContent = formatCurrency(todaySnapshot.salesAmount);
       if (logsEl)
         logsEl.textContent = formatCurrency(todaySnapshot.logbookAmount);
+      if (salesIncomeEl)
+        salesIncomeEl.textContent = formatCurrency(todaySnapshot.salesAmount);
+      if (logbookIncomeEl)
+        logbookIncomeEl.textContent = formatCurrency(
+          todaySnapshot.logbookAmount,
+        );
+      if (salesCountEl)
+        salesCountEl.textContent = String(todaySnapshot.salesCount || 0);
+      if (logbookCountEl)
+        logbookCountEl.textContent = String(todaySnapshot.trafficCount || 0);
       if (membersEl)
-        membersEl.textContent = String(toNumber(membersCountResult.count || 0));
-      if (trafficEl) trafficEl.textContent = `${todaySnapshot.trafficCount}/30`;
+        membersEl.textContent = `${activeMemberSet.size}/${totalMembers}`;
+      if (busiestHourEl)
+        this.setBusiestActiveHourFromTracker(todaySnapshot.logbookRows || []);
+      if (productsQtyEl)
+        productsQtyEl.textContent = String(Math.round(soldQtyToday));
+      if (peakWindowEl) peakWindowEl.textContent = 'Today (check-ins)';
 
       if (trendEl) {
         const absPct = Math.abs(deltaPct).toFixed(1);
+        const isUp = deltaPct >= 0;
+        const iconClass = isUp ? 'bx-trending-up' : 'bx-trending-down';
+        const iconColor = isUp ? '#22c55e' : 'var(--accent-red)';
+        let trendLabel = `${absPct}% VS YESTERDAY`;
         if (yesterdayTotal <= 0 && todayTotal > 0) {
-          trendEl.textContent = 'NEW REVENUE ACTIVITY TODAY';
+          trendLabel = 'NEW REVENUE ACTIVITY TODAY';
         } else {
-          trendEl.textContent = `${absPct}% VS YESTERDAY`;
+          trendLabel = `${absPct}% VS YESTERDAY`;
         }
+        trendEl.innerHTML = `<i id="dashboard-trend-icon" class="bx ${iconClass}" style="color:${iconColor}"></i> ${escapeHtml(trendLabel)}`;
       }
 
-      if (trendIcon) {
-        if (deltaPct >= 0) {
-          trendIcon.className = 'bx bx-trending-up';
-          trendIcon.style.color = '#22c55e';
-        } else {
-          trendIcon.className = 'bx bx-trending-down';
-          trendIcon.style.color = 'var(--accent-red)';
-        }
+      const weekRows = [...weekSalesRows, ...weekLogRows];
+      const hybridRows = [...hybridSalesRows, ...hybridLogRows];
+      this.renderHybridChart(hybridRows, hybridMode, hybridRange);
+      this.setPeakHour(todaySnapshot.logbookRows || []);
+      this.renderTopProducts(
+        todaySnapshot.salesRows || [],
+        productsResult.data || [],
+      );
+      this.renderProductsIncomePie(
+        dashboardSalesRows,
+        productsResult.data || [],
+        dashboardMode,
+        dashboardRange,
+      );
+      this.renderMembersAttendancePie(
+        dashboardLogRows,
+        membersRowsResult.data || [],
+        dashboardMode,
+        dashboardRange,
+      );
+
+      this._lastPayload = {
+        generated_at: new Date().toISOString(),
+        summary: {
+          total_income_today: todayTotal,
+          sales_income_today: todaySnapshot.salesAmount,
+          logbook_income_today: todaySnapshot.logbookAmount,
+          sales_transactions_today: todaySnapshot.salesCount,
+          logbook_entries_today: todaySnapshot.trafficCount,
+          members_total: totalMembers,
+          active_members_today: activeMemberSet.size,
+          products_qty_sold_today: Math.round(soldQtyToday),
+          delta_vs_yesterday_percent: Number(deltaPct.toFixed(2)),
+        },
+        week_income_rows: weekRows,
+        month_sales_rows: dashboardSalesRows,
+        month_logbook_rows: dashboardLogRows,
+        today_sales_rows: todaySnapshot.salesRows || [],
+        today_logbook_rows: todaySnapshot.logbookRows || [],
+      };
+
+      const opsLastUpdateEl = document.getElementById(
+        'dashboard-ops-last-update',
+      );
+      if (opsLastUpdateEl) {
+        opsLastUpdateEl.textContent = new Date().toLocaleTimeString(undefined, {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+      }
+      if (this.isDashboardMobileViewport() && !this._layoutEditing) {
+        this.scheduleMobileDashboardAutoSize();
       }
     },
   };
@@ -441,7 +3656,10 @@
       if (!startInput || !endInput || !rangeInput || !trigger) return;
       if (typeof flatpickr !== 'function') return;
 
-      if (this.customRangePicker && typeof this.customRangePicker.destroy === 'function') {
+      if (
+        this.customRangePicker &&
+        typeof this.customRangePicker.destroy === 'function'
+      ) {
         try {
           this.customRangePicker.destroy();
         } catch (_) {
@@ -478,9 +3696,7 @@
         onChange: (selectedDates) => {
           if (!Array.isArray(selectedDates) || selectedDates.length < 1) return;
           const startIso = this.toIsoDate(selectedDates[0]);
-          const endIso = this.toIsoDate(
-            selectedDates[1] || selectedDates[0],
-          );
+          const endIso = this.toIsoDate(selectedDates[1] || selectedDates[0]);
           if (!startIso || !endIso) return;
           startInput.value = startIso;
           endInput.value = endIso;
@@ -488,7 +3704,9 @@
         },
       });
 
-      this.customRangePicker = Array.isArray(instances) ? instances[0] : instances;
+      this.customRangePicker = Array.isArray(instances)
+        ? instances[0]
+        : instances;
 
       trigger.onclick = (event) => {
         event.preventDefault();
@@ -538,7 +3756,10 @@
         end_date: endDate,
       };
       try {
-        window.localStorage.setItem(LOCAL_GOAL_CUSTOM_KEY, JSON.stringify(payload));
+        window.localStorage.setItem(
+          LOCAL_GOAL_CUSTOM_KEY,
+          JSON.stringify(payload),
+        );
       } catch (_) {
         // ignore local storage failures
       }
@@ -556,8 +3777,10 @@
         const aId = toNumber(a?.id);
         const bId = toNumber(b?.id);
         return (
-          (Number.isFinite(bStart) ? bStart : 0) - (Number.isFinite(aStart) ? aStart : 0) ||
-          (Number.isFinite(bCreated) ? bCreated : 0) - (Number.isFinite(aCreated) ? aCreated : 0) ||
+          (Number.isFinite(bStart) ? bStart : 0) -
+            (Number.isFinite(aStart) ? aStart : 0) ||
+          (Number.isFinite(bCreated) ? bCreated : 0) -
+            (Number.isFinite(aCreated) ? aCreated : 0) ||
           bId - aId
         );
       });
@@ -622,7 +3845,7 @@
                 ? 'QUARTERLY'
                 : saveBtn.id.includes('yearly')
                   ? 'YEARLY'
-              : 'CUSTOM';
+                  : 'CUSTOM';
 
         await this.save(period);
       });
@@ -817,7 +4040,11 @@
       const tomorrowStart = getRangeEnd(now);
       const weekStart = getWeekStart(now);
       const monthStart = getMonthStart(now);
-      const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      const quarterStart = new Date(
+        now.getFullYear(),
+        Math.floor(now.getMonth() / 3) * 3,
+        1,
+      );
       const yearStart = new Date(now.getFullYear(), 0, 1);
       const customConfig = this.getCustomConfig();
       const customStart = getRangeStart(new Date(customConfig.start_date));
@@ -855,7 +4082,8 @@
         MONTHLY: monthlySnapshot.salesAmount + monthlySnapshot.logbookAmount,
       };
       const extraMetrics = {
-        QUARTERLY: quarterlySnapshot.salesAmount + quarterlySnapshot.logbookAmount,
+        QUARTERLY:
+          quarterlySnapshot.salesAmount + quarterlySnapshot.logbookAmount,
         YEARLY: yearlySnapshot.salesAmount + yearlySnapshot.logbookAmount,
         CUSTOM: customSnapshot.salesAmount + customSnapshot.logbookAmount,
       };
@@ -904,7 +4132,8 @@
       ['QUARTERLY', 'YEARLY', 'CUSTOM'].forEach((period) => {
         const target = toNumber(extraTargetMap[period]);
         const actual = toNumber(extraMetrics[period]);
-        const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0;
+        const pct =
+          target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0;
         const lower = period.toLowerCase();
         const amountEl = document.getElementById(`goal-${lower}-amount`);
         const barEl = document.getElementById(`goal-${lower}-progress`);
@@ -924,7 +4153,9 @@
             const endText = customEnd.toLocaleDateString('en-US', dateOpt);
             const diffDays = Math.max(
               1,
-              Math.round((customEnd.getTime() - customStart.getTime()) / 86400000) + 1,
+              Math.round(
+                (customEnd.getTime() - customStart.getTime()) / 86400000,
+              ) + 1,
             );
             windowEl.textContent = `${diffDays} DAYS | ${startText} -> ${endText} | ${pct}% OF TARGET`;
           }
@@ -936,15 +4167,25 @@
       });
 
       const customInput = document.getElementById('goal-custom-input');
-      const customStartInput = document.getElementById('goal-custom-start-input');
+      const customStartInput = document.getElementById(
+        'goal-custom-start-input',
+      );
       const customEndInput = document.getElementById('goal-custom-end-input');
       if (customInput && !customInput.value) {
         customInput.value = String(customConfig.target_amount);
       }
-      if (customStartInput) customStartInput.value = String(customConfig.start_date || '');
-      if (customEndInput) customEndInput.value = String(customConfig.end_date || '');
-      this.syncCustomRangeDisplay(customConfig.start_date, customConfig.end_date);
-      if (this.customRangePicker && typeof this.customRangePicker.setDate === 'function') {
+      if (customStartInput)
+        customStartInput.value = String(customConfig.start_date || '');
+      if (customEndInput)
+        customEndInput.value = String(customConfig.end_date || '');
+      this.syncCustomRangeDisplay(
+        customConfig.start_date,
+        customConfig.end_date,
+      );
+      if (
+        this.customRangePicker &&
+        typeof this.customRangePicker.setDate === 'function'
+      ) {
         this.customRangePicker.setDate(
           [customConfig.start_date, customConfig.end_date],
           false,
@@ -1364,7 +4605,9 @@
 
           const toggleBtn = event.target.closest('[data-feedback-toggle-id]');
           if (toggleBtn) {
-            const id = String(toggleBtn.getAttribute('data-feedback-toggle-id') || '');
+            const id = String(
+              toggleBtn.getAttribute('data-feedback-toggle-id') || '',
+            );
             if (!id) return;
             if (this.expandedEntryIds.has(id)) this.expandedEntryIds.delete(id);
             else this.expandedEntryIds.add(id);
@@ -1372,7 +4615,9 @@
             return;
           }
 
-          const removeTagBtn = event.target.closest('[data-feedback-tag-remove]');
+          const removeTagBtn = event.target.closest(
+            '[data-feedback-tag-remove]',
+          );
           if (removeTagBtn) {
             this.removeComposeTag(
               removeTagBtn.getAttribute('data-feedback-tag-remove'),
@@ -1434,11 +4679,15 @@
         });
 
         root.addEventListener('keydown', (event) => {
-          const summary = event.target.closest('.feedback-row-summary[data-feedback-toggle-id]');
+          const summary = event.target.closest(
+            '.feedback-row-summary[data-feedback-toggle-id]',
+          );
           if (!summary) return;
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
-          const id = String(summary.getAttribute('data-feedback-toggle-id') || '');
+          const id = String(
+            summary.getAttribute('data-feedback-toggle-id') || '',
+          );
           if (!id) return;
           if (this.expandedEntryIds.has(id)) this.expandedEntryIds.delete(id);
           else this.expandedEntryIds.add(id);
@@ -1519,13 +4768,15 @@
 
       const listHtml = visibleEntries.length
         ? (() => {
-          const unreadEntries = visibleEntries.filter((entry) => !entry.is_read);
-          const readEntries = visibleEntries.filter((entry) => entry.is_read);
-          return `
+            const unreadEntries = visibleEntries.filter(
+              (entry) => !entry.is_read,
+            );
+            const readEntries = visibleEntries.filter((entry) => entry.is_read);
+            return `
             ${this.renderFeedbackSection('Unread', unreadEntries, 'is-unread')}
             ${this.renderFeedbackSection('Read', readEntries, 'is-read')}
           `;
-        })()
+          })()
         : `
           <div class="feedback-empty-state">
             <div class="feedback-empty-hero" aria-hidden="true">
@@ -1617,7 +4868,9 @@
     },
 
     getFeedbackPreview(message) {
-      const value = String(message || '').trim().replace(/\s+/g, ' ');
+      const value = String(message || '')
+        .trim()
+        .replace(/\s+/g, ' ');
       if (!value) return 'No feedback details';
       if (value.length <= 54) return value;
       return `${value.slice(0, 51)}...`;
@@ -1943,16 +5196,21 @@
 
     refreshComposeUi() {
       if (!this.composeOpen) return;
-      const optionsEl = document.querySelector('#feedback-page .feedback-compose-options');
+      const optionsEl = document.querySelector(
+        '#feedback-page .feedback-compose-options',
+      );
       if (optionsEl) optionsEl.innerHTML = this.getComposeOptionsHtml();
 
-      const chipsEl = document.querySelector('#feedback-page .feedback-compose-chip-row');
+      const chipsEl = document.querySelector(
+        '#feedback-page .feedback-compose-chip-row',
+      );
       if (chipsEl) chipsEl.innerHTML = this.getComposeChipsHtml();
 
-      const countEl = document.querySelector('#feedback-page .feedback-compose-count');
+      const countEl = document.querySelector(
+        '#feedback-page .feedback-compose-count',
+      );
       if (countEl) countEl.textContent = this.getComposeCountLabel();
     },
-
 
     normalizeTagValue(value) {
       return String(value || '')
@@ -2001,7 +5259,9 @@
           .order('name', { ascending: true })
           .limit(500);
         appendOptions(fallback.data, (row) => {
-          const code = String(row.sku || '').trim().toUpperCase();
+          const code = String(row.sku || '')
+            .trim()
+            .toUpperCase();
           const title = String(row.name || code || 'UNKNOWN PRODUCT').trim();
           return {
             value: code || title,
@@ -2014,7 +5274,9 @@
         });
       } else {
         appendOptions(productsResult.data, (row) => {
-          const code = String(row.sku || '').trim().toUpperCase();
+          const code = String(row.sku || '')
+            .trim()
+            .toUpperCase();
           const title = String(row.name || code || 'UNKNOWN PRODUCT').trim();
           const brand = String(row.brand || '').trim();
           return {
@@ -2043,7 +5305,9 @@
           .limit(500);
         appendOptions(fallback.data, (row) => {
           const code = String(row.member_code || row.sku || '').trim();
-          const title = String(row.full_name || code || 'UNKNOWN MEMBER').trim();
+          const title = String(
+            row.full_name || code || 'UNKNOWN MEMBER',
+          ).trim();
           return {
             value: code || title,
             title,
@@ -2056,7 +5320,9 @@
       } else {
         appendOptions(membersResult.data, (row) => {
           const code = String(row.member_code || row.sku || '').trim();
-          const title = String(row.full_name || code || 'UNKNOWN MEMBER').trim();
+          const title = String(
+            row.full_name || code || 'UNKNOWN MEMBER',
+          ).trim();
           const membershipPlan = String(row.membership_plan || '').trim();
           return {
             value: code || title,
@@ -2075,7 +5341,10 @@
         .eq('is_active', true)
         .order('name', { ascending: true })
         .limit(500);
-      if (equipmentsResult.error && isMissingColumnError(equipmentsResult.error)) {
+      if (
+        equipmentsResult.error &&
+        isMissingColumnError(equipmentsResult.error)
+      ) {
         const fallback = await client
           .from('equipments')
           .select('id,equipment_code,name')
@@ -2327,7 +5596,10 @@
         return;
       }
       if (entry.is_read) {
-        notify('Read entries are locked and cannot be deleted manually.', 'warning');
+        notify(
+          'Read entries are locked and cannot be deleted manually.',
+          'warning',
+        );
         return;
       }
       if (!window.Swal) return;
@@ -2353,7 +5625,10 @@
         return;
       }
 
-      let response = await client.from('feedback_entries').delete().eq('id', entry.id);
+      let response = await client
+        .from('feedback_entries')
+        .delete()
+        .eq('id', entry.id);
       if (response.error && isMissingColumnError(response.error)) {
         response = await client
           .from('feedback_entries')
@@ -2909,7 +6184,8 @@
           }
 
           if (event.target.closest('#settings-logout-btn')) {
-            if (typeof window.handleLogout === 'function') window.handleLogout();
+            if (typeof window.handleLogout === 'function')
+              window.handleLogout();
             return;
           }
 
@@ -2933,7 +6209,9 @@
             return;
           }
 
-          const editUserBtn = event.target.closest('[data-settings-user-edit-id]');
+          const editUserBtn = event.target.closest(
+            '[data-settings-user-edit-id]',
+          );
           if (editUserBtn) {
             const userId = String(
               editUserBtn.getAttribute('data-settings-user-edit-id') || '',
@@ -2946,7 +6224,9 @@
             return;
           }
 
-          const deleteUserBtn = event.target.closest('[data-settings-user-delete-id]');
+          const deleteUserBtn = event.target.closest(
+            '[data-settings-user-delete-id]',
+          );
           if (deleteUserBtn) {
             const userId = String(
               deleteUserBtn.getAttribute('data-settings-user-delete-id') || '',
@@ -3026,7 +6306,8 @@
       const displayInput = document.getElementById('settings-display-name');
 
       let email = this.access.email || '';
-      let displayName = window.localStorage.getItem(SETTINGS_DISPLAY_NAME_KEY) || '';
+      let displayName =
+        window.localStorage.getItem(SETTINGS_DISPLAY_NAME_KEY) || '';
 
       if (client) {
         const { data } = await client.auth.getUser();
@@ -3055,15 +6336,18 @@
             ? 'STAFF'
             : 'UNAUTHORIZED';
 
-      if (profileNameEl) profileNameEl.textContent = String(displayName).toUpperCase();
+      if (profileNameEl)
+        profileNameEl.textContent = String(displayName).toUpperCase();
       if (profileRoleEl) profileRoleEl.textContent = roleText;
       if (profileEmailEl) profileEmailEl.textContent = email || 'N/A';
       if (displayInput) displayInput.value = displayName;
-      if (email) window.localStorage.setItem(SETTINGS_DISPLAY_NAME_KEY, displayName);
+      if (email)
+        window.localStorage.setItem(SETTINGS_DISPLAY_NAME_KEY, displayName);
 
       const sidebarName = document.querySelector('#wolfSidebar .user-name');
       const sidebarEmail = document.querySelector('#wolfSidebar .user-email');
-      if (sidebarName) sidebarName.textContent = String(displayName).toUpperCase();
+      if (sidebarName)
+        sidebarName.textContent = String(displayName).toUpperCase();
       if (sidebarEmail && email) sidebarEmail.textContent = email;
     },
 
@@ -3072,11 +6356,21 @@
       const root = document.querySelector('.settings-wrapper');
       const tabs = document.getElementById('settings-tabs');
       const usersTabBtn = document.querySelector('[data-settings-tab="users"]');
-      const usersPanel = document.querySelector('[data-settings-tab-panel="users"]');
-      const maintenanceCard = document.getElementById('settings-maintenance-card');
-      const superadminNote = document.getElementById('settings-superadmin-note');
-      const usersPermission = document.getElementById('settings-users-permission');
-      const adminLimitNote = document.getElementById('settings-admin-limit-note');
+      const usersPanel = document.querySelector(
+        '[data-settings-tab-panel="users"]',
+      );
+      const maintenanceCard = document.getElementById(
+        'settings-maintenance-card',
+      );
+      const superadminNote = document.getElementById(
+        'settings-superadmin-note',
+      );
+      const usersPermission = document.getElementById(
+        'settings-users-permission',
+      );
+      const adminLimitNote = document.getElementById(
+        'settings-admin-limit-note',
+      );
 
       if (!this.access.isAdmin) {
         if (root) root.classList.add('settings-single-column');
@@ -3105,8 +6399,7 @@
           : `Only superadmin (${SUPERADMIN_EMAIL}) can create, edit, or delete accounts.`;
       }
       if (adminLimitNote) {
-        adminLimitNote.textContent =
-          `ADMIN LIMIT: UP TO ${this.maxAdmins} ADMIN ACCOUNTS ONLY (INCLUDING SUPERADMIN).`;
+        adminLimitNote.textContent = `ADMIN LIMIT: UP TO ${this.maxAdmins} ADMIN ACCOUNTS ONLY (INCLUDING SUPERADMIN).`;
       }
     },
 
@@ -3118,11 +6411,14 @@
         button.classList.toggle('is-active', isActive);
       });
 
-      document.querySelectorAll('[data-settings-tab-panel]').forEach((panel) => {
-        const isActive =
-          String(panel.getAttribute('data-settings-tab-panel') || '') === normalized;
-        panel.classList.toggle('is-active', isActive);
-      });
+      document
+        .querySelectorAll('[data-settings-tab-panel]')
+        .forEach((panel) => {
+          const isActive =
+            String(panel.getAttribute('data-settings-tab-panel') || '') ===
+            normalized;
+          panel.classList.toggle('is-active', isActive);
+        });
     },
 
     setCreateControlsEnabled(enabled) {
@@ -3180,7 +6476,10 @@
       const normalized = Math.min(150, Math.max(50, toNumber(percent) || 100));
       const scale = normalized / 100;
       document.documentElement.style.fontSize = `${(16 * scale).toFixed(2)}px`;
-      document.documentElement.style.setProperty('--wolf-ui-scale-factor', String(scale));
+      document.documentElement.style.setProperty(
+        '--wolf-ui-scale-factor',
+        String(scale),
+      );
       const valueLabel = document.getElementById('settings-ui-scale-value');
       if (valueLabel) valueLabel.textContent = `${normalized}%`;
       return normalized;
@@ -3189,8 +6488,7 @@
     async resetToDefaults() {
       const proceed = await confirmAction({
         title: 'Reset settings to defaults?',
-        text:
-          'This will reset action sounds, victory visuals, and interface scale to default values.',
+        text: 'This will reset action sounds, victory visuals, and interface scale to default values.',
         confirmButtonText: 'Reset',
         cancelButtonText: 'Cancel',
         icon: 'warning',
@@ -3357,10 +6655,12 @@
           : [];
         this.currentAdmins = toNumber(payload?.limits?.currentAdmins);
         this.maxAdmins = Math.max(1, toNumber(payload?.limits?.maxAdmins) || 3);
-        this.canCreateAccounts = Boolean(payload?.permissions?.canCreateAccounts);
+        this.canCreateAccounts = Boolean(
+          payload?.permissions?.canCreateAccounts,
+        );
         this.canManageAccounts = Boolean(
           payload?.permissions?.canManageAccounts ??
-            payload?.permissions?.canCreateAccounts,
+          payload?.permissions?.canCreateAccounts,
         );
         this.updateAdminCountChip();
         this.setCreateControlsEnabled(this.canCreateAccounts);
@@ -3410,7 +6710,9 @@
           password,
         });
 
-        const usedDefaultPassword = Boolean(payload?.defaults?.usedDefaultPassword);
+        const usedDefaultPassword = Boolean(
+          payload?.defaults?.usedDefaultPassword,
+        );
         notify(
           usedDefaultPassword
             ? 'Account created with default password 12345.'
@@ -3469,7 +6771,8 @@
           cancelButtonText: 'Cancel',
           preConfirm: () => {
             const displayNameValue = String(
-              document.getElementById('settings-edit-display-name')?.value || '',
+              document.getElementById('settings-edit-display-name')?.value ||
+                '',
             ).trim();
             const roleValue = String(
               document.getElementById('settings-edit-role')?.value || '',
@@ -3493,7 +6796,9 @@
 
         if (!result.isConfirmed || !result.value) return;
         nextDisplayName = String(result.value.displayName || '').trim();
-        nextRole = String(result.value.role || '').trim().toLowerCase();
+        nextRole = String(result.value.role || '')
+          .trim()
+          .toLowerCase();
         nextPassword = String(result.value.password || '').trim();
       } else {
         const rolePrompt = window.prompt(
@@ -3501,7 +6806,9 @@
           nextRole,
         );
         if (rolePrompt === null) return;
-        nextRole = String(rolePrompt || '').trim().toLowerCase();
+        nextRole = String(rolePrompt || '')
+          .trim()
+          .toLowerCase();
         if (nextRole !== 'admin' && nextRole !== 'staff') {
           notify('Role must be admin or staff.', 'warning');
           return;
@@ -3704,6 +7011,3 @@
     },
   };
 })();
-
-
-

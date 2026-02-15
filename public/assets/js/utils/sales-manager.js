@@ -29,6 +29,8 @@
 
 window.salesManager = {
   allProducts: [],
+  _trashModalOpening: false,
+  _trashCloseTimer: null,
   selectedProductId: null,
   placeholderImg: '/assets/images/placeholder.png',
   getAccessContext() {
@@ -1032,39 +1034,81 @@ window.salesManager = {
   // SECTION: CONTEXTUAL TRASH BIN (FIXED FILTER)
   // ==========================================
 
-  async openTrashBin() {
-    // Uses the mode set by loadSales or loadLogbook
-    const mode = this.currentTrashMode || 'sales';
+  async openTrashBin(requestedMode = null) {
+    if (this._trashModalOpening) return;
+    this._trashModalOpening = true;
+    const mode = String(
+      requestedMode || window.wolfData?.activeMode || this.currentTrashMode || 'sales',
+    )
+      .trim()
+      .toLowerCase() === 'logbook'
+      ? 'logbook'
+      : 'sales';
+    this.currentTrashMode = mode;
     const COMPONENT_PATH = '/assets/components/trash-modal.html';
 
-    if (!document.getElementById('sales-trash-overlay')) {
-      const res = await fetch(COMPONENT_PATH);
-      const html = await res.text();
-      document.body.insertAdjacentHTML('beforeend', html);
+    let overlay = document.getElementById('sales-trash-overlay');
+    const hasRequiredNodes =
+      overlay &&
+      overlay.querySelector('.terminal-title') &&
+      overlay.querySelector('#closeTrashModal') &&
+      overlay.querySelector('#closeTrashBtn') &&
+      overlay.querySelector('#trash-list-container');
+
+    if (overlay && !hasRequiredNodes) {
+      overlay.remove();
+      overlay = null;
     }
 
-    // Ensure DOM is ready
-    await new Promise((r) => setTimeout(r, 50));
+    try {
+      if (!overlay) {
+        const res = await fetch(COMPONENT_PATH);
+        const html = await res.text();
+        document.body.insertAdjacentHTML('beforeend', html);
+        overlay = document.getElementById('sales-trash-overlay');
+      }
 
-    const overlay = document.getElementById('sales-trash-overlay');
-    if (!overlay) return;
+      // Ensure DOM is ready
+      await new Promise((r) => setTimeout(r, 50));
 
-    // FIX: Define titleHeader properly to avoid ReferenceError
-    const titleHeader = overlay.querySelector('.terminal-title');
-    if (titleHeader) {
-      const label = mode === 'sales' ? 'SALES' : 'LOGBOOK';
-      titleHeader.innerHTML = `${label} <span>TRASH BIN</span>`;
+      overlay = document.getElementById('sales-trash-overlay');
+      if (!overlay) return;
+      const container = overlay.querySelector('.master-terminal-container');
+      if (!container) return;
+
+      if (this._trashCloseTimer) {
+        clearTimeout(this._trashCloseTimer);
+        this._trashCloseTimer = null;
+      }
+
+      // Reset stale close/hidden state before showing again.
+      overlay.classList.remove('closing');
+      overlay.style.opacity = '1';
+      overlay.style.visibility = 'visible';
+      overlay.style.pointerEvents = 'auto';
+      overlay.style.display = 'flex';
+
+      // Restart intro animation for container.
+      container.style.animation = 'none';
+      void container.offsetWidth;
+      container.style.animation = '';
+
+      const titleHeader = overlay.querySelector('.terminal-title');
+      if (titleHeader) {
+        const label = mode === 'sales' ? 'SALES' : 'LOGBOOK';
+        titleHeader.innerHTML = `${label} <span>TRASH BIN</span>`;
+      }
+
+      const closeModalBtn = document.getElementById('closeTrashModal');
+      const closeTrashBtn = document.getElementById('closeTrashBtn');
+      if (closeModalBtn) closeModalBtn.onclick = () => this.closeTrash();
+      if (closeTrashBtn) closeTrashBtn.onclick = () => this.closeTrash();
+
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+      await this.loadTrashItems(mode);
+    } finally {
+      this._trashModalOpening = false;
     }
-
-    // Attach Listeners
-    document.getElementById('closeTrashModal').onclick = () =>
-      this.closeTrash();
-    document.getElementById('closeTrashBtn').onclick = () => this.closeTrash();
-
-    overlay.style.display = 'flex';
-    if (window.wolfAudio) window.wolfAudio.play('notif');
-
-    this.loadTrashItems(mode);
   },
 
   closeTrash() {
@@ -1075,9 +1119,11 @@ window.salesManager = {
     overlay.classList.add('closing');
 
     // 2. Wait for animation (300ms) then physically hide
-    setTimeout(() => {
+    if (this._trashCloseTimer) clearTimeout(this._trashCloseTimer);
+    this._trashCloseTimer = setTimeout(() => {
       overlay.style.display = 'none';
       overlay.classList.remove('closing');
+      this._trashCloseTimer = null;
     }, 300);
   },
 
@@ -1387,9 +1433,3 @@ window.salesManager = {
   },
 };
 
-// --- GLOBAL TRIGGER ---
-document.addEventListener('click', (e) => {
-  if (e.target.closest('#clear-sales-btn')) {
-    window.salesManager.openTrashBin();
-  }
-});

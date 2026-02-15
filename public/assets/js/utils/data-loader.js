@@ -1,7 +1,5 @@
 ﻿// Add this to your wolfData or a global utility
 async function moveToTrash(tableName, id, data) {
-  console.log(`Wolf OS: Moving ${id} from ${tableName} to Trash...`);
-
   const { error } = await supabaseClient.from('trash_bin').insert([
     {
       original_table: tableName,
@@ -28,6 +26,25 @@ const wolfData = {
   activeAF: null, // store active auto-filter
   lastTraffic: 0,
   summaryHUDReady: false,
+  searchLayoutBound: false,
+  imageZoomBound: false,
+  imageZoomOverlay: null,
+  imageZoomStyleEl: null,
+  imageZoomState: {
+    scale: 1,
+    rotation: 0,
+  },
+  salesFilterMode: 'all',
+  salesSortMode: 'latest',
+  salesMinAmount: 0,
+  salesInsights: {
+    mostSoldName: 'NO SALES YET',
+    mostSoldQty: 0,
+    mostSoldAmount: 0,
+    mostSoldImage: '/assets/images/placeholder.png',
+    previousTotal: 0,
+  },
+  searchToggleBound: false,
   currencySymbol: '₱',
   defaultWalkInFee: 80,
   goalTargets: {
@@ -89,11 +106,16 @@ const wolfData = {
   targetCinematicHideTimer: null,
   targetCinematicStartTimer: null,
   targetCinematicAF: null,
+  targetConfettiTimer: null,
+  targetConfettiLibPromise: null,
   formatCurrency(value = 0) {
-    return `${this.currencySymbol}${Number(value || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${this.currencySymbol}${Number(value || 0).toLocaleString(
+      undefined,
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      },
+    )}`;
   },
   getLocalGoalTargetMap() {
     const map = {};
@@ -123,8 +145,12 @@ const wolfData = {
       const raw = localStorage.getItem('wolf_local_goal_custom_config');
       const parsed = raw ? JSON.parse(raw) : {};
       const targetAmount = Number(parsed?.target_amount || 0);
-      const startDate = String(parsed?.start_date || start.toISOString().slice(0, 10));
-      const endDate = String(parsed?.end_date || end.toISOString().slice(0, 10));
+      const startDate = String(
+        parsed?.start_date || start.toISOString().slice(0, 10),
+      );
+      const endDate = String(
+        parsed?.end_date || end.toISOString().slice(0, 10),
+      );
       return {
         target_amount: targetAmount > 0 ? targetAmount : 50000,
         start_date: startDate,
@@ -136,6 +162,338 @@ const wolfData = {
         start_date: start.toISOString().slice(0, 10),
         end_date: end.toISOString().slice(0, 10),
       };
+    }
+  },
+  applySalesInsightCards() {
+    const mostSoldNameEl = document.getElementById('ledger-most-sold-name');
+    const mostSoldMetaEl = document.getElementById('ledger-most-sold-meta');
+    const mostSoldImageEl = document.getElementById('ledger-most-sold-image');
+    const prevDayEl = document.getElementById('ledger-prevday-amount');
+    const prevTrendEl = document.getElementById('ledger-prevday-trend');
+    if (mostSoldNameEl) {
+      mostSoldNameEl.textContent = String(
+        this.salesInsights?.mostSoldName || 'NO SALES YET',
+      )
+        .trim()
+        .toUpperCase();
+    }
+    if (mostSoldMetaEl) {
+      const qty = Number(this.salesInsights?.mostSoldQty || 0);
+      const amount = Number(this.salesInsights?.mostSoldAmount || 0);
+      mostSoldMetaEl.textContent = `Units: ${Math.max(0, Math.round(qty))} | ${this.formatCurrency(amount)}`;
+    }
+    if (mostSoldImageEl) {
+      const imageSrc = String(
+        this.salesInsights?.mostSoldImage || '/assets/images/placeholder.png',
+      ).trim();
+      mostSoldImageEl.src = imageSrc || '/assets/images/placeholder.png';
+    }
+    this.refreshZoomableImages();
+    const previousTotal = Number(this.salesInsights?.previousTotal || 0);
+    if (prevDayEl) {
+      prevDayEl.textContent = this.formatCurrency(previousTotal);
+    }
+    if (prevTrendEl) {
+      prevTrendEl.className = 'insight-trend up';
+      prevTrendEl.innerHTML =
+        '<i class="bx bx-up-arrow-alt"></i><span>Yesterday</span>';
+    }
+  },
+  refreshMostSoldToday(rows = []) {
+    const baseRows = Array.isArray(rows) ? rows : [];
+    const soldMap = new Map();
+    baseRows.forEach((row) => {
+      const qtyRaw = Number(row?.qty);
+      const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+      const productName = String(
+        row?.products?.name || row?.product_name || 'Unknown Product',
+      );
+      const sku = String(row?.products?.sku || row?.sku || '');
+      const key = String(row?.product_id || `${productName}::${sku}`).trim();
+      const prev = soldMap.get(key) || {
+        name: productName,
+        qty: 0,
+        amount: 0,
+        image: String(
+          row?.products?.image_url ||
+            row?.image_url ||
+            '/assets/images/placeholder.png',
+        ),
+      };
+      const amountRaw = Number(row?.total_amount || 0);
+      const unitPrice = Number(row?.unit_price || 0);
+      const amount = amountRaw > 0 ? amountRaw : unitPrice * qty;
+      prev.qty += qty;
+      prev.amount += amount;
+      soldMap.set(key, prev);
+    });
+
+    const mostSold =
+      Array.from(soldMap.values()).sort((a, b) => {
+        if (b.qty !== a.qty) return b.qty - a.qty;
+        return b.amount - a.amount;
+      })[0] || null;
+
+    this.salesInsights.mostSoldName = mostSold?.name || 'NO SALES YET';
+    this.salesInsights.mostSoldQty = Number(mostSold?.qty || 0);
+    this.salesInsights.mostSoldAmount = Number(mostSold?.amount || 0);
+    this.salesInsights.mostSoldImage = String(
+      mostSold?.image || '/assets/images/placeholder.png',
+    );
+    this.applySalesInsightCards();
+  },
+  ensureImageZoomStyles() {
+    if (
+      this.imageZoomStyleEl &&
+      document.head.contains(this.imageZoomStyleEl)
+    ) {
+      return this.imageZoomStyleEl;
+    }
+    let style = document.getElementById('wolf-universal-image-zoom-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'wolf-universal-image-zoom-style';
+      style.textContent = `
+        img.zoomable-image{cursor:zoom-in}
+        .wolf-image-zoom-overlay{position:fixed;inset:0;z-index:12000;display:grid;grid-template-rows:1fr auto;align-items:center;justify-items:center;background:rgba(6,10,16,.78);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s ease}
+        .wolf-image-zoom-overlay.active{opacity:1;pointer-events:auto}
+        .wolf-image-zoom-stage{width:min(92vw,760px);height:min(70vh,620px);display:flex;align-items:center;justify-content:center;padding:16px}
+        .wolf-image-zoom-target{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;background:#fff;box-shadow:0 24px 42px rgba(0,0,0,.45);user-select:none;-webkit-user-drag:none;transition:transform .2s ease}
+        .wolf-image-zoom-controls{margin-bottom:18px;display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(36,44,56,.92);box-shadow:0 12px 24px rgba(0,0,0,.32)}
+        .wolf-image-zoom-controls button{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#f1f5ff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s ease,border-color .15s ease}
+        .wolf-image-zoom-controls button:hover{transform:translateY(-1px);border-color:rgba(var(--wolf-red-rgb,255,74,58),.55)}
+        body.image-zoom-open{overflow:hidden}
+      `;
+      document.head.appendChild(style);
+    }
+    this.imageZoomStyleEl = style;
+    return style;
+  },
+  ensureImageZoomOverlay() {
+    this.ensureImageZoomStyles();
+    if (
+      this.imageZoomOverlay &&
+      document.body.contains(this.imageZoomOverlay)
+    ) {
+      return this.imageZoomOverlay;
+    }
+    let overlay = document.getElementById('wolf-image-zoom-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'wolf-image-zoom-overlay';
+      overlay.className = 'wolf-image-zoom-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.hidden = true;
+      overlay.style.display = 'none';
+      overlay.innerHTML = `
+        <div class="wolf-image-zoom-stage">
+          <img id="wolf-image-zoom-target" class="wolf-image-zoom-target" src="" alt="Zoomed image preview" />
+        </div>
+        <div class="wolf-image-zoom-controls" role="toolbar" aria-label="Image controls">
+          <button type="button" data-action="zoom-out" title="Zoom Out"><i class='bx bx-zoom-out'></i></button>
+          <button type="button" data-action="zoom-in" title="Zoom In"><i class='bx bx-zoom-in'></i></button>
+          <button type="button" data-action="fit" title="Fit to Screen"><i class='bx bx-fullscreen'></i></button>
+          <button type="button" data-action="rotate-left" title="Rotate Left"><i class='bx bx-undo'></i></button>
+          <button type="button" data-action="rotate-right" title="Rotate Right"><i class='bx bx-redo'></i></button>
+          <button type="button" data-action="close" title="Close"><i class='bx bx-x'></i></button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+    this.imageZoomOverlay = overlay;
+    return overlay;
+  },
+  refreshZoomableImages() {
+    document
+      .querySelectorAll(
+        'img:not([data-no-zoom="true"]):not(#wolf-image-zoom-target)',
+      )
+      .forEach((img) => img.classList.add('zoomable-image'));
+  },
+  applyImageZoomTransform() {
+    const overlay = this.ensureImageZoomOverlay();
+    const target = overlay.querySelector('#wolf-image-zoom-target');
+    if (!target) return;
+    target.style.transform = `scale(${this.imageZoomState.scale}) rotate(${this.imageZoomState.rotation}deg)`;
+  },
+  handleImageZoomAction(action) {
+    if (!action) return;
+    if (action === 'close') {
+      this.closeImageZoom();
+      return;
+    }
+    if (action === 'zoom-in') {
+      this.imageZoomState.scale = Math.min(4, this.imageZoomState.scale + 0.2);
+    } else if (action === 'zoom-out') {
+      this.imageZoomState.scale = Math.max(
+        0.4,
+        this.imageZoomState.scale - 0.2,
+      );
+    } else if (action === 'fit') {
+      this.imageZoomState.scale = 1;
+      this.imageZoomState.rotation = 0;
+    } else if (action === 'rotate-left') {
+      this.imageZoomState.rotation -= 90;
+    } else if (action === 'rotate-right') {
+      this.imageZoomState.rotation += 90;
+    }
+    this.applyImageZoomTransform();
+  },
+  closeImageZoom() {
+    const overlay = this.ensureImageZoomOverlay();
+    const target = overlay.querySelector('#wolf-image-zoom-target');
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.hidden = true;
+    overlay.style.display = 'none';
+    document.body.classList.remove('image-zoom-open');
+    if (target) {
+      target.removeAttribute('src');
+      target.alt = 'Zoomed image preview';
+      target.style.transform = '';
+    }
+  },
+  openImageZoom(src, alt = 'Image preview') {
+    const imageSrc = String(src || '').trim();
+    if (!imageSrc) return;
+    const overlay = this.ensureImageZoomOverlay();
+    const target = overlay.querySelector('#wolf-image-zoom-target');
+    if (!target) return;
+    target.src = imageSrc;
+    target.alt = String(alt || 'Image preview');
+    this.imageZoomState.scale = 1;
+    this.imageZoomState.rotation = 0;
+    this.applyImageZoomTransform();
+    overlay.hidden = false;
+    overlay.style.display = 'grid';
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('image-zoom-open');
+  },
+  bindImageZoom() {
+    if (this.imageZoomBound) return;
+    this.imageZoomBound = true;
+    this.ensureImageZoomOverlay();
+    this.refreshZoomableImages();
+
+    window.wolfImageViewer = {
+      open: (src, alt) => this.openImageZoom(src, alt),
+      close: () => this.closeImageZoom(),
+      refresh: () => this.refreshZoomableImages(),
+      action: (action) => this.handleImageZoomAction(action),
+    };
+
+    document.addEventListener('click', (e) => {
+      const overlay = document.getElementById('wolf-image-zoom-overlay');
+      const actionBtn = e.target.closest(
+        '#wolf-image-zoom-overlay button[data-action]',
+      );
+      if (actionBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.handleImageZoomAction(actionBtn.getAttribute('data-action'));
+        return;
+      }
+
+      if (overlay && e.target === overlay) {
+        this.closeImageZoom();
+        return;
+      }
+      if (e.target && e.target.id === 'wolf-image-zoom-target') {
+        this.closeImageZoom();
+        return;
+      }
+      if (e.target.closest('#wolf-image-zoom-overlay')) return;
+
+      const img = e.target.closest('img');
+      if (!img) return;
+      if (img.id === 'wolf-image-zoom-target') return;
+      if (img.getAttribute('data-no-zoom') === 'true') return;
+      const src = String(img.currentSrc || img.src || '').trim();
+      if (!src) return;
+      img.classList.add('zoomable-image');
+      this.openImageZoom(src, img.alt || 'Image preview');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeImageZoom();
+    });
+  },
+  syncLedgerSearchLayoutState() {
+    const searchContainer = document.getElementById('ledger-search-container');
+    const toggleBtn = document.getElementById('toggle-search-btn');
+    if (!searchContainer) return;
+    const forceOpenDesktop =
+      this.activeMode === 'sales' &&
+      window.matchMedia('(min-width: 1100px)').matches;
+    if (forceOpenDesktop) {
+      searchContainer.classList.add('active');
+      if (toggleBtn) toggleBtn.classList.add('active');
+      return;
+    }
+    if (toggleBtn) {
+      toggleBtn.classList.toggle(
+        'active',
+        searchContainer.classList.contains('active'),
+      );
+    }
+  },
+  toggleLedgerSearch(searchContainer, searchToggle, input, scope) {
+    if (!searchContainer || !searchToggle || !input) return;
+    const forceDesktopOpen =
+      this.activeMode === 'sales' &&
+      window.matchMedia('(min-width: 1100px)').matches;
+
+    if (forceDesktopOpen) {
+      searchContainer.classList.add('active');
+      searchToggle.classList.add('active');
+      setTimeout(() => input.focus(), 120);
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+      return;
+    }
+
+    const willOpen = !searchContainer.classList.contains('active');
+    searchContainer.classList.toggle('active', willOpen);
+    searchToggle.classList.toggle('active', willOpen);
+
+    if (willOpen) {
+      setTimeout(() => input.focus(), 120);
+      if (window.wolfAudio) window.wolfAudio.play('notif');
+      return;
+    }
+
+    const clearBtn = (scope || document).querySelector('#search-clear-btn');
+    if (clearBtn && !input.value.trim()) clearBtn.style.display = 'none';
+  },
+  bindLedgerSearchToggle() {
+    const searchToggle = document.getElementById('toggle-search-btn');
+    const searchContainer = document.getElementById('ledger-search-container');
+    const input = document.getElementById('ledger-main-search');
+    if (!searchToggle || !searchContainer || !input) return;
+    if (searchToggle.dataset.bound === '1') return;
+    searchToggle.dataset.bound = '1';
+    searchToggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleLedgerSearch(searchContainer, searchToggle, input, document);
+    });
+  },
+  syncSalesGuidePlacement() {
+    const guide = document.getElementById('sales-guide-card');
+    const leftRail = document.querySelector('#ledger-page .ledger-left-rail');
+    const ledgerPage = document.getElementById('ledger-page');
+    if (!guide || !leftRail || !ledgerPage) return;
+    const moveToBottom =
+      this.activeMode === 'sales' &&
+      window.matchMedia('(max-width: 1099px)').matches;
+    if (moveToBottom) {
+      if (guide.parentElement !== ledgerPage) {
+        ledgerPage.appendChild(guide);
+      }
+      return;
+    }
+    if (guide.parentElement !== leftRail) {
+      leftRail.appendChild(guide);
     }
   },
   isoDate(value) {
@@ -162,8 +520,6 @@ const wolfData = {
 
   // --- NAVIGATION SYNC ENGINE ---
   syncNavigationUI(currentMode) {
-    console.log(`Wolf OS: Navigation UI Lock engaged for [${currentMode}]`);
-
     // 1. Target both Floating Nav and Sidebar items
     const allNavLinks = document.querySelectorAll(
       '.nav-item[data-page], .sidebar-link[data-page]',
@@ -277,24 +633,22 @@ const wolfData = {
         .limit(200);
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        const latest = data
-          .slice()
-          .sort((a, b) => {
-            const aStart = new Date(a?.start_date || 0).getTime();
-            const bStart = new Date(b?.start_date || 0).getTime();
-            const aUpdated = new Date(
-              a?.updated_at || a?.created_at || 0,
-            ).getTime();
-            const bUpdated = new Date(
-              b?.updated_at || b?.created_at || 0,
-            ).getTime();
-            return (
-              (Number.isFinite(bStart) ? bStart : 0) -
-                (Number.isFinite(aStart) ? aStart : 0) ||
-              (Number.isFinite(bUpdated) ? bUpdated : 0) -
-                (Number.isFinite(aUpdated) ? aUpdated : 0)
-            );
-          })[0];
+        const latest = data.slice().sort((a, b) => {
+          const aStart = new Date(a?.start_date || 0).getTime();
+          const bStart = new Date(b?.start_date || 0).getTime();
+          const aUpdated = new Date(
+            a?.updated_at || a?.created_at || 0,
+          ).getTime();
+          const bUpdated = new Date(
+            b?.updated_at || b?.created_at || 0,
+          ).getTime();
+          return (
+            (Number.isFinite(bStart) ? bStart : 0) -
+              (Number.isFinite(aStart) ? aStart : 0) ||
+            (Number.isFinite(bUpdated) ? bUpdated : 0) -
+              (Number.isFinite(aUpdated) ? aUpdated : 0)
+          );
+        })[0];
         this.goalTargets[period] = Number(latest?.target_amount || 0);
       }
     }
@@ -371,14 +725,21 @@ const wolfData = {
     const sumLogbook = async (startIso, endIso) => {
       const { data, error } = await supabaseClient
         .from('check_in_logs')
-        .select('entry_fee,paid_amount,is_paid,time_in')
+        .select('entry_fee,paid_amount,is_paid,notes,time_in')
         .gte('time_in', startIso)
         .lt('time_in', endIso);
       if (error || !Array.isArray(data)) return 0;
       return data.reduce((sum, row) => {
         const paidAmount = Number(row.paid_amount || 0);
         if (paidAmount > 0) return sum + paidAmount;
-        if (row.is_paid) return sum + Number(row.entry_fee || 0);
+        const rawNotes = String(row.notes || '');
+        const paidMatch = rawNotes.match(/\|PAID:([0-9]+(?:\.[0-9]+)?)/i);
+        const paidFromNotes = paidMatch ? Number(paidMatch[1]) : 0;
+        const isPaidFromNotes = Boolean(paidMatch);
+        if (row.is_paid || isPaidFromNotes) {
+          if (paidFromNotes > 0) return sum + paidFromNotes;
+          return sum + Number(row.entry_fee || 0);
+        }
         return sum;
       }, 0);
     };
@@ -389,7 +750,8 @@ const wolfData = {
         sumSales(startIso, endIso),
         sumLogbook(startIso, endIso),
       ]);
-      this.goalActuals[period] = Number(salesTotal || 0) + Number(logbookTotal || 0);
+      this.goalActuals[period] =
+        Number(salesTotal || 0) + Number(logbookTotal || 0);
     }
   },
 
@@ -450,6 +812,8 @@ const wolfData = {
       attributes: true,
       attributeFilter: ['class'],
     });
+    // Warm-load confetti library to avoid delayed first burst.
+    this.loadCanvasConfettiLib().catch(() => {});
   },
 
   ensureTargetCinematicOverlay() {
@@ -473,6 +837,147 @@ const wolfData = {
     return el;
   },
 
+  ensureTargetConfettiStage() {
+    let stage = document.getElementById('wolf-target-confetti-stage');
+    if (stage) {
+      let canvas = stage.querySelector('#wolf-target-confetti-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'wolf-target-confetti-canvas';
+        stage.appendChild(canvas);
+      }
+      return { stage, canvas };
+    }
+    stage = document.createElement('div');
+    stage.id = 'wolf-target-confetti-stage';
+    stage.setAttribute('aria-hidden', 'true');
+    const canvas = document.createElement('canvas');
+    canvas.id = 'wolf-target-confetti-canvas';
+    stage.appendChild(canvas);
+    document.body.appendChild(stage);
+    return { stage, canvas };
+  },
+
+  loadCanvasConfettiLib() {
+    if (window.confetti && typeof window.confetti === 'function') {
+      return Promise.resolve(window.confetti);
+    }
+    if (this.targetConfettiLibPromise) return this.targetConfettiLibPromise;
+
+    this.targetConfettiLibPromise = new Promise((resolve, reject) => {
+      const existing = document.getElementById('wolf-canvas-confetti-lib');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.confetti), {
+          once: true,
+        });
+        existing.addEventListener(
+          'error',
+          () => reject(new Error('Failed to load canvas-confetti')),
+          { once: true },
+        );
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.id = 'wolf-canvas-confetti-lib';
+      script.src =
+        'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.confetti && typeof window.confetti === 'function') {
+          resolve(window.confetti);
+        } else {
+          reject(new Error('canvas-confetti loaded but API unavailable'));
+        }
+      };
+      script.onerror = () =>
+        reject(new Error('Failed to load canvas-confetti'));
+      document.head.appendChild(script);
+    }).catch((err) => {
+      this.targetConfettiLibPromise = null;
+      console.warn('Wolf OS: canvas-confetti unavailable.', err);
+      throw err;
+    });
+
+    return this.targetConfettiLibPromise;
+  },
+
+  getReachedMilestone(previousPct = 0, nextPct = 0) {
+    const from = Number(previousPct || 0);
+    const to = Number(nextPct || 0);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return 0;
+    const milestones = [25, 50, 75, 100];
+    let reached = 0;
+    milestones.forEach((milestone) => {
+      if (from < milestone && to >= milestone) reached = milestone;
+    });
+    return reached;
+  },
+
+  launchTargetConfetti(milestone = 0) {
+    if (window.uiSettings?.enableConfetti === false) return;
+    const isGoalReach = milestone >= 100;
+    const colors = ['#991b1b', '#1e3a8a', '#ffffff'];
+    const prefersReduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    this.loadCanvasConfettiLib()
+      .then((confetti) => {
+        const confettiStartDelayMs = 240;
+        const run = (opts) =>
+          confetti({
+            disableForReducedMotion: prefersReduced,
+            ...opts,
+          });
+
+        const base = isGoalReach
+          ? { particleCount: 120, spread: 82, startVelocity: 50, scalar: 1.0 }
+          : milestone >= 75
+            ? { particleCount: 80, spread: 72, startVelocity: 44, scalar: 0.92 }
+            : {
+                particleCount: 66,
+                spread: 64,
+                startVelocity: 44,
+                scalar: 0.86,
+              };
+
+        // Stackable bursts (do not cancel previous calls).
+        if (window.wolfAudio) window.wolfAudio.play('confetti');
+        setTimeout(() => {
+          run({
+            ...base,
+            origin: { x: 0.5, y: 0.62 },
+            colors,
+            ticks: 180,
+          });
+        }, confettiStartDelayMs);
+        setTimeout(() => {
+          run({
+            ...base,
+            particleCount: Math.max(26, Math.round(base.particleCount * 0.52)),
+            spread: base.spread + 18,
+            startVelocity: base.startVelocity * 0.9,
+            origin: { x: 0.2, y: 0.7 },
+            colors,
+            ticks: 170,
+          });
+        }, confettiStartDelayMs + 120);
+        setTimeout(() => {
+          run({
+            ...base,
+            particleCount: Math.max(26, Math.round(base.particleCount * 0.52)),
+            spread: base.spread + 18,
+            startVelocity: base.startVelocity * 0.9,
+            origin: { x: 0.8, y: 0.7 },
+            colors,
+            ticks: 170,
+          });
+        }, confettiStartDelayMs + 220);
+      })
+      .catch(() => {});
+  },
+
   renderTargetCinematic({
     period,
     pct,
@@ -482,6 +987,7 @@ const wolfData = {
     target,
     isGain,
     isDrop,
+    milestone = 0,
     animate = true,
   }) {
     const overlay = this.ensureTargetCinematicOverlay();
@@ -504,14 +1010,20 @@ const wolfData = {
     if (labelEl) labelEl.textContent = `${labelMap[period] || 'TARGET'} UPDATE`;
     valueEl.textContent = `${Math.round(previousPct)}% -> ${Math.round(pct)}%  |  ${this.formatCurrency(previousActual)} -> ${this.formatCurrency(actual)}`;
     if (stateEl) {
-      stateEl.textContent = isGain
-        ? 'INCOME RISING'
-        : isDrop
-          ? 'INCOME DROP DETECTED'
-          : 'SYNCHRONIZED';
+      stateEl.textContent =
+        milestone > 0
+          ? `MILESTONE ${milestone}% REACHED`
+          : isGain
+            ? 'INCOME RISING'
+            : isDrop
+              ? 'INCOME DROP DETECTED'
+              : 'SYNCHRONIZED';
     }
 
-    overlay.classList.toggle('is-light', document.body.classList.contains('light-theme'));
+    overlay.classList.toggle(
+      'is-light',
+      document.body.classList.contains('light-theme'),
+    );
     overlay.classList.toggle('is-gain', Boolean(isGain));
     overlay.classList.toggle('is-drop', Boolean(isDrop));
 
@@ -522,15 +1034,19 @@ const wolfData = {
       return;
     }
 
-    if (this.targetCinematicStartTimer) clearTimeout(this.targetCinematicStartTimer);
-    if (this.targetCinematicHideTimer) clearTimeout(this.targetCinematicHideTimer);
+    if (this.targetCinematicStartTimer)
+      clearTimeout(this.targetCinematicStartTimer);
+    if (this.targetCinematicHideTimer)
+      clearTimeout(this.targetCinematicHideTimer);
     if (this.targetCinematicAF) {
       cancelAnimationFrame(this.targetCinematicAF);
       this.targetCinematicAF = null;
     }
     overlay.classList.add('is-active');
 
-    const fromPct = Number.isFinite(Number(previousPct)) ? Number(previousPct) : pct;
+    const fromPct = Number.isFinite(Number(previousPct))
+      ? Number(previousPct)
+      : pct;
     const toPct = Number.isFinite(Number(pct)) ? Number(pct) : fromPct;
     fillEl.style.transition = 'none';
     fillEl.style.width = `${fromPct}%`;
@@ -554,7 +1070,8 @@ const wolfData = {
           ghostEl.style.width = `${fromPct + (toPct - fromPct) * eased}%`;
           ghostEl.style.opacity = `${0.92 * (1 - eased)}`;
         }
-        const currentActual = previousActual + (actual - previousActual) * eased;
+        const currentActual =
+          previousActual + (actual - previousActual) * eased;
         valueEl.textContent = `${Math.round(fromPct + (toPct - fromPct) * eased)}% -> ${Math.round(toPct)}%  |  ${this.formatCurrency(currentActual)} -> ${this.formatCurrency(actual)}`;
 
         if (t < 1) {
@@ -562,14 +1079,20 @@ const wolfData = {
         } else {
           this.targetCinematicAF = null;
           ghostEl.style.opacity = '0';
+          if (milestone > 0) this.launchTargetConfetti(milestone);
         }
       };
       this.targetCinematicAF = requestAnimationFrame(tick);
     }, delay);
 
-    this.targetCinematicHideTimer = setTimeout(() => {
-      overlay.classList.remove('is-active', 'is-gain', 'is-drop');
-    }, duration + delay + 700);
+    const celebrationHoldMs =
+      milestone >= 100 ? 6400 : milestone > 0 ? 3600 : 0;
+    this.targetCinematicHideTimer = setTimeout(
+      () => {
+        overlay.classList.remove('is-active', 'is-gain', 'is-drop');
+      },
+      duration + delay + 700 + celebrationHoldMs,
+    );
   },
 
   scheduleGoalActualsSync(delayMs = 260) {
@@ -582,6 +1105,20 @@ const wolfData = {
         console.error('Wolf OS Target Sync Fault:', err);
       }
     }, delayMs);
+  },
+
+  async forceGoalActualsSync(options = {}) {
+    const { animate = true } = options;
+    if (this.targetSyncTimer) {
+      clearTimeout(this.targetSyncTimer);
+      this.targetSyncTimer = null;
+    }
+    try {
+      await this.loadGoalActuals();
+      this.updateTargetBox({ animate });
+    } catch (err) {
+      console.error('Wolf OS Target Force Sync Fault:', err);
+    }
   },
 
   clearTargetValueAnimation() {
@@ -703,6 +1240,7 @@ const wolfData = {
         ? pct
         : Number(this.targetDisplayPct[period]);
     const crossedGoal = previousPct < 100 && pct >= 100;
+    const reachedMilestone = this.getReachedMilestone(previousPct, pct);
 
     if (stateEl) {
       stateEl.textContent = `${pct >= 100 ? 'REACHED' : 'ACTIVE'}: ${period}`;
@@ -777,6 +1315,7 @@ const wolfData = {
         target,
         isGain: true,
         isDrop: false,
+        milestone: reachedMilestone,
         animate: true,
       });
     } else {
@@ -818,6 +1357,7 @@ const wolfData = {
         target,
         isGain: false,
         isDrop: true,
+        milestone: 0,
         animate: true,
       });
     }
@@ -830,7 +1370,9 @@ const wolfData = {
       this.goalReachedCelebrated[period] = false;
     } else if (crossedGoal && !this.goalReachedCelebrated[period]) {
       this.goalReachedCelebrated[period] = true;
-      if (window.wolfAudio) window.wolfAudio.play('confetti');
+    }
+    if (reachedMilestone >= 50 && reachedMilestone < 100 && window.wolfAudio) {
+      window.wolfAudio.play('success');
     }
   },
 
@@ -954,7 +1496,6 @@ const wolfData = {
     // 3. Trigger HUD Rolling Animation (Red Glow)
     this.refreshSummaryHUD();
     this.scheduleGoalActualsSync();
-    alert('test');
   },
 
   updateProductUI(product) {
@@ -1004,7 +1545,6 @@ const wolfData = {
   },
 
   async syncServerTime() {
-    console.log('Wolf OS: Synchronizing with Atomic Clock...');
     try {
       const { data, error } = await supabaseClient.rpc('get_server_time');
       if (error) throw error;
@@ -1033,7 +1573,6 @@ const wolfData = {
   },
 
   async syncTime() {
-    console.log('Wolf OS: Syncing with Atomic Server Clock...');
     try {
       const { data, error } = await supabaseClient.rpc('get_server_time');
 
@@ -1071,22 +1610,73 @@ const wolfData = {
     const title = document.getElementById('ledger-title');
     const label = document.getElementById('ledger-summary-label');
     const searchContainer = document.getElementById('ledger-search-container');
+    const ledgerPage = document.getElementById('ledger-page');
+    const recordsTitle = document.getElementById('ledger-records-title');
+    const recordsSub = document.getElementById('ledger-records-sub');
+    const salesFilterPanel = document.getElementById('sales-filter-panel');
+    const salesInsightGrid = document.querySelector('.sales-insight-grid');
+
+    if (ledgerPage) {
+      ledgerPage.classList.toggle('sales-mode', mode === 'sales');
+      ledgerPage.classList.toggle('logbook-mode', mode !== 'sales');
+    }
 
     if (title) {
       if (mode === 'sales') {
         title.innerText = 'SALES';
         label.innerText = 'Daily Income Summary';
+        if (recordsTitle) recordsTitle.innerText = 'Transactions';
+        if (recordsSub)
+          recordsSub.innerText = 'Live sales feed by selected day';
       } else {
         title.innerText = 'LOGBOOK';
         label.innerText = 'Floor Income Summary';
+        if (recordsTitle) recordsTitle.innerText = 'Check-In Records';
+        if (recordsSub)
+          recordsSub.innerText = 'Live logbook feed by selected day';
       }
+    }
+
+    if (salesFilterPanel) {
+      salesFilterPanel.style.display = mode === 'sales' ? '' : 'none';
+    }
+    if (salesInsightGrid) {
+      salesInsightGrid.style.display = mode === 'sales' ? '' : 'none';
     }
 
     // Ensure search bar starts in the correct state
     if (searchContainer) {
-      searchContainer.style.display = 'block';
-      searchContainer.classList.remove('active');
+      this.syncLedgerSearchLayoutState();
     }
+    this.bindLedgerSearchToggle();
+    this.bindImageZoom();
+    this.closeImageZoom();
+
+    if (mode === 'sales') {
+      this.salesFilterMode = 'all';
+      this.salesSortMode = 'latest';
+      this.salesMinAmount = 0;
+      const minInp = document.getElementById('sales-min-amount');
+      if (minInp) minInp.value = '';
+      const sortSel = document.getElementById('sales-sort-select');
+      if (sortSel) sortSel.value = 'latest';
+      document
+        .querySelectorAll('[data-sales-filter]')
+        .forEach((btn) =>
+          btn.classList.toggle(
+            'is-active',
+            btn.getAttribute('data-sales-filter') === 'all',
+          ),
+        );
+    }
+    if (!this.searchLayoutBound) {
+      this.searchLayoutBound = true;
+      window.addEventListener('resize', () => {
+        this.syncLedgerSearchLayoutState();
+        this.syncSalesGuidePlacement();
+      });
+    }
+    this.syncSalesGuidePlacement();
     this.syncNavigationUI(mode);
     this.initChrono(mode);
     await this.syncServerTime();
@@ -1391,9 +1981,7 @@ const wolfData = {
         );
         const paidAmount = Number(
           log.paid_amount ??
-            (isPaid
-              ? (parsedNotes.paidAmountFromNote ?? entryFee)
-              : 0),
+            (isPaid ? (parsedNotes.paidAmountFromNote ?? entryFee) : 0),
         );
 
         return {
@@ -1442,6 +2030,7 @@ const wolfData = {
 
       if (filtered.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-user-x' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
+        await this.forceGoalActualsSync({ animate: true });
         return;
       }
 
@@ -1451,7 +2040,8 @@ const wolfData = {
         1,
         Math.ceil(totalItems / this.ledgerPageSize),
       );
-      if (this.currentLedgerPage > totalPages) this.currentLedgerPage = totalPages;
+      if (this.currentLedgerPage > totalPages)
+        this.currentLedgerPage = totalPages;
       const start = (this.currentLedgerPage - 1) * this.ledgerPageSize;
       const pageRows = filtered.slice(start, start + this.ledgerPageSize);
 
@@ -1459,18 +2049,24 @@ const wolfData = {
         .map((log, index) => {
           const isClosed = log.time_out !== null;
           const time = this.formatServerClock(log.time_in);
-          const outTime = isClosed ? this.formatServerClock(log.time_out) : '--:--';
+          const outTime = isClosed
+            ? this.formatServerClock(log.time_out)
+            : '--:--';
           const paidBadgeClass = log.isPaid ? 'badge-paid' : 'badge-unpaid';
           const paidBadgeText = log.isPaid ? 'PAID' : 'UNPAID';
 
           const checkoutLabel = isClosed ? 'UNDO CHECK OUT' : 'CHECK OUT';
           const checkoutMeta = isClosed ? `OUT ${outTime}` : 'ACTIVE';
-          const checkoutClass = isClosed ? 'btn-logbook-neutral' : 'btn-logbook-danger';
+          const checkoutClass = isClosed
+            ? 'btn-logbook-neutral'
+            : 'btn-logbook-danger';
 
           const paidLabel = log.isPaid
             ? 'UNDO PAID'
             : `COLLECT ${this.formatCurrency(log.entryFee)}`;
-          const paidClass = log.isPaid ? 'btn-logbook-neutral' : 'btn-logbook-success';
+          const paidClass = log.isPaid
+            ? 'btn-logbook-neutral'
+            : 'btn-logbook-success';
           const actionDisabled = this.isReadOnly ? 'disabled' : '';
 
           return `
@@ -1516,7 +2112,11 @@ const wolfData = {
           </div>`;
         })
         .join('');
-      container.innerHTML += this.renderLedgerPagination(totalItems, totalPages);
+      container.innerHTML += this.renderLedgerPagination(
+        totalItems,
+        totalPages,
+      );
+      await this.forceGoalActualsSync({ animate: true });
     } catch (err) {
       console.error('Wolf OS Logbook Fault:', err);
     }
@@ -1535,24 +2135,51 @@ const wolfData = {
     }
 
     const localDay = this.selectedDate.toLocaleDateString('en-CA');
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    const previousDayStart = new Date(selectedDayStart);
+    previousDayStart.setDate(previousDayStart.getDate() - 1);
+    const previousDayIso = previousDayStart.toLocaleDateString('en-CA');
 
     try {
       this.currentLedgerPage = 1;
-      const { data, error } = await supabaseClient
-        .from('sales')
-        .select('*, products(name, sku, image_url, brand)')
-        .gte('created_at', `${localDay}T00:00:00+08:00`)
-        .lte('created_at', `${localDay}T23:59:59+08:00`)
-        .order('created_at', { ascending: false });
+      const [salesResult, prevSalesResult] = await Promise.all([
+        supabaseClient
+          .from('sales')
+          .select('*, products(name, sku, image_url, brand, qty)')
+          .gte('created_at', `${localDay}T00:00:00+08:00`)
+          .lte('created_at', `${localDay}T23:59:59+08:00`)
+          .order('created_at', { ascending: false }),
+        supabaseClient
+          .from('sales')
+          .select('total_amount,qty,unit_price')
+          .gte('created_at', `${previousDayIso}T00:00:00+08:00`)
+          .lte('created_at', `${previousDayIso}T23:59:59+08:00`),
+      ]);
 
-      if (error) throw error;
+      if (salesResult.error) throw salesResult.error;
 
-      this.allSales = data || [];
+      this.allSales = salesResult.data || [];
+      const prevRows = prevSalesResult?.data || [];
+      const prevTotal = prevRows.reduce((sum, row) => {
+        const total = Number(row?.total_amount || 0);
+        if (total > 0) return sum + total;
+        return sum + Number(row?.qty || 0) * Number(row?.unit_price || 0);
+      }, 0);
+
+      this.salesInsights = {
+        previousTotal: prevTotal,
+        mostSoldName: 'NO SALES YET',
+        mostSoldQty: 0,
+        mostSoldAmount: 0,
+        mostSoldImage: '/assets/images/placeholder.png',
+      };
+      this.refreshMostSoldToday(this.allSales);
 
       const searchInp = document.getElementById('ledger-main-search');
       const currentTerm = searchInp ? searchInp.value : '';
       this.renderSales(this.selectedDate.getDay(), currentTerm);
-      this.scheduleGoalActualsSync();
+      await this.forceGoalActualsSync({ animate: true });
     } catch (err) {
       console.error('Wolf OS Sales Fault:', err);
     } finally {
@@ -1565,6 +2192,7 @@ const wolfData = {
     if (!container) return;
 
     const labelEl = document.getElementById('ledger-summary-label');
+    const countEl = document.getElementById('ledger-filter-count');
     const dayNames = [
       'Sunday',
       'Monday',
@@ -1586,11 +2214,46 @@ const wolfData = {
       });
     }
 
+    if (this.salesFilterMode === 'high-value') {
+      filtered = filtered.filter(
+        (sale) => Number(sale?.total_amount || 0) >= 250,
+      );
+    } else if (this.salesFilterMode === 'bulk') {
+      filtered = filtered.filter((sale) => Number(sale?.qty || 0) >= 2);
+    }
+
+    if (Number(this.salesMinAmount || 0) > 0) {
+      const min = Number(this.salesMinAmount || 0);
+      filtered = filtered.filter(
+        (sale) => Number(sale?.total_amount || 0) >= min,
+      );
+    }
+
+    if (this.salesSortMode === 'amount-desc') {
+      filtered.sort(
+        (a, b) => Number(b?.total_amount || 0) - Number(a?.total_amount || 0),
+      );
+    } else if (this.salesSortMode === 'name-asc') {
+      filtered.sort((a, b) => {
+        const aName = String(a?.products?.name || '');
+        const bName = String(b?.products?.name || '');
+        return aName.localeCompare(bName);
+      });
+    } else {
+      filtered.sort(
+        (a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0),
+      );
+    }
+
     const totalIncome = filtered.reduce(
       (sum, s) => sum + Number(s.total_amount || 0),
       0,
     );
     this.refreshSummaryHUD(totalIncome);
+    this.refreshMostSoldToday(this.allSales);
+    if (countEl) {
+      countEl.textContent = `${filtered.length} record${filtered.length === 1 ? '' : 's'}`;
+    }
 
     if (filtered.length === 0) {
       container.innerHTML = `<div style="text-align:center; padding:80px; opacity:0.2;"><i class='bx bx-shopping-bag' style='font-size:3rem;'></i><p style="font-size:10px; font-weight:900; margin-top:10px;">NO DATA LOGGED</p></div>`;
@@ -1600,7 +2263,8 @@ const wolfData = {
     this.currentLedgerRows = filtered;
     const totalItems = filtered.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / this.ledgerPageSize));
-    if (this.currentLedgerPage > totalPages) this.currentLedgerPage = totalPages;
+    if (this.currentLedgerPage > totalPages)
+      this.currentLedgerPage = totalPages;
     const start = (this.currentLedgerPage - 1) * this.ledgerPageSize;
     const pageRows = filtered.slice(start, start + this.ledgerPageSize);
 
@@ -1642,6 +2306,7 @@ const wolfData = {
       })
       .join('');
     container.innerHTML += this.renderLedgerPagination(totalItems, totalPages);
+    this.refreshZoomableImages();
   },
 
   renderLedgerPagination(totalItems, totalPages) {
@@ -1942,7 +2607,8 @@ const wolfData = {
         .select('qty, name')
         .eq('productid', saleData.product_id)
         .single();
-      if (productErr || !product) throw productErr || new Error('PRODUCT_NOT_FOUND');
+      if (productErr || !product)
+        throw productErr || new Error('PRODUCT_NOT_FOUND');
 
       const stockNow = Number(product.qty || 0);
       const limitedStock = stockNow < 999999;
@@ -1966,7 +2632,9 @@ const wolfData = {
 
       const unitPrice = Number(
         saleData.unit_price ||
-          (currentQty > 0 ? Number(saleData.total_amount || 0) / currentQty : 0),
+          (currentQty > 0
+            ? Number(saleData.total_amount || 0) / currentQty
+            : 0),
       );
       const nextTotal = unitPrice * nextQty;
 
@@ -1982,7 +2650,10 @@ const wolfData = {
     } catch (err) {
       console.error('Sale qty adjust fault:', err);
       if (window.wolfAudio) window.wolfAudio.play('error');
-      window.salesManager?.showSystemAlert('FAILED TO UPDATE SALE QTY', 'error');
+      window.salesManager?.showSystemAlert(
+        'FAILED TO UPDATE SALE QTY',
+        'error',
+      );
     }
   },
 
@@ -2313,16 +2984,12 @@ wolfData.initRealtime = async function () {
 };
 
 wolfData.updateLedgerRevenue = function () {
-  const revenueEl = document.getElementById('ledger-summary-amount');
-  if (!revenueEl) return;
-
-  // Uses allSales (the same array populated by loadSales)
   const total = (this.allSales || []).reduce(
     (sum, sale) => sum + Number(sale.total_amount || 0),
     0,
   );
-
-  revenueEl.textContent = this.formatCurrency(total);
+  this.refreshSummaryHUD(total);
+  this.scheduleGoalActualsSync(30);
 };
 // UI Feedback Helper
 wolfData.showRealtimeToast = function () {
@@ -2365,6 +3032,33 @@ document.addEventListener('input', (e) => {
       wolfData.loadLogbook();
     }
   }
+
+  if (e.target.id === 'sales-min-amount') {
+    const nextValue = Number(e.target.value || 0);
+    wolfData.salesMinAmount = Number.isFinite(nextValue)
+      ? Math.max(0, nextValue)
+      : 0;
+    if (wolfData.activeMode === 'sales') {
+      const searchInp = document.getElementById('ledger-main-search');
+      wolfData.renderSales(
+        wolfData.selectedDate.getDay(),
+        searchInp ? searchInp.value : '',
+      );
+    }
+  }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'sales-sort-select') {
+    wolfData.salesSortMode = String(e.target.value || 'latest');
+    if (wolfData.activeMode === 'sales') {
+      const searchInp = document.getElementById('ledger-main-search');
+      wolfData.renderSales(
+        wolfData.selectedDate.getDay(),
+        searchInp ? searchInp.value : '',
+      );
+    }
+  }
 });
 
 document.addEventListener('click', async (e) => {
@@ -2389,38 +3083,32 @@ document.addEventListener('click', async (e) => {
     'en-CA',
   );
 
+  const filterChip = e.target.closest('[data-sales-filter]');
+  if (filterChip && wolfData.activeMode === 'sales') {
+    const nextFilter = String(
+      filterChip.getAttribute('data-sales-filter') || 'all',
+    );
+    wolfData.salesFilterMode = nextFilter;
+    document
+      .querySelectorAll('[data-sales-filter]')
+      .forEach((btn) =>
+        btn.classList.toggle(
+          'is-active',
+          btn.getAttribute('data-sales-filter') === nextFilter,
+        ),
+      );
+    const searchInp = document.getElementById('ledger-main-search');
+    wolfData.renderSales(
+      wolfData.selectedDate.getDay(),
+      searchInp ? searchInp.value : '',
+    );
+    return;
+  }
+
   const searchToggle = e.target.closest('#toggle-search-btn');
   if (searchToggle) {
-    const scope =
-      searchToggle.closest(
-        '#sales-main-view, #logbook-main-view, #main-content, .ledger-page-wrapper',
-      ) || document;
-    const searchContainer = scope.querySelector('#ledger-search-container');
-    const input = scope.querySelector('#ledger-main-search');
-
-    // Only this handler controls Sales/Logbook search.
-    // Member/Product pages use their own scoped managers.
-    if (searchContainer && input) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const isActive = searchContainer.classList.toggle('active');
-      searchToggle.classList.toggle('active', isActive);
-
-      if (isActive) {
-        setTimeout(() => {
-          input.focus();
-        }, 180);
-        if (window.wolfAudio) window.wolfAudio.play('notif');
-      } else {
-        input.value = '';
-        const clearBtn = scope.querySelector('#search-clear-btn');
-        if (clearBtn) clearBtn.style.display = 'none';
-        wolfRefreshView();
-      }
-
-      return;
-    }
+    // Bound directly in initLedger via bindLedgerSearchToggle().
+    return;
   }
 
   // 1. Week Navigation (Shift Week)
@@ -2452,9 +3140,6 @@ document.addEventListener('click', async (e) => {
         } else {
           // We are in the past, but the +7 jump goes too far.
           // FIX: Instead of blocking, just "Snap" to today's date.
-          console.log(
-            'WolfChrono: Jump exceeds today. Snapping to current date.',
-          );
           wolfData.selectedDate = realToday;
         }
       } else {
@@ -2515,21 +3200,8 @@ document.addEventListener('click', async (e) => {
   }
 
   // 5. Contextual Archive Action (Trash Icon in Header)
-  if (e.target.closest('#clear-ledger-btn')) {
+  if (e.target.closest('#clear-sales-btn, #clear-ledger-btn')) {
     const currentMode = wolfData.activeMode;
-    Toastify({
-      text: `Opening ${currentMode.toUpperCase()} Trash Bin...`,
-      duration: 5000,
-      gravity: 'top',
-      position: 'right',
-      style: {
-        background: '#343434',
-        borderRadius: '10px',
-        fontWeight: 'bold',
-        color: '#fff',
-      },
-    }).showToast();
-
     if (window.salesManager) {
       window.salesManager.openTrashBin(currentMode);
     }
@@ -2538,7 +3210,6 @@ document.addEventListener('click', async (e) => {
   const snapBtn = e.target.closest('#snap-today-btn');
   if (snapBtn) {
     if (!snapBtn.classList.contains('visible') || snapBtn.disabled) return;
-    console.log('WolfChrono: Snap-to-Today triggered.');
     await wolfData.syncServerTime();
     if (wolfData.fp) {
       wolfData.fp.setDate(wolfData.selectedDate, false);
@@ -2565,7 +3236,6 @@ document.addEventListener('click', () => {
       const type = document.getElementById('sales-day-picker')
         ? 'sales'
         : 'logbook';
-      console.log(`WolfChrono: Auto-initializing ${type} view...`);
       wolfData.initChrono(type);
     }
   }, 100);
@@ -2575,6 +3245,8 @@ document.addEventListener('click', () => {
 window.addEventListener('load', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const p = urlParams.get('p') || 'home';
+  wolfData.bindImageZoom();
+  wolfData.refreshZoomableImages();
 
   wolfData.syncNavigationUI(p);
   setTimeout(() => {
@@ -2594,6 +3266,3 @@ window.addEventListener('load', () => {
     }, 500);
   }
 });
-
-
-

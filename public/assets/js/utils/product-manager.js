@@ -297,6 +297,12 @@ const ProductManager = {
   currentPage: 1,
   pageSize: 9,
   currentFilterList: [],
+  uiListenersBound: false,
+  productImageViewerBound: false,
+  productImageViewerState: {
+    scale: 1,
+    rotation: 0,
+  },
   getAccessContext() {
     const context = window.WOLF_ACCESS_CONTEXT || {};
     const role = String(context.role || window.WOLF_USER_ROLE || '')
@@ -1284,6 +1290,7 @@ const ProductManager = {
     object-fit: cover;
     opacity: 0.78;
     transform: scale(1.02);
+    cursor: zoom-in;
     transition:
       transform 0.35s ease,
       opacity 0.35s ease,
@@ -1294,6 +1301,79 @@ const ProductManager = {
     transform: scale(1.07);
     opacity: 0.96;
     filter: saturate(1.1);
+  }
+
+  .product-image-viewer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    justify-items: center;
+    background: rgba(6, 10, 16, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .product-image-viewer-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .product-image-viewer-stage {
+    width: min(92vw, 760px);
+    height: min(70vh, 620px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .product-image-viewer-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 24px 42px rgba(0, 0, 0, 0.45);
+    user-select: none;
+    -webkit-user-drag: none;
+    transition: transform 0.2s ease;
+  }
+
+  .product-image-viewer-controls {
+    margin-bottom: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(36, 44, 56, 0.92);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32);
+  }
+
+  .product-image-viewer-controls button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: #f1f5ff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+
+  .product-image-viewer-controls button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(var(--wolf-red-rgb), 0.55);
   }
 
   /* ===== INFO SECTION ===== */
@@ -2005,7 +2085,7 @@ const ProductManager = {
                   </div>
 
                   <div class="product-visual">
-                    <img src="${p.image_url || '/assets/images/placeholder.png'}" 
+                    <img class="product-image-zoomable zoomable-image" src="${p.image_url || '/assets/images/placeholder.png'}" 
                          alt="Product Preview" 
                          data-product-name="${p.name || ''}"
                          data-product-id="${p.productid}">
@@ -2666,16 +2746,148 @@ const ProductManager = {
 
   toggleFlip(id) {
     const card = document.getElementById(`prod-${id}`);
-    if (card) card.classList.toggle('is-flipped');
+    if (card) {
+      card.classList.toggle('is-flipped');
+      if (window.wolfAudio) window.wolfAudio.play('swipe');
+    }
+  },
+
+  ensureProductImageViewer() {
+    let overlay = document.getElementById('product-image-viewer-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'product-image-viewer-overlay';
+      overlay.className = 'product-image-viewer-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML = `
+        <div class="product-image-viewer-stage">
+          <img id="product-image-viewer-img" class="product-image-viewer-img" src="" alt="Product image preview" />
+        </div>
+        <div class="product-image-viewer-controls" role="toolbar" aria-label="Image controls">
+          <button type="button" data-action="zoom-out" title="Zoom Out"><i class='bx bx-zoom-out'></i></button>
+          <button type="button" data-action="zoom-in" title="Zoom In"><i class='bx bx-zoom-in'></i></button>
+          <button type="button" data-action="fit" title="Fit to Screen"><i class='bx bx-fullscreen'></i></button>
+          <button type="button" data-action="rotate-left" title="Rotate Left"><i class='bx bx-undo'></i></button>
+          <button type="button" data-action="rotate-right" title="Rotate Right"><i class='bx bx-redo'></i></button>
+          <button type="button" data-action="close" title="Close"><i class='bx bx-x'></i></button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+
+    if (!this.productImageViewerBound) {
+      this.productImageViewerBound = true;
+      overlay.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (btn) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.handleProductImageAction(btn.getAttribute('data-action'));
+          return;
+        }
+        const stage = e.target.closest('.product-image-viewer-stage');
+        const img = e.target.closest('#product-image-viewer-img');
+        if (!stage || img) {
+          this.closeProductImageViewer();
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.closeProductImageViewer();
+      });
+    }
+
+    return overlay;
+  },
+
+  applyProductImageTransform() {
+    const img = document.getElementById('product-image-viewer-img');
+    if (!img) return;
+    const scale = this.productImageViewerState.scale;
+    const rotation = this.productImageViewerState.rotation;
+    img.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
+  },
+
+  handleProductImageAction(action) {
+    if (!action) return;
+    if (action === 'close') {
+      this.closeProductImageViewer();
+      return;
+    }
+    if (action === 'zoom-in') {
+      this.productImageViewerState.scale = Math.min(
+        4,
+        this.productImageViewerState.scale + 0.2,
+      );
+    } else if (action === 'zoom-out') {
+      this.productImageViewerState.scale = Math.max(
+        0.4,
+        this.productImageViewerState.scale - 0.2,
+      );
+    } else if (action === 'fit') {
+      this.productImageViewerState.scale = 1;
+      this.productImageViewerState.rotation = 0;
+    } else if (action === 'rotate-left') {
+      this.productImageViewerState.rotation -= 90;
+    } else if (action === 'rotate-right') {
+      this.productImageViewerState.rotation += 90;
+    }
+    this.applyProductImageTransform();
+  },
+
+  openProductImageViewer(src, alt = 'Product image preview') {
+    const safeSrc = String(src || '').trim();
+    if (!safeSrc) return;
+    const overlay = this.ensureProductImageViewer();
+    const img = overlay.querySelector('#product-image-viewer-img');
+    if (!img) return;
+    img.src = safeSrc;
+    img.alt = alt || 'Product image preview';
+    this.productImageViewerState.scale = 1;
+    this.productImageViewerState.rotation = 0;
+    this.applyProductImageTransform();
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('image-zoom-open');
+  },
+
+  closeProductImageViewer() {
+    const overlay = document.getElementById('product-image-viewer-overlay');
+    const img = document.getElementById('product-image-viewer-img');
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('image-zoom-open');
+    if (img) {
+      img.removeAttribute('src');
+      img.alt = 'Product image preview';
+    }
   },
 
   setupUIListeners() {
     const root = document.getElementById('product-main-view') || document;
+    if (window.wolfImageViewer && window.wolfImageViewer.refresh) {
+      window.wolfImageViewer.refresh();
+    }
 
     // 1) Card actions inside products grid
     const container = root.querySelector('#products-list');
-    if (container) {
+    if (container && container.dataset.pmBound !== 'true') {
+      container.dataset.pmBound = 'true';
       container.addEventListener('click', (e) => {
+        const imageEl = e.target.closest('.product-visual img.product-image-zoomable');
+        if (imageEl) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (window.wolfImageViewer && window.wolfImageViewer.open) {
+            window.wolfImageViewer.open(
+              imageEl.currentSrc || imageEl.src,
+              imageEl.alt || 'Product image preview',
+            );
+          }
+          return;
+        }
+
         const card = e.target.closest('.product-card');
         if (!card) return;
         const productId = card.getAttribute('data-product-id');
